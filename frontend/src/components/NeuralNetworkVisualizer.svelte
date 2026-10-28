@@ -3,91 +3,106 @@
   import { arena } from '../lib/store.svelte.js';
   import { formatUSD } from '../lib/formatters.js';
 
-  // Live Binance WebSocket tick references
-  let btcPrice = $derived(arena.prices['BTCUSDT']?.price ?? 67840);
-  let ethPrice = $derived(arena.prices['ETHUSDT']?.price ?? 3485);
-  let solPrice = $derived(arena.prices['SOLUSDT']?.price ?? 182.5);
+  // Live Multi-Asset Ticks from Store (Crypto + Forex & Metals)
+  let btcPrice = $derived(arena.prices['BTCUSDT']?.price ?? arena.prices['BTCUSDT'] ?? 67840);
+  let ethPrice = $derived(arena.prices['ETHUSDT']?.price ?? arena.prices['ETHUSDT'] ?? 3485);
+  let solPrice = $derived(arena.prices['SOLUSDT']?.price ?? arena.prices['SOLUSDT'] ?? 182.5);
+
+  let xauPrice = $derived(arena.prices['XAUUSD']?.price ?? arena.prices['XAUUSD'] ?? 4048.45);
+  let eurPrice = $derived(arena.prices['EURUSD']?.price ?? arena.prices['EURUSD'] ?? 1.11324);
+  let oilPrice = $derived(arena.prices['XTIUSD']?.price ?? arena.prices['XTIUSD'] ?? 105.69);
 
   // Neural Network Architecture Data
   // Radius of each neuron circle
-  const R = 22;
-  const ARROW_OFFSET = 4;
+  const R = 18;
+  const ARROW_OFFSET = 3;
 
+  // Unified Multi-Asset Neural Architecture (Crypto + Forex + Metals running concurrently)
   const layers = [
     {
       id: 'input',
-      name: 'Input layer',
-      x: 75,
+      name: 'Multi-Asset Feed Layer',
+      x: 70,
       nodes: [
-        { id: 'in_0', label: 'BTC', sub: 'TICK', val: () => `$${formatUSD(btcPrice).replace('$', '')}`, type: 'input' },
-        { id: 'in_1', label: 'ETH', sub: 'TICK', val: () => `$${formatUSD(ethPrice).replace('$', '')}`, type: 'input' },
-        { id: 'in_2', label: 'SOL', sub: 'TICK', val: () => `$${formatUSD(solPrice).replace('$', '')}`, type: 'input' },
-        { id: 'in_3', label: 'VOL', sub: 'ATR', val: () => '24h Vol', type: 'input' },
-        { id: 'in_4', label: 'RSI', sub: 'OB', val: () => 'Depth', type: 'input' },
+        { id: 'in_0', label: 'BTC', sub: 'CRYPTO', val: () => `$${formatUSD(btcPrice).replace('$', '')}`, desc: 'Bitcoin Live WebSocket Tick (Binance Futures/Spot)', type: 'input' },
+        { id: 'in_1', label: 'ETH', sub: 'CRYPTO', val: () => `$${formatUSD(ethPrice).replace('$', '')}`, desc: 'Ethereum Live WebSocket Tick (Binance)', type: 'input' },
+        { id: 'in_2', label: 'XAU', sub: 'METALS', val: () => `$${Number(xauPrice).toFixed(2)}`, desc: 'Spot Gold / US Dollar (MetaTrader 5 Headway Live Feed)', type: 'input' },
+        { id: 'in_3', label: 'EUR', sub: 'FOREX', val: () => `${Number(eurPrice).toFixed(5)}`, desc: 'Euro / US Dollar Major Pair (MT5 Live Feed)', type: 'input' },
+        { id: 'in_4', label: 'OIL', sub: 'ENERGY', val: () => `$${Number(oilPrice).toFixed(2)}`, desc: 'WTI Crude Oil vs USD (MT5 Commodity Feed)', type: 'input' },
+        { id: 'in_5', label: 'VOL', sub: 'DEPTH', val: () => 'OrderBook', desc: 'Real-Time Order Book Volume & Market Depth', type: 'input' },
+        { id: 'in_6', label: 'SPR', sub: 'PIPS', val: () => 'Dynamic', desc: 'MT5 Broker Real-Time Bid/Ask Dynamic Spread', type: 'input' },
       ],
-      yCoords: [110, 180, 250, 320, 390],
+      yCoords: [84, 140, 196, 252, 308, 364, 420],
       stroke: '#38bdf8',
       fill: 'rgba(56, 189, 248, 0.08)',
       glow: '#38bdf8',
     },
     {
       id: 'h1',
-      name: 'Hidden Layer 1',
-      x: 225,
+      name: 'Hidden Layer 1 · Signal & Feature Extractors',
+      x: 220,
       nodes: [
-        { id: 'h1_0', label: 'EMA', sub: 'Trend', desc: 'EMA 9/21 Trend Filter' },
-        { id: 'h1_1', label: 'MACD', sub: 'Mom', desc: 'MACD Divergence' },
-        { id: 'h1_2', label: 'ATR', sub: 'Vol', desc: 'ATR Volatility Squeeze' },
-        { id: 'h1_3', label: 'BOLL', sub: 'Bands', desc: 'Bollinger Breakout' },
-        { id: 'h1_4', label: 'GRID', sub: 'Micro', desc: 'High-Freq Spread Harvest' },
+        { id: 'h1_0', label: 'SMC', sub: 'OB', desc: 'SMC Institutional Order Block Mitigation Algorithm' },
+        { id: 'h1_1', label: 'ICT', sub: 'FVG', desc: 'ICT Fair Value Gap Imbalance Retest Model' },
+        { id: 'h1_2', label: 'EMA', sub: 'Stack', desc: 'Multi-Timeframe EMA 9/21/50 Trend Alignment' },
+        { id: 'h1_3', label: 'MACD', sub: 'Mom', desc: 'MACD Histogram & Momentum Divergence Engine' },
+        { id: 'h1_4', label: 'SWP', sub: 'BOS', desc: 'Liquidity Sweep & Market Structure Shift (MSS/BOS)' },
+        { id: 'h1_5', label: 'VSA', sub: 'Vol', desc: 'Volume Spread Analysis & Stopping Volume Absorption' },
+        { id: 'h1_6', label: 'ATR', sub: 'Sqze', desc: 'Bollinger/Keltner Volatility Squeeze & Channel Break' },
       ],
-      yCoords: [110, 180, 250, 320, 390],
+      yCoords: [84, 140, 196, 252, 308, 364, 420],
       stroke: '#06b6d4',
       fill: 'rgba(6, 182, 212, 0.08)',
       glow: '#06b6d4',
     },
     {
       id: 'h2',
-      name: 'Hidden Layer 2',
-      x: 365,
+      name: 'Hidden Layer 2 · 86 Model Weights',
+      x: 370,
       nodes: [
-        { id: 'h2_0', label: 'W₁', sub: '0.84', desc: 'Strategy Model Weight #1' },
-        { id: 'h2_1', label: 'W₁₄', sub: '0.91', desc: 'Strategy Model Weight #14' },
-        { id: 'h2_2', label: 'W₂₇', sub: '0.78', desc: 'Strategy Model Weight #27' },
-        { id: 'h2_3', label: 'W₃₉', sub: '0.86', desc: 'Strategy Model Weight #39' },
-        { id: 'h2_4', label: 'W₅₀', sub: '0.95', desc: 'Strategy Model Weight #50' },
+        { id: 'h2_0', label: 'W₁', sub: '0.84', desc: 'EMA Stack 9/21/50 Model Weight' },
+        { id: 'h2_1', label: 'W₁₄', sub: '0.91', desc: 'Donchian Turtle Breakout Weight' },
+        { id: 'h2_2', label: 'W₂₈', sub: '0.82', desc: 'SMC Institutional Order Block Weight' },
+        { id: 'h2_3', label: 'W₄₂', sub: '0.88', desc: 'ICT Fair Value Gap Imbalance Weight' },
+        { id: 'h2_4', label: 'W₅₆', sub: '0.79', desc: 'Petro-CAD Divergence Model Weight' },
+        { id: 'h2_5', label: 'W₇₀', sub: '0.93', desc: 'Safe-Haven Gold Relay Model Weight' },
+        { id: 'h2_6', label: 'W₈₆', sub: '0.86', desc: 'Three Line Strike Price Action Weight' },
       ],
-      yCoords: [110, 180, 250, 320, 390],
+      yCoords: [84, 140, 196, 252, 308, 364, 420],
       stroke: '#0ea5e9',
       fill: 'rgba(14, 165, 233, 0.08)',
       glow: '#0ea5e9',
     },
     {
       id: 'h3',
-      name: 'Hidden Layer 3',
-      x: 505,
+      name: 'Hidden Layer 3 · Risk & Capital Allocation',
+      x: 520,
       nodes: [
-        { id: 'h3_0', label: 'NORM', sub: 'Z-Scr', desc: 'Statistical Normalization' },
-        { id: 'h3_1', label: 'RISK', sub: 'Var', desc: 'Value-at-Risk Engine' },
-        { id: 'h3_2', label: 'MTM', sub: '1s', desc: 'Mark-to-Market Live PnL' },
-        { id: 'h3_3', label: 'FUND', sub: '8h', desc: 'Funding Rate Simulator' },
-        { id: 'h3_4', label: 'LEVR', sub: '20x', desc: 'Leverage Risk Controller' },
+        { id: 'h3_0', label: 'NORM', sub: 'Z-Scr', desc: 'Statistical Z-Score Price Normalization' },
+        { id: 'h3_1', label: 'RISK', sub: '2% SL', desc: 'Strict 2% Equity Portfolio Risk Controller ($200 Max SL)' },
+        { id: 'h3_2', label: 'MTM', sub: '1s MTM', desc: 'Live 1-Second Mark-to-Market Real-Time Equity Tracking' },
+        { id: 'h3_3', label: 'FUND', sub: '8h Fee', desc: 'Crypto Futures 8-Hour Funding Rate Simulator' },
+        { id: 'h3_4', label: 'LEVR', sub: '20x Cap', desc: 'Crypto Futures Leverage Multiplier Control (1-20x)' },
+        { id: 'h3_5', label: 'LOT', sub: 'Direct', desc: 'MetaTrader 5 Direct Standard Lot Sizing (Tanpa Leverage Kripto)' },
+        { id: 'h3_6', label: 'SPRD', sub: '0-Slipp', desc: 'Live Headway Broker Dynamic Bid/Ask Spread Filter' },
       ],
-      yCoords: [110, 180, 250, 320, 390],
+      yCoords: [84, 140, 196, 252, 308, 364, 420],
       stroke: '#10b981',
       fill: 'rgba(16, 185, 129, 0.08)',
       glow: '#10b981',
     },
     {
       id: 'output',
-      name: 'Output layer',
-      x: 645,
+      name: 'Execution Engines · Tri-Market Output',
+      x: 680,
       nodes: [
-        { id: 'out_0', label: 'LONG', sub: 'FUTURES', tag: '20x LEV', desc: 'Binance Futures Long Position', type: 'output-long' },
-        { id: 'out_1', label: 'SPOT', sub: 'CRYPTO', tag: '1x SPOT', desc: 'Binance Spot Execution', type: 'output-spot' },
-        { id: 'out_2', label: 'SHORT', sub: 'FUTURES', tag: '20x LEV', desc: 'Binance Futures Short Position', type: 'output-short' },
+        { id: 'out_0', label: 'FUT·L', sub: 'FUTURES', tag: '20x LEV', desc: 'Binance Futures Long Position (Leverage 1-20x)', type: 'output-long' },
+        { id: 'out_1', label: 'SPOT', sub: 'CRYPTO', tag: '1x SPOT', desc: 'Binance Spot Execution (Long-Only, Tanpa Leverage)', type: 'output-spot' },
+        { id: 'out_2', label: 'FX·BUY', sub: 'MT5 DIRECT', tag: 'LOT SIZING', desc: 'MetaTrader 5 Direct Buy Order (Spread Riil, Non-Crypto)', type: 'output-forex' },
+        { id: 'out_3', label: 'FX·SEL', sub: 'MT5 DIRECT', tag: 'LOT SIZING', desc: 'MetaTrader 5 Direct Sell Order (Spread Riil, Non-Crypto)', type: 'output-forex' },
+        { id: 'out_4', label: 'FUT·S', sub: 'FUTURES', tag: '20x LEV', desc: 'Binance Futures Short Position (Leverage 1-20x)', type: 'output-short' },
       ],
-      yCoords: [180, 250, 320],
+      yCoords: [140, 196, 252, 308, 364],
       stroke: '#f59e0b',
       fill: 'rgba(245, 158, 11, 0.08)',
       glow: '#f59e0b',
@@ -159,14 +174,14 @@
   let pulseTimer = null;
 
   onMount(() => {
-    // Generate a new flowing pulse wave every 600ms
+    // Generate a new flowing pulse wave every 500ms
     pulseTimer = setInterval(() => {
-      // Pick random nodes in each layer to form an active signal chain
-      const n0 = Math.floor(Math.random() * 5);
-      const n1 = Math.floor(Math.random() * 5);
-      const n2 = Math.floor(Math.random() * 5);
-      const n3 = Math.floor(Math.random() * 5);
-      const n4 = Math.floor(Math.random() * 3);
+      // Pick random nodes in each layer to form an active multi-asset signal chain
+      const n0 = Math.floor(Math.random() * layers[0].nodes.length);
+      const n1 = Math.floor(Math.random() * layers[1].nodes.length);
+      const n2 = Math.floor(Math.random() * layers[2].nodes.length);
+      const n3 = Math.floor(Math.random() * layers[3].nodes.length);
+      const n4 = Math.floor(Math.random() * layers[4].nodes.length);
 
       const chain = [
         `in_${n0}->h1_${n1}`,
@@ -175,8 +190,8 @@
         `h3_${n3}->out_${n4}`,
       ];
 
-      // Random color: cyan, emerald, gold
-      const colors = ['#38bdf8', '#10b981', '#f59e0b'];
+      // Multi-asset pulse colors: cyan (crypto), emerald (forex), amber (futures), purple (arbitrage)
+      const colors = ['#38bdf8', '#10b981', '#f59e0b', '#a855f7'];
       const chosenColor = colors[Math.floor(Math.random() * colors.length)];
 
       const newPulse = {
@@ -187,8 +202,8 @@
         t: 0,
       };
 
-      activePulses = [...activePulses.slice(-5), newPulse];
-    }, 700);
+      activePulses = [...activePulses.slice(-7), newPulse];
+    }, 550);
 
     // 60FPS animation loop for pulse particle movement
     let animFrame;
@@ -196,7 +211,7 @@
       animFrame = requestAnimationFrame(updatePulses);
       activePulses = activePulses
         .map((p) => {
-          p.t += 0.035;
+          p.t += 0.038;
           if (p.t >= 1) {
             p.t = 0;
             p.step += 1;
@@ -219,17 +234,18 @@
   <div class="panel-top-bar">
     <div class="top-title">
       <span class="live-pulse-dot"></span>
-      <span class="mono header-tag">STRATEGY ARENA · NEURAL NETWORK INFERENCE</span>
+      <span class="mono header-tag">STRATEGY ARENA · UNIFIED MULTI-ASSET NEURAL NETWORK</span>
     </div>
     <div class="top-badges mono">
-      <span class="tag-live">LIVE TICK ENGINE</span>
-      <span class="tag-latency">LATENCY &lt; 5MS</span>
+      <span class="tag-live">LIVE TICK PIPELINE</span>
+      <span class="tag-pairs">28 FOREX + 100 CRYPTO</span>
+      <span class="tag-latency">86 ACTIVE STRATEGIES</span>
     </div>
   </div>
 
   <!-- Main Responsive SVG Canvas -->
   <div class="svg-container">
-    <svg viewBox="0 0 720 440" preserveAspectRatio="xMidYMid meet" class="nn-svg">
+    <svg viewBox="0 0 760 480" preserveAspectRatio="xMidYMid meet" class="nn-svg">
       <defs>
         <!-- Arrowhead Markers matching each layer color -->
         <marker id="arrow-blue" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse">
@@ -252,26 +268,29 @@
         <filter id="glow-gold" x="-20%" y="-20%" width="140%" height="140%">
           <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#f59e0b" flood-opacity="0.6"/>
         </filter>
+        <filter id="glow-emerald" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#10b981" flood-opacity="0.6"/>
+        </filter>
       </defs>
 
-      <!-- 1. DIAGRAM TITLES & BRACKETS (Directly matching reference image) -->
+      <!-- 1. DIAGRAM TITLES & BRACKETS -->
 
       <!-- Column Title: Input layer -->
-      <text x="75" y="58" text-anchor="middle" class="svg-col-title">Input layer</text>
+      <text x="70" y="48" text-anchor="middle" class="svg-col-title">Multi-Asset Input</text>
 
-      <!-- Bracket above Multiple hidden layers (x = 225 to x = 505) -->
+      <!-- Bracket above Multiple hidden layers (x = 220 to x = 520) -->
       <path 
-        d="M 225,64 L 225,50 L 357,50 L 365,42 L 373,50 L 505,50 L 505,64" 
+        d="M 220,54 L 220,40 L 362,40 L 370,32 L 378,40 L 520,40 L 520,54" 
         fill="none" 
         stroke="#64748b" 
         stroke-width="1.6"
         stroke-linecap="round"
         stroke-linejoin="round"
       />
-      <text x="365" y="38" text-anchor="middle" class="svg-col-title">Multiple hidden layers</text>
+      <text x="370" y="28" text-anchor="middle" class="svg-col-title">Deep Quantitative Neural Layers (86 Models · SMC / ICT / Trend)</text>
 
       <!-- Column Title: Output layer -->
-      <text x="645" y="58" text-anchor="middle" class="svg-col-title">Output layer</text>
+      <text x="680" y="48" text-anchor="middle" class="svg-col-title">Execution Engines</text>
 
       <!-- 2. SYNAPSE CONNECTIONS (Directed arrows between all layers) -->
       <g class="synapse-group">
@@ -286,8 +305,8 @@
             class="synapse-line"
             class:synapse-active={isConnected}
             stroke={isConnected ? '#f59e0b' : syn.layerIdx === 0 ? '#38bdf8' : syn.layerIdx === 1 ? '#06b6d4' : syn.layerIdx === 2 ? '#0ea5e9' : '#10b981'}
-            stroke-width={isConnected ? 2.2 : 1.1}
-            stroke-opacity={isConnected ? 0.95 : 0.28}
+            stroke-width={isConnected ? 2.2 : 0.95}
+            stroke-opacity={isConnected ? 0.95 : 0.22}
             marker-end="url(#{markerName})"
           />
         {/each}
@@ -306,12 +325,13 @@
         {/each}
       </g>
 
-      <!-- 4. NEURON CIRCLE NODES (With precise colors and typography) -->
+      <!-- 4. NEURON CIRCLE NODES -->
       {#each layers as layer}
         <g class="layer-group">
           {#each layer.nodes as node, idx}
             {@const ny = layer.yCoords[idx]}
             {@const isHovered = hoveredNodeId === node.id}
+            {@const isForexNode = node.type === 'output-forex' || node.label === 'XAU' || node.label === 'EUR' || node.label === 'OIL' || node.label === 'SPR' || node.label === 'LOT' || node.label === 'SMC' || node.label === 'ICT'}
             
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <g 
@@ -323,27 +343,28 @@
             >
               <!-- Outer glowing aura on hover -->
               {#if isHovered}
-                <circle cx={layer.x} cy={ny} r={R + 5} fill="none" stroke="#f59e0b" stroke-width="2" opacity="0.8"/>
+                <circle cx={layer.x} cy={ny} r={R + 5} fill="none" stroke={isForexNode ? '#10b981' : '#f59e0b'} stroke-width="2" opacity="0.8"/>
               {/if}
 
-              <!-- Main Neuron Ring (matching the circular aesthetic of reference) -->
+              <!-- Main Neuron Ring -->
               <circle
                 cx={layer.x}
                 cy={ny}
                 r={R}
-                fill={layer.id === 'output' ? 'rgba(245, 158, 11, 0.12)' : layer.id === 'input' ? 'rgba(56, 189, 248, 0.1)' : 'rgba(6, 182, 212, 0.08)'}
-                stroke={isHovered ? '#ffffff' : layer.stroke}
-                stroke-width="3"
+                fill={layer.id === 'output' ? (node.type === 'output-forex' ? 'rgba(16, 185, 129, 0.14)' : 'rgba(245, 158, 11, 0.12)') : layer.id === 'input' ? 'rgba(56, 189, 248, 0.1)' : 'rgba(6, 182, 212, 0.08)'}
+                stroke={isHovered ? '#ffffff' : (node.type === 'output-forex' ? '#10b981' : layer.stroke)}
+                stroke-width="2.5"
                 class="neuron-circle"
               />
 
               <!-- Inner Center Dot / Code Symbol -->
               <text 
                 x={layer.x} 
-                y={ny + 4} 
+                y={ny + 3.5} 
                 text-anchor="middle" 
                 class="node-label mono"
-                fill={layer.id === 'output' ? '#fbbf24' : '#ffffff'}
+                font-size={node.label.length >= 5 ? '8.5' : (node.label.length >= 4 ? '9' : '10')}
+                fill={layer.id === 'output' ? (node.type === 'output-forex' ? '#34d399' : '#fbbf24') : '#ffffff'}
               >
                 {node.label}
               </text>
@@ -368,15 +389,15 @@
       <div class="legend-strip mono">
         <div class="l-item">
           <span class="l-dot dot-blue"></span>
-          <span>INPUT (100+ BINANCE TICKS)</span>
+          <span>INPUT (100+ CRYPTO & 28+ FOREX PAIRS)</span>
         </div>
         <div class="l-item">
           <span class="l-dot dot-cyan"></span>
-          <span>HIDDEN (50+ ALGO WEIGHTS)</span>
+          <span>HIDDEN (86+ QUANT, SMC & ICT ALGORITHMS)</span>
         </div>
         <div class="l-item">
           <span class="l-dot dot-gold"></span>
-          <span>OUTPUT (SPOT 1X & FUTURES 20X)</span>
+          <span>OUTPUT (CRYPTO SPOT, FUTURES & MT5 DIRECT)</span>
         </div>
       </div>
     {/if}
@@ -394,7 +415,7 @@
     justify-content: space-between;
     box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55);
     height: 100%;
-    min-height: 480px;
+    min-height: 520px;
     position: relative;
     overflow: hidden;
   }
@@ -444,6 +465,16 @@
     font-weight: 600;
   }
 
+  .tag-pairs {
+    font-size: 10px;
+    background: rgba(56, 189, 248, 0.12);
+    color: #38bdf8;
+    border: 1px solid rgba(56, 189, 248, 0.25);
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+
   .tag-latency {
     font-size: 10px;
     background: rgba(255, 255, 255, 0.05);
@@ -460,24 +491,23 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 8px 0;
+    padding: 6px 0;
   }
 
   .nn-svg {
     width: 100%;
     height: auto;
-    max-height: 400px;
+    max-height: 440px;
     display: block;
     user-select: none;
   }
 
-  /* Diagram Titles matching reference image */
-
   .svg-col-title {
     font-family: 'Inter', -apple-system, sans-serif;
-    font-size: 12px;
-    font-weight: 600;
+    font-size: 11px;
+    font-weight: 700;
     fill: #94a3b8;
+    letter-spacing: 0.02em;
   }
 
   /* Node Typography & Effects */
@@ -486,7 +516,6 @@
   }
 
   .node-label {
-    font-size: 10px;
     font-weight: 800;
     pointer-events: none;
     letter-spacing: 0.02em;

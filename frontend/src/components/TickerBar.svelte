@@ -40,7 +40,7 @@
   <!-- Market Mode Identifier Pill -->
   <div class="ticker-label">
     <span class="dot {isForex ? 'dot-forex' : (isFutures ? 'dot-futures' : 'dot-spot')}">●</span>
-    <span class="label-text">{isForex ? 'FOREX & METALS' : (isFutures ? 'FUTURES PAIRS' : 'SPOT PAIRS')}</span>
+    <span class="label-text">{isForex ? 'FOREX & METALS PAIRS' : (isFutures ? 'FUTURES PAIRS' : 'SPOT PAIRS')}</span>
   </div>
 
   <!-- Infinite Smooth Animated Marquee Ticker -->
@@ -51,17 +51,18 @@
         {#each pairs as p (p.symbol + '_g1')}
           {@const price = arena.prices[p.symbol] ?? p.last_close}
           {@const flash = arena.priceChanges[p.symbol]}
-          {@const dec = p.digits ?? (p.symbol.includes('JPY') || p.symbol === 'USOIL' ? 3 : (p.symbol === 'XAUUSD' ? 2 : 5))}
-          {@const bid = p.bid ?? price}
-          {@const ask = p.ask ?? (price && p.spread ? price + p.spread : price)}
-          {@const spr = p.spread_pips ?? '0.8'}
+          {@const dec = p.digits ?? (p.symbol.includes('JPY') || p.symbol === 'XTIUSD' || p.symbol === 'USOIL' ? 3 : (p.symbol === 'XAUUSD' ? 2 : 5))}
+          {@const bid = p.bid != null ? Number(p.bid) : (price != null ? Number(price) : null)}
+          {@const ask = p.ask != null ? Number(p.ask) : (price && p.spread ? Number(price) + Number(p.spread) : (price != null ? Number(price) : null))}
+          {@const pipVal = p.pip || (dec === 3 ? 0.01 : (dec === 2 ? 0.1 : 0.0001))}
+          {@const sprDiff = (ask != null && bid != null && ask >= bid) ? (ask - bid) : (p.spread != null ? Number(p.spread) : 0)}
+          {@const spr = (sprDiff > 0 && pipVal > 0) ? (sprDiff / pipVal).toFixed(1) : (p.spread_pips != null ? Number(p.spread_pips).toFixed(1) : '0.0')}
           <div class="ticker-item {isForex ? 'ticker-item-fx' : ''}">
             <span class="ticker-sym">{isForex ? p.symbol : (p.base || p.symbol.replace('USDT', ''))}</span>
             {#if isForex}
               <div class="fx-ticker-3row mono {flash === 'up' ? 'flash-up' : flash === 'down' ? 'flash-down' : ''}">
-                <span class="fx-b">B {bid ? Number(bid).toFixed(dec) : '---'}</span>
-                <span class="fx-a">A {ask ? Number(ask).toFixed(dec) : '---'}</span>
-                <span class="fx-s">{spr}p</span>
+                <span class="fx-b">B {bid != null ? bid.toFixed(dec) : '---'}</span>
+                <span class="fx-a">A {ask != null ? ask.toFixed(dec) : '---'}</span>
               </div>
             {:else}
               <span class="ticker-price mono {flash === 'up' ? 'flash-up' : flash === 'down' ? 'flash-down' : ''}">
@@ -77,17 +78,18 @@
         {#each pairs as p (p.symbol + '_g2')}
           {@const price = arena.prices[p.symbol] ?? p.last_close}
           {@const flash = arena.priceChanges[p.symbol]}
-          {@const dec = p.digits ?? (p.symbol.includes('JPY') || p.symbol === 'USOIL' ? 3 : (p.symbol === 'XAUUSD' ? 2 : 5))}
-          {@const bid = p.bid ?? price}
-          {@const ask = p.ask ?? (price && p.spread ? price + p.spread : price)}
-          {@const spr = p.spread_pips ?? '0.8'}
+          {@const dec = p.digits ?? (p.symbol.includes('JPY') || p.symbol === 'XTIUSD' || p.symbol === 'USOIL' ? 3 : (p.symbol === 'XAUUSD' ? 2 : 5))}
+          {@const bid = p.bid != null ? Number(p.bid) : (price != null ? Number(price) : null)}
+          {@const ask = p.ask != null ? Number(p.ask) : (price && p.spread ? Number(price) + Number(p.spread) : (price != null ? Number(price) : null))}
+          {@const pipVal = p.pip || (dec === 3 ? 0.01 : (dec === 2 ? 0.1 : 0.0001))}
+          {@const sprDiff = (ask != null && bid != null && ask >= bid) ? (ask - bid) : (p.spread != null ? Number(p.spread) : 0)}
+          {@const spr = (sprDiff > 0 && pipVal > 0) ? (sprDiff / pipVal).toFixed(1) : (p.spread_pips != null ? Number(p.spread_pips).toFixed(1) : '0.0')}
           <div class="ticker-item {isForex ? 'ticker-item-fx' : ''}">
             <span class="ticker-sym">{isForex ? p.symbol : (p.base || p.symbol.replace('USDT', ''))}</span>
             {#if isForex}
               <div class="fx-ticker-3row mono {flash === 'up' ? 'flash-up' : flash === 'down' ? 'flash-down' : ''}">
-                <span class="fx-b">B {bid ? Number(bid).toFixed(dec) : '---'}</span>
-                <span class="fx-a">A {ask ? Number(ask).toFixed(dec) : '---'}</span>
-                <span class="fx-s">{spr}p</span>
+                <span class="fx-b">B {bid != null ? bid.toFixed(dec) : '---'}</span>
+                <span class="fx-a">A {ask != null ? ask.toFixed(dec) : '---'}</span>
               </div>
             {:else}
               <span class="ticker-price mono {flash === 'up' ? 'flash-up' : flash === 'down' ? 'flash-down' : ''}">
@@ -210,9 +212,6 @@
     align-items: center;
     gap: 7px;
     padding: 1px 6px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 4px;
   }
 
   .fx-ticker-3row {
@@ -229,15 +228,6 @@
 
   .fx-a {
     color: #f43f5e;
-  }
-
-  .fx-s {
-    color: #10b981;
-    font-size: 9.5px;
-    font-weight: 700;
-    background: rgba(16, 185, 129, 0.12);
-    padding: 1px 4px;
-    border-radius: 3px;
   }
 
   .ticker-sym {

@@ -897,6 +897,194 @@ def fx_economic_straddle(s):
     return 0.0
 
 
+def fx_smc_orderblock(s):
+    """Institutional Order Block Mitigation (SMC)."""
+    if s.i < 15:
+        return 0.0
+    c, o, h, l, atr = s.c[s.i], s.o[s.i], s.h[s.i], s.l[s.i], s.atr14[s.i]
+    if not _ok(c, o, h, l, atr) or atr <= 0:
+        return 0.0
+    # Bullish OB: last down candle before displacement wave up, retested by current candle
+    for k in range(s.i - 2, max(s.i - 10, 1), -1):
+        if s.c[k] < s.o[k] and (s.c[k + 1] - s.c[k]) > 1.1 * atr:
+            ob_high, ob_low = s.h[k], s.l[k]
+            if l <= ob_high and c >= ob_low and c > o:
+                return 0.80
+            break
+    # Bearish OB: last up candle before displacement wave down, retested by current candle
+    for k in range(s.i - 2, max(s.i - 10, 1), -1):
+        if s.c[k] > s.o[k] and (s.c[k] - s.c[k + 1]) > 1.1 * atr:
+            ob_high, ob_low = s.h[k], s.l[k]
+            if h >= ob_low and c <= ob_high and c < o:
+                return -0.80
+            break
+    return 0.0
+
+
+def fx_ict_fair_value_gap(s):
+    """ICT Fair Value Gap (FVG) Imbalance Retest."""
+    if s.i < 5:
+        return 0.0
+    c, o, h, l = s.c[s.i], s.o[s.i], s.h[s.i], s.l[s.i]
+    h2, l2, h0, l0 = s.h[s.i - 2], s.l[s.i - 2], s.h[s.i], s.l[s.i]
+    if not _ok(c, o, h, l, h2, l2):
+        return 0.0
+    # Bullish FVG created at bar i-1 (low[i-1] > high[i-3] or low[i] > high[i-2])
+    gap_low, gap_high = s.h[s.i - 2], s.l[s.i - 1]
+    if gap_high > gap_low:
+        # Price dips into FVG and closes bullish
+        if l <= gap_high and c >= gap_low and c > o:
+            return 0.80
+    # Bearish FVG (high[i-1] < low[i-3] or high[i-1] < low[i-2])
+    bgap_high, bgap_low = s.l[s.i - 2], s.h[s.i - 1]
+    if bgap_high > bgap_low:
+        if h >= bgap_low and c <= bgap_high and c < o:
+            return -0.80
+    return 0.0
+
+
+def fx_smc_liquidity_sweep(s):
+    """SMC Liquidity Sweep & Market Structure Shift (MSS)."""
+    c, o, h, l, hh, ll = s.c[s.i], s.o[s.i], s.h[s.i], s.l[s.i], s.hh20[s.i - 1], s.ll20[s.i - 1]
+    if not _ok(c, o, h, l, hh, ll):
+        return 0.0
+    rng = max(h - l, 1e-9)
+    # Sellside Liquidity Sweep: price sweeps below 20-bar low, but closes back above with lower wick >= 50%
+    if l < ll and c > ll and (min(o, c) - l) / rng >= 0.45:
+        return 0.85
+    # Buyside Liquidity Sweep: price sweeps above 20-bar high, but closes back below with upper wick >= 50%
+    if h > hh and c < hh and (h - max(o, c)) / rng >= 0.45:
+        return -0.85
+    return 0.0
+
+
+def fx_ict_optimal_trade_entry(s):
+    """ICT Optimal Trade Entry (OTE 62% - 79% Retracement)."""
+    c, o, hh, ll, e21, e50 = s.c[s.i], s.o[s.i], s.hh20[s.i], s.ll20[s.i], s.ema21[s.i], s.ema50[s.i]
+    if not _ok(c, o, hh, ll, e21, e50):
+        return 0.0
+    rng = hh - ll
+    if rng <= 0:
+        return 0.0
+    # Uptrend OTE: pullback into 61.8% - 78.6% discount zone
+    if e21 > e50 and c > o:
+        depth = (hh - c) / rng
+        if 0.58 <= depth <= 0.80:
+            return 0.78
+    # Downtrend OTE: rally into 61.8% - 78.6% premium zone
+    if e21 < e50 and c < o:
+        depth = (c - ll) / rng
+        if 0.58 <= depth <= 0.80:
+            return -0.78
+    return 0.0
+
+
+def fx_momentum_candle_burst(s):
+    """Momentum Candle (Marubozu / Full-Body Range Expansion)."""
+    c, o, h, l, atr, e9 = s.c[s.i], s.o[s.i], s.h[s.i], s.l[s.i], s.atr14[s.i], s.ema9[s.i]
+    if not _ok(c, o, h, l, atr, e9) or atr <= 0:
+        return 0.0
+    rng = h - l
+    body = abs(c - o)
+    if rng > 1.5 * atr and body >= 0.75 * rng:
+        if c > o and c > e9:
+            return 0.85
+        if c < o and c < e9:
+            return -0.85
+    return 0.0
+
+
+def fx_three_line_strike(s):
+    """Three Line Strike Price Action Reversal."""
+    if s.i < 4:
+        return 0.0
+    c0, o0 = s.c[s.i], s.o[s.i]
+    c1, o1 = s.c[s.i - 1], s.o[s.i - 1]
+    c2, o2 = s.c[s.i - 2], s.o[s.i - 2]
+    c3, o3 = s.c[s.i - 3], s.o[s.i - 3]
+    if not _ok(c0, o0, c1, o1, c2, o2, c3, o3):
+        return 0.0
+    # Bullish Strike: 3 consecutive bear bars wiped out by 1 powerful bull candle
+    if c3 < o3 and c2 < o2 and c1 < o1 and c1 < c2 < c3:
+        if c0 > o0 and c0 > o3 and o0 <= c1:
+            return 0.85
+    # Bearish Strike: 3 consecutive bull bars wiped out by 1 powerful bear candle
+    if c3 > o3 and c2 > o2 and c1 > o1 and c1 > c2 > c3:
+        if c0 < o0 and c0 < o3 and o0 >= c1:
+            return -0.85
+    return 0.0
+
+
+def fx_pinbar_liquidity_reject(s):
+    """Pin Bar Rejection of Dynamic S/R (EMA21/50)."""
+    c, o, h, l, e21 = s.c[s.i], s.o[s.i], s.h[s.i], s.l[s.i], s.ema21[s.i]
+    if not _ok(c, o, h, l, e21):
+        return 0.0
+    rng = max(h - l, 1e-9)
+    body = abs(c - o)
+    # Bullish Hammer/Pin: lower wick >= 60% of candle range, body <= 30%
+    if (min(o, c) - l) / rng >= 0.60 and body / rng <= 0.32:
+        if l < e21 and c >= e21 * 0.999:
+            return 0.80
+    # Bearish Shooting Star/Pin: upper wick >= 60% of candle range, body <= 30%
+    if (h - max(o, c)) / rng >= 0.60 and body / rng <= 0.32:
+        if h > e21 and c <= e21 * 1.001:
+            return -0.80
+    return 0.0
+
+
+def fx_london_ny_overlap(s):
+    """London - New York Session Overlap Scalper (13:00 - 17:00 UTC)."""
+    c, o, e9, e21, adx = s.c[s.i], s.o[s.i], s.ema9[s.i], s.ema21[s.i], s.adx[s.i]
+    if not _ok(c, o, e9, e21, adx):
+        return 0.0
+    hr = int((s.ts[s.i] // 3600000) % 24)
+    # Peak overlap hours
+    if 12 <= hr <= 17:
+        if c > e9 > e21 and adx > 20 and c > o:
+            return 0.75
+        if c < e9 < e21 and adx > 20 and c < o:
+            return -0.75
+    return 0.0
+
+
+def fx_supply_demand_zone(s):
+    """Institutional Supply & Demand Imbalance Retest."""
+    if s.i < 5:
+        return 0.0
+    c, o, h, l, atr = s.c[s.i], s.o[s.i], s.h[s.i], s.l[s.i], s.atr14[s.i]
+    if not _ok(c, o, h, l, atr) or atr <= 0:
+        return 0.0
+    # Demand Zone (Rally-Base-Rally): base at i-2, rally at i-1, retest at i
+    base_h, base_l = s.h[s.i - 2], s.l[s.i - 2]
+    rally = s.c[s.i - 1] - s.o[s.i - 1]
+    if rally > 1.0 * atr and (base_h - base_l) < 0.8 * atr:
+        if l <= base_h and c >= base_l and c > o:
+            return 0.80
+    # Supply Zone (Drop-Base-Drop): base at i-2, drop at i-1, retest at i
+    drop = s.o[s.i - 1] - s.c[s.i - 1]
+    if drop > 1.0 * atr and (base_h - base_l) < 0.8 * atr:
+        if h >= base_l and c <= base_h and c < o:
+            return -0.80
+    return 0.0
+
+
+def fx_volume_spread_analysis(s):
+    """Volume Spread Analysis (VSA) Stopping Volume & Absorption."""
+    c, o, h, l, atr = s.c[s.i], s.o[s.i], s.h[s.i], s.l[s.i], s.atr14[s.i]
+    if not _ok(c, o, h, l, atr) or atr <= 0:
+        return 0.0
+    rng = h - l
+    if rng > 1.5 * atr:
+        # Ultra-wide spread down bar closing in the upper half -> Absorption of selling
+        if (c - l) / rng >= 0.55 and c > o:
+            return 0.80
+        # Ultra-wide spread up bar closing in the lower half -> Buying climax / Absorption of buying
+        if (h - c) / rng >= 0.55 and c < o:
+            return -0.80
+    return 0.0
+
+
 STRATEGIES: list[tuple[str, str, str, Callable]] = [
     # id, nama, keluarga, fungsi sinyal
     ("ict_momentum", "ICT Momentum", "ICT", order_block),
@@ -976,6 +1164,16 @@ STRATEGIES: list[tuple[str, str, str, Callable]] = [
     ("fx_orderflow_sweep", "Order Flow Liquidity Sweep", "Order flow", fx_orderflow_sweep),
     ("fx_carry_yield_momentum", "Synthetic Carry-Trade Yield", "Trend", fx_carry_yield_momentum),
     ("fx_economic_straddle", "Economic Straddle Breakout", "Breakout", fx_economic_straddle),
+    ("fx_smc_orderblock", "SMC Order Block Mitigation", "ICT", fx_smc_orderblock),
+    ("fx_ict_fair_value_gap", "ICT Fair Value Gap (FVG)", "ICT", fx_ict_fair_value_gap),
+    ("fx_smc_liquidity_sweep", "SMC Liquidity Sweep & BOS", "Struktur", fx_smc_liquidity_sweep),
+    ("fx_ict_optimal_trade_entry", "ICT Optimal Trade Entry", "ICT", fx_ict_optimal_trade_entry),
+    ("fx_momentum_candle_burst", "Momentum Candle Expansion", "Momentum", fx_momentum_candle_burst),
+    ("fx_three_line_strike", "Three Line Strike Pattern", "Price action", fx_three_line_strike),
+    ("fx_pinbar_liquidity_reject", "Pin Bar Liquidity Rejection", "Price action", fx_pinbar_liquidity_reject),
+    ("fx_london_ny_overlap", "London-NY Overlap Scalper", "Breakout", fx_london_ny_overlap),
+    ("fx_supply_demand_zone", "Supply & Demand Zone", "Struktur", fx_supply_demand_zone),
+    ("fx_volume_spread_analysis", "Volume Spread Analysis (VSA)", "Order flow", fx_volume_spread_analysis),
 ]
 
 DEFAULT_SL = {"atr": 2.0}
@@ -1014,13 +1212,17 @@ _leverage_map = {
     # Statistical & Time (10-15x)
     "vwap_band": 12, "vwap_trend": 10, "price_ema_dev": 12, "price_ema_dev2": 15,
     "value_area": 10, "time_session": 10, "time_open": 12,
-    # ── Forex Specific (20-40x) ──
-    "fx_lob_alpha": 30, "fx_tokyo_fader": 30, "fx_frankfurt_probe": 30, "fx_ny_reversal": 30,
-    "fx_sunday_gap": 25, "fx_aud_nzd_arb": 40, "fx_triangular_synth": 40, "fx_oil_cad_divergence": 25,
-    "fx_gold_safehaven_relay": 20, "fx_dragon_momentum": 25, "fx_bb_squeeze": 30, "fx_atr_expansion": 25,
-    "fx_gold_flash_spike": 20, "fx_ema_ribbon": 30, "fx_supertrend_trailing": 30, "fx_ichimoku_quantum": 25,
-    "fx_heikin_ashi_smooth": 30, "fx_hedging_grid": 20, "fx_camarilla_fader": 30, "fx_orderflow_sweep": 30,
-    "fx_carry_yield_momentum": 35, "fx_economic_straddle": 25,
+    # ── Forex Specific (Akun MT5 Direct, Leverage 1x / Tanpa Leverage Kripto) ──
+    "fx_lob_alpha": 1, "fx_tokyo_fader": 1, "fx_frankfurt_probe": 1, "fx_ny_reversal": 1,
+    "fx_sunday_gap": 1, "fx_aud_nzd_arb": 1, "fx_triangular_synth": 1, "fx_oil_cad_divergence": 1,
+    "fx_gold_safehaven_relay": 1, "fx_dragon_momentum": 1, "fx_bb_squeeze": 1, "fx_atr_expansion": 1,
+    "fx_gold_flash_spike": 1, "fx_ema_ribbon": 1, "fx_supertrend_trailing": 1, "fx_ichimoku_quantum": 1,
+    "fx_heikin_ashi_smooth": 1, "fx_hedging_grid": 1, "fx_camarilla_fader": 1, "fx_orderflow_sweep": 1,
+    "fx_carry_yield_momentum": 1, "fx_economic_straddle": 1,
+    "fx_smc_orderblock": 1, "fx_ict_fair_value_gap": 1, "fx_smc_liquidity_sweep": 1,
+    "fx_ict_optimal_trade_entry": 1, "fx_momentum_candle_burst": 1, "fx_three_line_strike": 1,
+    "fx_pinbar_liquidity_reject": 1, "fx_london_ny_overlap": 1, "fx_supply_demand_zone": 1,
+    "fx_volume_spread_analysis": 1,
 }
 DEFAULT_LEVERAGE.update(_leverage_map)
 # Fallback: strategi tanpa mapping dapat 10x
@@ -1085,7 +1287,7 @@ FUTURES_STRATEGIES = [
     "macd_div",
 ]
 
-# ── Forex strategy assignment (22 Quantitative Models) ───────────────
+# ── Forex strategy assignment (32 Quantitative Models) ───────────────
 FOREX_STRATEGIES = [
     "fx_lob_alpha", "fx_tokyo_fader", "fx_frankfurt_probe", "fx_ny_reversal", "fx_sunday_gap",
     "fx_aud_nzd_arb", "fx_triangular_synth", "fx_oil_cad_divergence", "fx_gold_safehaven_relay",
@@ -1093,6 +1295,11 @@ FOREX_STRATEGIES = [
     "fx_ema_ribbon", "fx_supertrend_trailing", "fx_ichimoku_quantum", "fx_heikin_ashi_smooth",
     "fx_hedging_grid", "fx_camarilla_fader", "fx_orderflow_sweep", "fx_carry_yield_momentum",
     "fx_economic_straddle",
+    # ── 10 New Advanced Quantitative Forex Models (SMC, ICT, Candle Action, VSA) ──
+    "fx_smc_orderblock", "fx_ict_fair_value_gap", "fx_smc_liquidity_sweep",
+    "fx_ict_optimal_trade_entry", "fx_momentum_candle_burst", "fx_three_line_strike",
+    "fx_pinbar_liquidity_reject", "fx_london_ny_overlap", "fx_supply_demand_zone",
+    "fx_volume_spread_analysis",
 ]
 
 # Deduplicate while preserving order
@@ -1108,13 +1315,12 @@ for sid in FUTURES_STRATEGIES:
 for sid in FOREX_STRATEGIES:
     assert sid in _all_ids, f"Forex strategy {sid} not in STRATEGIES"
 
-# ── Forex pair selection ──────────────────────────────────────────────
+# ── Forex pair selection (28 Pairs sesuai watchlist broker Headway) ─────────
 FOREX_PAIRS = [
-    "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "AUDUSD", "USDCAD", "NZDUSD",
-    "GBPJPY", "EURJPY", "AUDJPY", "CADJPY", "CHFJPY", "NZDJPY",
-    "EURGBP", "EURCHF", "GBPCHF",
-    "AUDNZD", "AUDCAD", "EURAUD", "GBPAUD",
-    "XAUUSD", "USOIL",
+    "XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "USDCAD", "AUDCAD", "AUDJPY",
+    "AUDUSD", "EURGBP", "EURAUD", "EURJPY", "EURNZD", "GBPJPY", "GBPAUD",
+    "GBPCAD", "GBPNZD", "NZDUSD", "NZDCAD", "XTIUSD", "USDCHF", "EURCHF",
+    "GBPCHF", "CADJPY", "CHFJPY", "NZDJPY", "AUDNZD", "CADCHF", "AUDCHF",
 ]
 
 # ── Futures pair selection ────────────────────────────────────────────

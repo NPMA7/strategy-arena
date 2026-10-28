@@ -1,6 +1,6 @@
 <script>
-  import { arena } from '../lib/store.svelte.js';
-  import { formatUptime } from '../lib/formatters.js';
+  import { arena } from "../lib/store.svelte.js";
+  import { formatUptime } from "../lib/formatters.js";
 
   function handleModeChange(m) {
     arena.setMode(m);
@@ -15,30 +15,56 @@
       title="Kembali ke Page Utama"
       onclick={(e) => {
         e.preventDefault();
-        arena.navigate('/');
+        arena.navigate("/");
       }}
     >
       <div class="brand-emblem">
         <svg viewBox="0 0 64 64" width="34" height="34" class="emblem-svg">
           <defs>
             <linearGradient id="hdrBg" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#151b26"/>
-              <stop offset="100%" stop-color="#080c12"/>
+              <stop offset="0%" stop-color="#151b26" />
+              <stop offset="100%" stop-color="#080c12" />
             </linearGradient>
             <linearGradient id="hdrGold" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#fbbf24"/>
-              <stop offset="100%" stop-color="#d97706"/>
+              <stop offset="0%" stop-color="#fbbf24" />
+              <stop offset="100%" stop-color="#d97706" />
             </linearGradient>
             <linearGradient id="hdrCyan" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#38bdf8"/>
-              <stop offset="100%" stop-color="#0284c7"/>
+              <stop offset="0%" stop-color="#38bdf8" />
+              <stop offset="100%" stop-color="#0284c7" />
             </linearGradient>
           </defs>
-          <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#hdrBg)" stroke="#232d3d" stroke-width="1.5"/>
-          <path d="M26 16 L15 16 L15 29 L26 31 L26 47 L14 47" stroke="url(#hdrGold)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M31 47 L41 16 L51 47" stroke="url(#hdrGold)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M35 37 L47 37" stroke="url(#hdrCyan)" stroke-width="3" stroke-linecap="round"/>
-          <circle cx="41" cy="16" r="3.2" fill="#ffffff"/>
+          <rect
+            x="2"
+            y="2"
+            width="60"
+            height="60"
+            rx="16"
+            fill="url(#hdrBg)"
+            stroke="#232d3d"
+            stroke-width="1.5"
+          />
+          <path
+            d="M26 16 L15 16 L15 29 L26 31 L26 47 L14 47"
+            stroke="url(#hdrGold)"
+            stroke-width="4.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <path
+            d="M31 47 L41 16 L51 47"
+            stroke="url(#hdrGold)"
+            stroke-width="4.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <path
+            d="M35 37 L47 37"
+            stroke="url(#hdrCyan)"
+            stroke-width="3"
+            stroke-linecap="round"
+          />
+          <circle cx="41" cy="16" r="3.2" fill="#ffffff" />
         </svg>
       </div>
       <div class="brand-text">
@@ -51,7 +77,7 @@
     <nav class="market-switcher" aria-label="Market Mode Selection">
       <button
         class="switcher-btn {arena.mode === 'spot' ? 'active-spot' : ''}"
-        onclick={() => handleModeChange('spot')}
+        onclick={() => handleModeChange("spot")}
       >
         <span class="indicator-dot dot-amber"></span>
         <span class="label">Crypto Spot</span>
@@ -60,7 +86,7 @@
 
       <button
         class="switcher-btn {arena.mode === 'futures' ? 'active-futures' : ''}"
-        onclick={() => handleModeChange('futures')}
+        onclick={() => handleModeChange("futures")}
       >
         <span class="indicator-dot dot-cyan"></span>
         <span class="label">Crypto Futures</span>
@@ -69,11 +95,11 @@
 
       <button
         class="switcher-btn {arena.mode === 'forex' ? 'active-forex' : ''}"
-        onclick={() => handleModeChange('forex')}
+        onclick={() => handleModeChange("forex")}
       >
         <span class="indicator-dot dot-emerald"></span>
         <span class="label">Forex</span>
-        <span class="count-badge num">22++ Strats</span>
+        <span class="count-badge num">30++ Strats</span>
       </button>
 
       <div class="switcher-btn disabled" title="Direncanakan untuk Phase 2">
@@ -89,13 +115,18 @@
       <span class="live-status {arena.connected ? 'online' : 'offline'}">
         <span class="pulse-ring"></span>
         <span class="status-dot"></span>
-        <span class="status-text">{arena.connected ? 'LIVE FEED' : 'RECONNECTING'}</span>
+        <span class="status-text"
+          >{arena.connected ? "LIVE FEED" : "RECONNECTING"}</span
+        >
       </span>
 
       <span class="telemetry-divider"></span>
 
       <!-- Continuous Uptime Clock -->
-      <div class="uptime-badge" title="Waktu berjalan kontinu (tidak reset saat restart)">
+      <div
+        class="uptime-badge"
+        title="Waktu berjalan kontinu (tidak reset saat restart)"
+      >
         <span class="lbl">UPTIME:</span>
         <span class="val num">{formatUptime(arena.uptime)}</span>
       </div>
@@ -103,9 +134,12 @@
       <span class="telemetry-divider"></span>
 
       <!-- Trade Executions Count -->
-      <div class="uptime-badge" title="Total order trade dieksekusi di seluruh arena">
+      <div
+        class="uptime-badge"
+        title="Total order trade dieksekusi di seluruh arena"
+      >
         <span class="lbl">TRADES:</span>
-        <span class="val num">{arena.totalTrades.toLocaleString('en-US')}</span>
+        <span class="val num">{arena.totalTrades.toLocaleString("en-US")}</span>
       </div>
     </div>
 
@@ -115,7 +149,17 @@
       onclick={() => (arena.copyTradeModalOpen = true)}
       title="Buka panduan & API Key untuk menyalin sinyal trading"
     >
-      <svg class="btn-icon-svg" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <svg
+        class="btn-icon-svg"
+        viewBox="0 0 24 24"
+        width="13"
+        height="13"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2.2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
         <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
       </svg>
       <span class="btn-text">Copy-Trade API</span>
@@ -360,7 +404,8 @@
       align-items: stretch;
       padding: 10px 12px;
     }
-    .header-left, .header-right {
+    .header-left,
+    .header-right {
       justify-content: space-between;
       width: 100%;
     }

@@ -35,10 +35,10 @@ SYMBOL_MAP = {
 REVERSE_MAP = {v: k for k, v in SYMBOL_MAP.items()}
 
 FOREX_PAIRS = [
-    "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "AUDUSD", "USDCAD", "NZDUSD",
+    "XAUUSD", "USOIL", "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "AUDUSD", "USDCAD", "NZDUSD",
     "GBPJPY", "EURJPY", "AUDJPY", "CADJPY", "CHFJPY", "NZDJPY",
     "EURGBP", "EURCHF", "GBPCHF", "AUDNZD", "AUDCAD", "EURAUD", "GBPAUD",
-    "XAUUSD", "USOIL"
+    
 ]
 
 state = {

@@ -103,25 +103,25 @@
         </h1>
 
         <p class="hero-desc">
-          76 algoritma kuantitatif independen bertarung tanpa emosi di pasar kripto Binance dan Forex & Metals MT5 secara real-time. Dilengkapi mark-to-market live per detik, kalkulasi leverage hingga 40x, simulasi funding rate & spread komisi nyata.
+          86 algoritma kuantitatif independen bertarung tanpa emosi di pasar kripto Binance dan Forex & Metals MT5 secara real-time. Dilengkapi mark-to-market live per detik, eksekusi MT5 Direct tanpa funding fee, simulasi leverage kripto & spread nyata broker.
         </p>
 
         <!-- CTAs -->
         <div class="hero-ctas">
+          <button class="cta-secondary" onclick={() => enterTerminal('spot')}>
+            <div class="cta-title">Arena Spot</div>
+            <div class="cta-sub mono">NO-LEVERAGE · 35++ STRATEGI</div>
+          </button>
           <button class="cta-primary" onclick={() => enterTerminal('futures')}>
-            <div class="cta-title">Masuk Arena Futures</div>
+            <div class="cta-title">Arena Futures</div>
             <div class="cta-sub mono">LEVERAGE 1-20X · 50++ STRATEGI</div>
           </button>
 
           <button class="cta-forex" onclick={() => enterTerminal('forex')}>
-            <div class="cta-title">Masuk Arena Forex</div>
-            <div class="cta-sub mono">22 PAIR FX & METALS · 22 STRATEGI</div>
+            <div class="cta-title">Arena Forex</div>
+            <div class="cta-sub mono">MT5 DIRECT · 30++ STRATEGI</div>
           </button>
 
-          <button class="cta-secondary" onclick={() => enterTerminal('spot')}>
-            <div class="cta-title">Masuk Arena Spot</div>
-            <div class="cta-sub mono">NO-LEVERAGE · 35++ STRATEGI</div>
-          </button>
         </div>
 
         <!-- Key Metrics Quad -->
@@ -132,7 +132,7 @@
           </div>
           <div class="metric-item">
             <span class="m-val mono">100++</span>
-            <span class="m-lbl">Pair Likuid USDT</span>
+            <span class="m-lbl">Pairs</span>
           </div>
           <div class="metric-item">
             <span class="m-val mono">$10.000</span>
@@ -170,7 +170,6 @@
         <div class="podium-col">
           <div class="col-header">
             <span class="col-tag spot-tag">CRYPTO SPOT</span>
-            <span class="col-meta mono">39 Model · 1x Leverage</span>
           </div>
 
           <div class="card-stack">
@@ -202,7 +201,6 @@
         <div class="podium-col">
           <div class="col-header">
             <span class="col-tag futures-tag">CRYPTO FUTURES</span>
-            <span class="col-meta mono">50++ Model · ~20x Leverage</span>
           </div>
 
           <div class="card-stack">
@@ -234,7 +232,6 @@
         <div class="podium-col">
           <div class="col-header">
             <span class="col-tag forex-tag">FOREX & METALS</span>
-            <span class="col-meta mono">22 Model · ~30x Leverage</span>
           </div>
 
           <div class="card-stack">
@@ -250,7 +247,7 @@
                   <span class="rank-badge mono">#{idx + 1}</span>
                   <div>
                     <div class="strat-name">{s.name}</div>
-                    <div class="strat-sub mono">{s.leverage || 30}x Lev · {s.trades || 0} Trade · WR {s.trades > 0 ? ((s.wins / s.trades) * 100).toFixed(0) : 0}%</div>
+                    <div class="strat-sub mono">MT5 Direct · {s.trades || 0} Trade · WR {s.trades > 0 ? ((s.wins / s.trades) * 100).toFixed(0) : 0}%</div>
                   </div>
                 </div>
                 <div class="card-right">
@@ -717,10 +714,6 @@
     color: #10b981;
   }
 
-  .col-meta {
-    font-size: 10.5px;
-    color: #64748b;
-  }
 
   .card-stack {
     display: flex;

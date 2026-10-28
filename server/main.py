@@ -159,7 +159,7 @@ def get_all_prices() -> dict[str, float]:
         for p in forex_feed.pairs():
             sym = p["symbol"]
             r = rings.get(sym)
-            dec = 5 if ("JPY" in sym or sym == "USOIL") else (2 if sym == "XAUUSD" else 5)
+            dec = p.get("digits") or (5 if ("JPY" in sym or sym in ("USOIL", "XTIUSD")) else (2 if sym == "XAUUSD" else 5))
             if r and r.n > 0 and r.last_close > 0:
                 out[sym] = round(r.last_close, dec)
             elif p.get("last_close"):

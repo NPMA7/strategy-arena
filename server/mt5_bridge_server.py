@@ -18,30 +18,36 @@ PORT = int(os.getenv("PORT", "5000"))
 MT5_RPYC_HOST = os.getenv("MT5_RPYC_HOST", "mt5-vnc")
 MT5_RPYC_PORT = int(os.getenv("MT5_RPYC_PORT", "18812"))
 
-# 22 Pair Forex & Komoditas Strategy Arena beserta spesifikasi broker Headway
+# 28 Pair Forex & Komoditas Strategy Arena (Watchlist Image 1 + Majors & Crosses)
 PAIRS: dict[str, dict] = {
+    "XAUUSD": {"name": "Gold Spot vs USD", "digits": 2, "pip": 0.1, "base": "XAU", "quote": "USD", "broker_symbol": "XAUUSD"},
     "EURUSD": {"name": "Euro vs US Dollar", "digits": 5, "pip": 0.0001, "base": "EUR", "quote": "USD", "broker_symbol": "EURUSD"},
     "GBPUSD": {"name": "British Pound vs USD", "digits": 5, "pip": 0.0001, "base": "GBP", "quote": "USD", "broker_symbol": "GBPUSD"},
     "USDJPY": {"name": "US Dollar vs Japanese Yen", "digits": 3, "pip": 0.01, "base": "USD", "quote": "JPY", "broker_symbol": "USDJPY"},
-    "USDCHF": {"name": "US Dollar vs Swiss Franc", "digits": 5, "pip": 0.0001, "base": "USD", "quote": "CHF", "broker_symbol": "USDCHF"},
-    "AUDUSD": {"name": "Aussie vs US Dollar", "digits": 5, "pip": 0.0001, "base": "AUD", "quote": "USD", "broker_symbol": "AUDUSD"},
     "USDCAD": {"name": "US Dollar vs Canadian Dollar", "digits": 5, "pip": 0.0001, "base": "USD", "quote": "CAD", "broker_symbol": "USDCAD"},
-    "NZDUSD": {"name": "Kiwi vs US Dollar", "digits": 5, "pip": 0.0001, "base": "NZD", "quote": "USD", "broker_symbol": "NZDUSD"},
-    "GBPJPY": {"name": "British Pound vs Japanese Yen", "digits": 3, "pip": 0.01, "base": "GBP", "quote": "JPY", "broker_symbol": "GBPJPY"},
-    "EURJPY": {"name": "Euro vs Japanese Yen", "digits": 3, "pip": 0.01, "base": "EUR", "quote": "JPY", "broker_symbol": "EURJPY"},
+    "AUDCAD": {"name": "Aussie vs Canadian Dollar", "digits": 5, "pip": 0.0001, "base": "AUD", "quote": "CAD", "broker_symbol": "AUDCAD"},
     "AUDJPY": {"name": "Aussie vs Japanese Yen", "digits": 3, "pip": 0.01, "base": "AUD", "quote": "JPY", "broker_symbol": "AUDJPY"},
+    "AUDUSD": {"name": "Aussie vs US Dollar", "digits": 5, "pip": 0.0001, "base": "AUD", "quote": "USD", "broker_symbol": "AUDUSD"},
+    "EURGBP": {"name": "Euro vs British Pound", "digits": 5, "pip": 0.0001, "base": "EUR", "quote": "GBP", "broker_symbol": "EURGBP"},
+    "EURAUD": {"name": "Euro vs Aussie", "digits": 5, "pip": 0.0001, "base": "EUR", "quote": "AUD", "broker_symbol": "EURAUD"},
+    "EURJPY": {"name": "Euro vs Japanese Yen", "digits": 3, "pip": 0.01, "base": "EUR", "quote": "JPY", "broker_symbol": "EURJPY"},
+    "EURNZD": {"name": "Euro vs Kiwi", "digits": 5, "pip": 0.0001, "base": "EUR", "quote": "NZD", "broker_symbol": "EURNZD"},
+    "GBPJPY": {"name": "British Pound vs Japanese Yen", "digits": 3, "pip": 0.01, "base": "GBP", "quote": "JPY", "broker_symbol": "GBPJPY"},
+    "GBPAUD": {"name": "British Pound vs Aussie", "digits": 5, "pip": 0.0001, "base": "GBP", "quote": "AUD", "broker_symbol": "GBPAUD"},
+    "GBPCAD": {"name": "British Pound vs Canadian Dollar", "digits": 5, "pip": 0.0001, "base": "GBP", "quote": "CAD", "broker_symbol": "GBPCAD"},
+    "GBPNZD": {"name": "British Pound vs Kiwi", "digits": 5, "pip": 0.0001, "base": "GBP", "quote": "NZD", "broker_symbol": "GBPNZD"},
+    "NZDUSD": {"name": "Kiwi vs US Dollar", "digits": 5, "pip": 0.0001, "base": "NZD", "quote": "USD", "broker_symbol": "NZDUSD"},
+    "NZDCAD": {"name": "Kiwi vs Canadian Dollar", "digits": 5, "pip": 0.0001, "base": "NZD", "quote": "CAD", "broker_symbol": "NZDCAD"},
+    "XTIUSD": {"name": "WTI Crude Oil vs USD", "digits": 3, "pip": 0.01, "base": "XTI", "quote": "USD", "broker_symbol": "XTIUSD"},
+    "USDCHF": {"name": "US Dollar vs Swiss Franc", "digits": 5, "pip": 0.0001, "base": "USD", "quote": "CHF", "broker_symbol": "USDCHF"},
+    "EURCHF": {"name": "Euro vs Swiss Franc", "digits": 5, "pip": 0.0001, "base": "EUR", "quote": "CHF", "broker_symbol": "EURCHF"},
+    "GBPCHF": {"name": "British Pound vs Swiss Franc", "digits": 5, "pip": 0.0001, "base": "GBP", "quote": "CHF", "broker_symbol": "GBPCHF"},
     "CADJPY": {"name": "Canadian Dollar vs Japanese Yen", "digits": 3, "pip": 0.01, "base": "CAD", "quote": "JPY", "broker_symbol": "CADJPY"},
     "CHFJPY": {"name": "Swiss Franc vs Japanese Yen", "digits": 3, "pip": 0.01, "base": "CHF", "quote": "JPY", "broker_symbol": "CHFJPY"},
     "NZDJPY": {"name": "Kiwi vs Japanese Yen", "digits": 3, "pip": 0.01, "base": "NZD", "quote": "JPY", "broker_symbol": "NZDJPY"},
-    "EURGBP": {"name": "Euro vs British Pound", "digits": 5, "pip": 0.0001, "base": "EUR", "quote": "GBP", "broker_symbol": "EURGBP"},
-    "EURCHF": {"name": "Euro vs Swiss Franc", "digits": 5, "pip": 0.0001, "base": "EUR", "quote": "CHF", "broker_symbol": "EURCHF"},
-    "GBPCHF": {"name": "British Pound vs Swiss Franc", "digits": 5, "pip": 0.0001, "base": "GBP", "quote": "CHF", "broker_symbol": "GBPCHF"},
     "AUDNZD": {"name": "Aussie vs Kiwi", "digits": 5, "pip": 0.0001, "base": "AUD", "quote": "NZD", "broker_symbol": "AUDNZD"},
-    "AUDCAD": {"name": "Aussie vs Canadian Dollar", "digits": 5, "pip": 0.0001, "base": "AUD", "quote": "CAD", "broker_symbol": "AUDCAD"},
-    "EURAUD": {"name": "Euro vs Aussie", "digits": 5, "pip": 0.0001, "base": "EUR", "quote": "AUD", "broker_symbol": "EURAUD"},
-    "GBPAUD": {"name": "British Pound vs Aussie", "digits": 5, "pip": 0.0001, "base": "GBP", "quote": "AUD", "broker_symbol": "GBPAUD"},
-    "XAUUSD": {"name": "Gold Spot vs USD", "digits": 2, "pip": 0.1, "base": "XAU", "quote": "USD", "broker_symbol": "XAUUSD"},
-    "USOIL": {"name": "WTI Crude Oil", "digits": 2, "pip": 0.01, "base": "OIL", "quote": "USD", "broker_symbol": "XTIUSD"},
+    "CADCHF": {"name": "Canadian Dollar vs Swiss Franc", "digits": 5, "pip": 0.0001, "base": "CAD", "quote": "CHF", "broker_symbol": "CADCHF"},
+    "AUDCHF": {"name": "Aussie vs Swiss Franc", "digits": 5, "pip": 0.0001, "base": "AUD", "quote": "CHF", "broker_symbol": "AUDCHF"},
 }
 
 BROKER_MAP = {k: v["broker_symbol"] for k, v in PAIRS.items()}
@@ -99,17 +105,50 @@ def _arena_init():
                 mt5.login(6310591, password="dL7ny!PE", server="mt5.demo.trade-hw.online:443")
     return ok
 
+_daily_base_prices = {}
+_last_d1_update = 0.0
+
+def _arena_update_d1_base(symbols):
+    global _daily_base_prices, _last_d1_update
+    import time
+    now = time.time()
+    if now - _last_d1_update < 60.0 and len(_daily_base_prices) >= len(symbols):
+        return
+    _last_d1_update = now
+    for s in symbols:
+        try:
+            rates = mt5.copy_rates_from_pos(s, mt5.TIMEFRAME_D1, 0, 2)
+            if rates is not None and len(rates) >= 2:
+                # Previous day's close (rates[-2]['close']) is the official Daily Change reference
+                _daily_base_prices[s] = float(rates[-2]['close'])
+            elif rates is not None and len(rates) >= 1:
+                _daily_base_prices[s] = float(rates[0]['open'])
+            else:
+                info = mt5.symbol_info(s)
+                if info and getattr(info, 'session_open', 0) > 0:
+                    _daily_base_prices[s] = float(info.session_open)
+        except Exception:
+            pass
+
 def _arena_select_symbols(symbols):
     for s in symbols:
         mt5.symbol_select(s, True)
+    _arena_update_d1_base(symbols)
     return True
 
 def _arena_get_ticks(pairs_map):
+    _arena_update_d1_base(list(pairs_map.values()))
     res = {}
     for arena_sym, broker_sym in pairs_map.items():
         t = mt5.symbol_info_tick(broker_sym)
+        if not t or t.bid <= 0 or t.ask <= 0:
+            mt5.symbol_select(broker_sym, True)
+            t = mt5.symbol_info_tick(broker_sym)
         if t and t.bid > 0 and t.ask > 0:
-            res[arena_sym] = (float(t.bid), float(t.ask), float(t.last), int(t.time), int(t.time_msc))
+            base_p = _daily_base_prices.get(broker_sym, 0.0)
+            mid = (float(t.bid) + float(t.ask)) / 2.0
+            chg = round(((mid - base_p) / base_p) * 100.0, 2) if base_p > 0 else 0.0
+            res[arena_sym] = (float(t.bid), float(t.ask), float(t.last or t.bid), int(t.time), int(t.time_msc), float(chg), float(base_p))
     return res
 
 def _arena_get_bars(broker_sym, num_bars):
@@ -182,7 +221,12 @@ async def tick_updater_loop():
             if conn is not None:
                 ticks_raw = await asyncio.to_thread(_sync_fetch_ticks, conn)
                 if ticks_raw and isinstance(ticks_raw, dict):
-                    for sym, (bid, ask, last, t_sec, t_msc) in ticks_raw.items():
+                    for sym, tick_info in ticks_raw.items():
+                        if len(tick_info) >= 7:
+                            bid, ask, last, t_sec, t_msc, chg_pct, base_p = tick_info
+                        else:
+                            bid, ask, last, t_sec, t_msc = tick_info[:5]
+                            chg_pct, base_p = 0.0, 0.0
                         meta = PAIRS.get(sym)
                         if not meta:
                             continue
@@ -193,12 +237,16 @@ async def tick_updater_loop():
                         ask = round(ask, digits)
                         mid = round((bid + ask) / 2.0, digits)
                         spr_points = round(ask - bid, digits)
-                        spr_pips = round(spr_points / pip, 1)
+                        spr_pips = round(spr_points / pip, 1) if pip > 0 else 0.0
 
-                        if sym not in day_open_prices:
-                            day_open_prices[sym] = mid
-                        day_open = day_open_prices[sym]
-                        change_pct = round(((mid - day_open) / day_open) * 100.0, 2) if day_open > 0 else 0.0
+                        # Gunakan Daily Change resmi dari MT5, atau fallback ke mid vs base_p
+                        if chg_pct == 0.0 and base_p > 0:
+                            chg_pct = round(((mid - base_p) / base_p) * 100.0, 2)
+                        elif chg_pct == 0.0:
+                            if sym not in day_open_prices:
+                                day_open_prices[sym] = mid
+                            day_open = day_open_prices[sym]
+                            chg_pct = round(((mid - day_open) / day_open) * 100.0, 2) if day_open > 0 else 0.0
 
                         current_ticks[sym] = {
                             "symbol": sym,
@@ -211,7 +259,8 @@ async def tick_updater_loop():
                             "price": bid,
                             "spread": spr_points,
                             "spread_pips": spr_pips,
-                            "change": change_pct,
+                            "change": chg_pct,
+                            "day_open": base_p,
                             "digits": digits,
                             "pip": pip,
                             "time": t_sec if t_sec > 0 else int(now_sec),
@@ -241,11 +290,6 @@ async def handle_health(request):
         "connected": True,
         "mt5_live_connected": cached_account_info.get("connected", False),
         "symbols_count": len(current_ticks),
-        "gold_price": current_ticks.get("XAUUSD", {}).get("price", 0.0),
-        "oil_price": current_ticks.get("USOIL", {}).get("price", 0.0),
-        "eurusd": current_ticks.get("EURUSD", {}).get("price", 0.0),
-        "usdjpy": current_ticks.get("USDJPY", {}).get("price", 0.0),
-        "gbpusd": current_ticks.get("GBPUSD", {}).get("price", 0.0),
     })
 
 

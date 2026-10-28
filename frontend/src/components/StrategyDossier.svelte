@@ -321,7 +321,13 @@
           <h2>{strategy.name}</h2>
           <span class="chip mono">#{rank}/{allAccounts.length}</span>
           <span class="chip badge-category">
-            {(strategy.family || getStrategyCategory(strategy.id)).toUpperCase()} · {strategy.leverage || 1}x
+            {#if arena.mode === 'forex' || strategy.mode === 'forex'}
+              {(strategy.family || getStrategyCategory(strategy.id)).toUpperCase()} · MT5 DIRECT
+            {:else if arena.mode === 'futures'}
+              {(strategy.family || getStrategyCategory(strategy.id)).toUpperCase()} · {strategy.leverage || 1}x
+            {:else}
+              {(strategy.family || getStrategyCategory(strategy.id)).toUpperCase()}
+            {/if}
           </span>
           {#if strategy.refillCount > 0}
             <span class="chip-mc">MC {strategy.refillCount}x</span>
@@ -405,7 +411,7 @@
               <tr>
                 <th>Pair</th>
                 <th>Arah</th>
-                <th>Lev</th>
+                <th>{arena.mode === 'forex' ? 'Lot' : 'Lev'}</th>
                 <th class="r">Entry</th>
                 <th class="r">Mark</th>
                 <th class="r">uPnL</th>
@@ -427,7 +433,13 @@
                       {p.side}
                     </span>
                   </td>
-                  <td class="mono muted">{p.leverage}x</td>
+                  <td class="mono muted">
+                    {#if arena.mode === 'forex'}
+                      {(p.lot ? p.lot : (p.qty ? (p.qty >= 1000 ? (p.qty / 100000).toFixed(2) : p.qty.toFixed(2)) : '0.10'))} Lot
+                    {:else}
+                      {p.leverage}x
+                    {/if}
+                  </td>
                   <td class="r mono">{formatPrice(p.entry)}</td>
                   <td class="r mono">{formatPrice(currentMark)}</td>
                   <td class="r mono font-bold {isUp ? 'up' : 'down'}">

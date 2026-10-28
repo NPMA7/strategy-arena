@@ -52,7 +52,7 @@
       <!-- Institutional Footer Bar -->
       <footer class="floor-foot">
         <span class="foot-left">
-          Data: {arena.mode === 'forex' ? 'MT5 Bridge / MetaQuotes Realtime Feed' : 'Binance REST + WebSocket'} · Database menyimpan candle, akun, trade, kurva ekuitas
+          Data: {arena.mode === 'forex' ? 'MT5 Realtime Feed' : 'Binance REST + WebSocket'} · Database menyimpan candle, akun, trade, kurva ekuitas
         </span>
         <span class="foot-right mono">
           {openPositionsCount} posisi terbuka

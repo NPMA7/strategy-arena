@@ -563,7 +563,13 @@
             <h2>{strategy.name}</h2>
             <span class="chip mono">#{rank}/{totalStrategies}</span>
             <span class="chip badge-category mono">
-              {(strategy.family || getStrategyCategory(strategy.id)).toUpperCase()} · {strategy.leverage || 1}x
+              {#if arena.mode === 'forex' || strategy.mode === 'forex'}
+                {(strategy.family || getStrategyCategory(strategy.id)).toUpperCase()} · MT5 DIRECT
+              {:else if arena.mode === 'futures'}
+                {(strategy.family || getStrategyCategory(strategy.id)).toUpperCase()} · {strategy.leverage || 1}x
+              {:else}
+                {(strategy.family || getStrategyCategory(strategy.id)).toUpperCase()}
+              {/if}
             </span>
             {#if strategy.refillCount > 0}
               <span class="chip-mc mono">MC {strategy.refillCount}x</span>
@@ -578,7 +584,7 @@
               {formatUSD(strategy.equity)}
             </span>
             <span class="eq-sub mono">
-              {formatPercent(strategy.returnPct)} · {arena.mode === 'forex' ? `FOREX ${strategy.leverage || 30}X` : (arena.mode === 'futures' ? `FUTURES ${strategy.leverage || 1}X` : 'SPOT 1X')} · {openPositionsCount} POSISI TERBUKA
+              {formatPercent(strategy.returnPct)} · {arena.mode === 'forex' ? 'FOREX MT5 DIRECT' : (arena.mode === 'futures' ? `FUTURES ${strategy.leverage || 1}X` : 'SPOT 1X')} · {openPositionsCount} POSISI TERBUKA
             </span>
           </div>
           <button class="m-close" onclick={() => (isOpen = false)} aria-label="Tutup Modal">×</button>
@@ -763,9 +769,9 @@
 
             <!-- Box 11: Leverage & Engine -->
             <div class="stat-card">
-              <span class="s-label mono">LEVERAGE & MARGIN</span>
-              <b class="s-val mono">{deepStats.leverage}x</b>
-              <span class="s-sub mono">{arena.mode === 'forex' ? 'MetaTrader 5 / MetaQuotes Multi-Asset' : (arena.mode === 'futures' ? 'Binance Futures (Funding 8h)' : 'Binance Spot (No-Loan)')}</span>
+              <span class="s-label mono">{arena.mode === 'forex' ? 'EXECUTION & SPREAD' : 'LEVERAGE & MARGIN'}</span>
+              <b class="s-val mono">{arena.mode === 'forex' ? 'MT5 Direct' : `${deepStats.leverage}x`}</b>
+              <span class="s-sub mono">{arena.mode === 'forex' ? 'MetaTrader 5 Direct (Live Headway Feed)' : (arena.mode === 'futures' ? 'Binance Futures (Funding 8h)' : 'Binance Spot (No-Loan)')}</span>
             </div>
 
             <!-- Box 12: Margin Call Counter -->
@@ -834,7 +840,7 @@
                     <th>Durasi</th>
                     <th>Pair</th>
                     <th>Arah</th>
-                    <th>Lev</th>
+                    <th>{arena.mode === 'forex' ? 'Lot' : 'Lev'}</th>
                     <th class="r">Entry Price</th>
                     <th class="r">Exit Price</th>
                     <th class="r">Realized PnL</th>
@@ -860,7 +866,13 @@
                           {tr.side === 1 || tr.side === 'LONG' || tr.side === 'BUY' ? 'LONG' : 'SHORT'}
                         </span>
                       </td>
-                      <td class="mono muted-cell">{tr.leverage || 1}x</td>
+                      <td class="mono muted-cell">
+                        {#if arena.mode === 'forex'}
+                          {tr.lot ? `${tr.lot} Lot` : (tr.qty ? `${(tr.qty >= 1000 ? (tr.qty / 100000).toFixed(2) : tr.qty.toFixed(2))} Lot` : '0.10 Lot')}
+                        {:else}
+                          {tr.leverage || 1}x
+                        {/if}
+                      </td>
                       <td class="r mono">{formatPrice(tr.entry)}</td>
                       <td class="r mono">{formatPrice(tr.exit)}</td>
                       <td class="r mono {isWin ? 'up' : 'down'}">

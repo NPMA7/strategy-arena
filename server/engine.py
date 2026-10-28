@@ -45,8 +45,8 @@ STRAT_COLORS = [
 def _new_account(idx: int, mode: str = "spot") -> dict:
     sid = STRATEGY_IDS[idx]
     if mode == "forex":
-        leverage = DEFAULT_LEVERAGE.get(sid, 30)
-        fee = 0.0001
+        leverage = 1
+        fee = 0.0  # Di Forex, biaya trading murni spread bid/ask MT5
     elif mode == "futures":
         leverage = DEFAULT_LEVERAGE.get(sid, 5)
         fee = FUTURES_TAKER_FEE
@@ -264,9 +264,9 @@ class Engine:
     # ── eksekusi ────────────────────────────────────────────────────────
     def _portfolio_risk(self, acct: dict) -> tuple[float, float]:
         """Return (total_committed, total_risk) across all open positions.
-        Spot: committed = notional (maks 100% equity).
-        Futures & Forex: committed = margin_used (maks 100% equity)."""
-        if self.mode in ("futures", "forex"):
+        Spot & Forex: committed = notional (maks 100% equity).
+        Futures: committed = margin_used (maks 100% equity)."""
+        if self.mode == "futures":
             tc = sum(p.get("margin_used", p["notional"] / max(1, p.get("leverage", 1))) for p in acct["pos"].values())
         else:
             tc = sum(p["notional"] for p in acct["pos"].values())
@@ -287,14 +287,14 @@ class Engine:
 
         # Risk-based position limit: alokasi margin per posisi dibatasi SINGLE_POS_CAP (20% equity = $2.000)
         # sehingga tiap strategi dapat memegang hingga MAX_POS (5) pair berbeda secara simultan
-        leverage = acct.get("leverage", 1) if self.mode in ("futures", "forex") else 1
+        leverage = acct.get("leverage", 1) if self.mode == "futures" else 1
         stop_dist = SL_MULT * atr if (atr and atr > 0) else price * 0.02
         stop_dist = max(stop_dist, price * 0.0035)
 
         # Sizing berbasis risiko murni: loss saat SL terkena adalah ~2% equity ($200 dari modal $10.000)
         target_risk = acct["equity"] * RISK
         risk_based_notional = target_risk / (stop_dist / price)
-        if self.mode in ("futures", "forex"):
+        if self.mode == "futures":
             max_notional_cap = acct["equity"] * SINGLE_POS_CAP * leverage
             est_notional = min(risk_based_notional, max_notional_cap)
             est_committed = est_notional / leverage
@@ -347,7 +347,7 @@ class Engine:
         # Margin yang dijaminkan dibatasi maks SINGLE_POS_CAP (20% equity = $2.000)
         target_risk = acct["equity"] * RISK
         risk_based_notional = target_risk / (stop_dist / price)
-        if self.mode in ("futures", "forex"):
+        if self.mode == "futures":
             max_notional_cap = acct["equity"] * SINGLE_POS_CAP * leverage
             notional = min(risk_based_notional, max_notional_cap)
             margin_used = notional / leverage
@@ -359,10 +359,15 @@ class Engine:
         if notional < 5:
             return
         qty = notional / price
-        fee = notional * fee_rate
+        fee = notional * fee_rate if self.mode != "forex" else 0.0
         stop = price - stop_dist if side == LONG else price + stop_dist
         target = price + tp_dist if side == LONG else price - tp_dist
         actual_risk = stop_dist * qty
+
+        # Standar lot Forex: 1 Standard Lot = 100,000 unit
+        lot = round(notional / 100000, 2)
+        if self.mode == "forex" and lot < 0.01:
+            lot = 0.01
 
         acct["cash"] -= fee
         acct["pos"][symbol] = {
@@ -370,11 +375,18 @@ class Engine:
             "stop": stop, "target": target, "opened_at": ts,
             "notional": notional, "margin_used": margin_used,
             "risk_amount": actual_risk, "score": score,
-            "leverage": leverage, "rr": rr_ratio,
+            "leverage": 1 if self.mode != "futures" else leverage,
+            "lot": lot if self.mode == "forex" else None,
+            "rr": rr_ratio,
         }
         self.signal_count += 1
         side_label = "LONG" if side == LONG else "SHORT"
-        lev_str = f" {leverage}x" if self.mode in ("futures", "forex") else ""
+        if self.mode == "forex":
+            lev_str = f" ({lot:.2f} Lot)"
+        elif self.mode == "futures":
+            lev_str = f" {leverage}x"
+        else:
+            lev_str = ""
         msg = f"OPEN {side_label}{lev_str} {symbol} @ {price:.6g} | size ${notional:.0f} | SL {stop:.6g} | TP {target:.6g} (RR 1:{rr_ratio:.1f})"
         self._push_event([acct["id"]], symbol, "entry", msg)
 
@@ -388,7 +400,8 @@ class Engine:
             "symbol": symbol,
             "action": f"OPEN_{side_label}",
             "side": side_label,
-            "leverage": leverage,
+            "leverage": 1 if self.mode != "futures" else leverage,
+            "lot": lot if self.mode == "forex" else None,
             "price": price,
             "stop_loss": stop,
             "take_profit": target,
@@ -410,7 +423,7 @@ class Engine:
             return
         fee_rate = acct.get("fee_rate", SPOT_FEE)
         gross = (price - p["entry"]) * p["qty"] * p["side"]
-        fee = abs(price * p["qty"]) * fee_rate
+        fee = abs(price * p["qty"]) * fee_rate if self.mode != "forex" else 0.0
         net = gross - fee
         acct["cash"] += net
         acct["realized"] += net
@@ -422,7 +435,13 @@ class Engine:
             acct["gross_loss"] += -net
         side_label = "LONG" if p["side"] == LONG else "SHORT"
         lev = p.get("leverage", 1)
-        lev_str = f" {lev}x" if self.mode == "futures" else ""
+        if self.mode == "forex":
+            lot_val = p.get("lot") or round(p["notional"] / 100000, 2)
+            lev_str = f" ({lot_val:.2f} Lot)"
+        elif self.mode == "futures":
+            lev_str = f" {lev}x"
+        else:
+            lev_str = ""
         pnl_sign = "+" if net >= 0 else ""
         event_kind = "tp" if ("Take Profit" in why or why == "tp") else ("stop" if ("Stop" in why or why == "stop") else "trade")
         close_msg = f"{why} {side_label}{lev_str} {symbol} @ {price:.6g} | entry {p['entry']:.6g} | PnL {pnl_sign}${net:.2f} | equity ${acct['equity'] + net:,.2f}"
@@ -430,8 +449,9 @@ class Engine:
         self.new_trades.append({
             "strategy": acct["id"], "symbol": symbol, "side": p["side"], "qty": p["qty"],
             "entry": p["entry"], "exit": price, "opened_at": p["opened_at"], "closed_at": ts,
-            "pnl": net, "fee": fee + p["notional"] * fee_rate, "reason": why,
-            "leverage": lev,
+            "pnl": net, "fee": fee + (p["notional"] * fee_rate if self.mode != "forex" else 0.0), "reason": why,
+            "leverage": 1 if self.mode != "futures" else lev,
+            "lot": p.get("lot"),
             "equity_after": acct["cash"] + sum(
                 (self._get_price(s, q["entry"]) - q["entry"]) * q["qty"] * q["side"]
                 for s, q in acct["pos"].items()
@@ -562,7 +582,7 @@ class Engine:
 
             accts.append({
                 "id": sid, "name": a["name"], "family": a["family"], "color": a["color"],
-                "mode": self.mode, "leverage": a.get("leverage", 1),
+                "mode": self.mode, "leverage": 1 if self.mode != "futures" else a.get("leverage", 1),
                 "equity": eq, "cash": round(a["cash"], 2), "peak": a["peak"],
                 "max_dd": a["max_dd"], "trades": a["trades"], "wins": a["wins"],
                 "gross_win": a["gross_win"], "gross_loss": a["gross_loss"], "realized": a["realized"],
@@ -577,7 +597,8 @@ class Engine:
                     "entry": p["entry"], "stop": p["stop"], "target": p["target"],
                     "opened_at": p["opened_at"], "notional": p["notional"],
                     "margin_used": p.get("margin_used", p["notional"]),
-                    "leverage": p.get("leverage", 1),
+                    "leverage": 1 if self.mode != "futures" else p.get("leverage", 1),
+                    "lot": p.get("lot"),
                     "risk_amount": p["risk_amount"], "reason": None,
                     "mark": px, "upnl": (px - p["entry"]) * p["qty"] * p["side"],
                 })

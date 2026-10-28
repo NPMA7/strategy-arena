@@ -1,31 +1,35 @@
 <script>
-  import { arena } from '../lib/store.svelte.js';
+  import { arena } from "../lib/store.svelte.js";
 
-  let selectedStrategy = $state(arena.selectedStrategyId || 'all');
+  let selectedStrategy = $state(arena.selectedStrategyId || "all");
   let selectedMode = $state(arena.mode);
-  let activeTab = $state('python'); // 'python', 'ws', 'curl', 'json'
-  let copyFeedback = $state('');
+  let activeTab = $state("python"); // 'python', 'ws', 'curl', 'json'
+  let copyFeedback = $state("");
 
   let accounts = $derived(
-    selectedMode === 'spot'
+    selectedMode === "spot"
       ? arena.spot.accounts
-      : selectedMode === 'futures'
-      ? arena.futures.accounts
-      : selectedMode === 'forex'
-      ? arena.forex.accounts
-      : [...arena.forex.accounts, ...arena.futures.accounts, ...arena.spot.accounts]
+      : selectedMode === "futures"
+        ? arena.futures.accounts
+        : selectedMode === "forex"
+          ? arena.forex.accounts
+          : [
+              ...arena.forex.accounts,
+              ...arena.futures.accounts,
+              ...arena.spot.accounts,
+            ],
   );
 
   let host = $derived(window.location.host);
-  let protoWs = $derived(window.location.protocol === 'https:' ? 'wss' : 'ws');
+  let protoWs = $derived(window.location.protocol === "https:" ? "wss" : "ws");
   let protoHttp = $derived(window.location.protocol);
 
   let wsUrl = $derived(
-    `${protoWs}://${host}/ws/signals?strategy=${selectedStrategy}&mode=${selectedMode}&api_key=${arena.activeApiKey}`
+    `${protoWs}://${host}/ws/signals?strategy=${selectedStrategy}&mode=${selectedMode}&api_key=${arena.activeApiKey}`,
   );
 
   let pythonCode = $derived(
-`import asyncio, websockets, json
+    `import asyncio, websockets, json
 
 API_KEY = "${arena.activeApiKey}"
 WS_URL = "${wsUrl}"
@@ -41,49 +45,47 @@ async def copy_trading_client():
                 print(f"[*] SIGNAL: {sig['action']} {sig['symbol']} @ {sig['price']} | TP: {sig.get('take_profit')} | SL: {sig.get('stop_loss')}")
                 # Eksekusi order ke Binance/Bybit/Exchange akun Anda
 
-asyncio.run(copy_trading_client())`
+asyncio.run(copy_trading_client())`,
   );
 
   let curlCode = $derived(
-`# 1. Cek posisi aktif strategi terpilih:
+    `# 1. Cek posisi aktif strategi terpilih:
 curl -s "${protoHttp}//${host}/api/v1/signals/positions?strategy=${selectedStrategy}&mode=${selectedMode}&api_key=${arena.activeApiKey}"
 
 # 2. Riwayat sinyal eksekusi terbaru:
 curl -s "${protoHttp}//${host}/api/v1/signals/feed?strategy=${selectedStrategy}&mode=${selectedMode}&limit=20&api_key=${arena.activeApiKey}"
 
 # 3. Peringkat performa strategi:
-curl -s "${protoHttp}//${host}/api/v1/signals/strategies?mode=${selectedMode}&api_key=${arena.activeApiKey}"`
+curl -s "${protoHttp}//${host}/api/v1/signals/strategies?mode=${selectedMode}&api_key=${arena.activeApiKey}"`,
   );
 
-  let wsCode = $derived(
-`wscat -c "${wsUrl}"`
-  );
+  let wsCode = $derived(`wscat -c "${wsUrl}"`);
 
   let jsonSchema = $derived(
-`{
+    `{
   "type": "signal",
   "signal": {
-    "strategy": "${selectedStrategy === 'all' ? 'turtle' : selectedStrategy}",
+    "strategy": "${selectedStrategy === "all" ? "turtle" : selectedStrategy}",
     "mode": "${selectedMode}",
     "symbol": "BTCUSDT",
     "action": "BUY",
     "price": 68420.5,
-    "leverage": ${selectedMode === 'futures' ? 10 : 1},
+    "leverage": ${selectedMode === "futures" ? 10 : 1},
     "margin_usd": 200.0,
     "take_profit": 71840.0,
     "stop_loss": 66710.0,
     "timestamp": 1793107500000
   }
-}`
+}`,
   );
 
   async function copyToClipboard(text, label) {
     try {
       await navigator.clipboard.writeText(text);
       copyFeedback = `${label} berhasil disalin!`;
-      setTimeout(() => (copyFeedback = ''), 2500);
+      setTimeout(() => (copyFeedback = ""), 2500);
     } catch {
-      copyFeedback = 'Gagal menyalin.';
+      copyFeedback = "Gagal menyalin.";
     }
   }
 </script>
@@ -100,29 +102,47 @@ curl -s "${protoHttp}//${host}/api/v1/signals/strategies?mode=${selectedMode}&ap
       <div class="modal-header">
         <div class="modal-title-box">
           <div class="m-icon">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+            <svg
+              viewBox="0 0 24 24"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"
+              ></polygon>
             </svg>
           </div>
           <div>
             <h2 class="font-display">Copy-Trade Signal Stream & Public API</h2>
-            <p>Salin sinyal order eksekusi (Open, TP, SL, Exit) secara real-time ke bot atau exchange pribadi.</p>
+            <p>
+              Salin sinyal order eksekusi (Open, TP, SL, Exit) secara real-time
+              ke bot atau exchange pribadi.
+            </p>
           </div>
         </div>
-        <button class="m-close" onclick={() => (arena.copyTradeModalOpen = false)}>×</button>
+        <button
+          class="m-close"
+          onclick={() => (arena.copyTradeModalOpen = false)}>×</button
+        >
       </div>
 
       <!-- Public Key Box -->
       <div class="key-box">
         <div class="key-label">
           <span>PUBLIC FEED API KEY</span>
-          <span class="rate-limit">Rate limit: 60 req/min · No Secret Required</span>
+          <span class="rate-limit"
+            >Rate limit: 60 req/min · No Secret Required</span
+          >
         </div>
         <div class="key-input-row">
           <input type="text" readonly value={arena.activeApiKey} class="mono" />
           <button
             class="btn-copy-key"
-            onclick={() => copyToClipboard(arena.activeApiKey, 'API Key')}
+            onclick={() => copyToClipboard(arena.activeApiKey, "API Key")}
           >
             Salin Kunci
           </button>
@@ -134,9 +154,10 @@ curl -s "${protoHttp}//${host}/api/v1/signals/strategies?mode=${selectedMode}&ap
         <div class="filter-col">
           <label for="selMode">PILIH PASAR:</label>
           <select id="selMode" bind:value={selectedMode}>
-            <option value="futures">Crypto Futures Arena (50++ Strategi)</option>
+            <option value="futures">Crypto Futures Arena (50++ Strategi)</option
+            >
             <option value="spot">Crypto Spot Arena (35++ Strategi)</option>
-            <option value="forex">Forex & Metals Arena (22++ Strategi)</option>
+            <option value="forex">Forex & Metals Arena (25++ Strategi)</option>
             <option value="all">Semua Pasar (Cross-Market Stream)</option>
           </select>
         </div>
@@ -147,7 +168,10 @@ curl -s "${protoHttp}//${host}/api/v1/signals/strategies?mode=${selectedMode}&ap
             <option value="all">Semua Strategi (Full Stream Feed)</option>
             {#each accounts as a}
               <option value={a.id}>
-                {a.name || a.id} ({a.equity >= 10000 ? '+' : ''}{((a.equity / 10000 - 1) * 100).toFixed(1)}%)
+                {a.name || a.id} ({a.equity >= 10000 ? "+" : ""}{(
+                  (a.equity / 10000 - 1) *
+                  100
+                ).toFixed(1)}%)
               </option>
             {/each}
           </select>
@@ -159,36 +183,36 @@ curl -s "${protoHttp}//${host}/api/v1/signals/strategies?mode=${selectedMode}&ap
         <div class="snippet-tabs">
           <button
             class="s-tab {activeTab === 'python' ? 'active' : ''}"
-            onclick={() => (activeTab = 'python')}
+            onclick={() => (activeTab = "python")}
           >
             Python Bot Client
           </button>
           <button
             class="s-tab {activeTab === 'ws' ? 'active' : ''}"
-            onclick={() => (activeTab = 'ws')}
+            onclick={() => (activeTab = "ws")}
           >
             WebSocket CLI
           </button>
           <button
             class="s-tab {activeTab === 'curl' ? 'active' : ''}"
-            onclick={() => (activeTab = 'curl')}
+            onclick={() => (activeTab = "curl")}
           >
             cURL / REST
           </button>
           <button
             class="s-tab {activeTab === 'json' ? 'active' : ''}"
-            onclick={() => (activeTab = 'json')}
+            onclick={() => (activeTab = "json")}
           >
             JSON Format
           </button>
         </div>
 
         <div class="snippet-box">
-          {#if activeTab === 'python'}
+          {#if activeTab === "python"}
             <pre class="mono"><code>{pythonCode}</code></pre>
-          {:else if activeTab === 'ws'}
+          {:else if activeTab === "ws"}
             <pre class="mono"><code>{wsCode}</code></pre>
-          {:else if activeTab === 'curl'}
+          {:else if activeTab === "curl"}
             <pre class="mono"><code>{curlCode}</code></pre>
           {:else}
             <pre class="mono"><code>{jsonSchema}</code></pre>
@@ -202,19 +226,30 @@ curl -s "${protoHttp}//${host}/api/v1/signals/strategies?mode=${selectedMode}&ap
               class="btn-copy-code"
               onclick={() => {
                 const code =
-                  activeTab === 'python'
+                  activeTab === "python"
                     ? pythonCode
-                    : activeTab === 'ws'
-                    ? wsCode
-                    : activeTab === 'curl'
-                    ? curlCode
-                    : jsonSchema;
-                copyToClipboard(code, 'Kode Cuplikan');
+                    : activeTab === "ws"
+                      ? wsCode
+                      : activeTab === "curl"
+                        ? curlCode
+                        : jsonSchema;
+                copyToClipboard(code, "Kode Cuplikan");
               }}
             >
-              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg
+                viewBox="0 0 24 24"
+                width="13"
+                height="13"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                <path
+                  d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                ></path>
               </svg>
               <span>Salin Kode</span>
             </button>

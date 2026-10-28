@@ -45,7 +45,12 @@
     {#each pairs as p (p.symbol)}
       {@const px = arena.prices[p.symbol] ?? p.last_close}
       {@const change = arena.priceChanges[p.symbol]}
-      {@const dec = p.digits ?? (p.symbol.includes('JPY') || p.symbol === 'USOIL' ? 3 : (p.symbol === 'XAUUSD' ? 2 : 5))}
+      {@const dec = p.digits ?? (p.symbol.includes('JPY') || p.symbol === 'XTIUSD' || p.symbol === 'USOIL' ? 3 : (p.symbol === 'XAUUSD' ? 2 : 5))}
+      {@const bidNum = p.bid != null ? Number(p.bid) : (px != null ? Number(px) : null)}
+      {@const askNum = p.ask != null ? Number(p.ask) : (px != null ? Number(px) : null)}
+      {@const pipVal = p.pip || (dec === 3 ? 0.01 : (dec === 2 ? 0.1 : 0.0001))}
+      {@const diff = (bidNum != null && askNum != null && askNum >= bidNum) ? (askNum - bidNum) : (p.spread != null ? Number(p.spread) : 0)}
+      {@const sprPips = (diff > 0 && pipVal > 0) ? (diff / pipVal).toFixed(1) : (p.spread_pips != null ? Number(p.spread_pips).toFixed(1) : '0.0')}
       <div class="tile {isForex ? 'tile-forex' : ''}" data-symbol={p.symbol}>
         <div class="tile-top">
           <div class="tile-sym">
@@ -63,14 +68,15 @@
           <div class="tile-fx-body">
             <div class="fx-row fx-bid mono">
               <span class="fx-lbl">Bid</span>
-              <span class="fx-val text-bid">{p.bid ? Number(p.bid).toFixed(dec) : (px ? Number(px).toFixed(dec) : '—')}</span>
+              <span class="fx-val text-bid">{bidNum != null ? bidNum.toFixed(dec) : '—'}</span>
             </div>
             <div class="fx-row fx-ask mono">
               <span class="fx-lbl">Ask</span>
-              <span class="fx-val text-ask">{p.ask ? Number(p.ask).toFixed(dec) : (px ? Number(px).toFixed(dec) : '—')}</span>
+              <span class="fx-val text-ask">{askNum != null ? askNum.toFixed(dec) : '—'}</span>
             </div>
             <div class="fx-spr-row mono">
-              <span class="spr-tag">spread {p.spread_pips != null ? p.spread_pips : '1.0'}p</span>
+              <span class="spr-tag" title="Spread dalam Pips">spread {sprPips}p</span>
+              <span class="fx-spr-diff" title="Selisih Harga (Ask - Bid)">Δ {diff.toFixed(dec)}</span>
             </div>
           </div>
         {:else}
@@ -254,17 +260,27 @@
 
   .fx-spr-row {
     display: flex;
-    justify-content: flex-end;
-    margin-top: 1px;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 2px;
+    gap: 4px;
+  }
+
+  .fx-spr-diff {
+    font-size: 8.5px;
+    font-weight: 500;
+    color: #cbd5e1;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .spr-tag {
     font-size: 8.5px;
-    font-weight: 500;
+    font-weight: 600;
     color: #cbd5e1;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    padding: 1px 4px;
-    border-radius: 3px;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 </style>

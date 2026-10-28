@@ -62,15 +62,15 @@
         {#if isForex}
           <div class="tile-fx-body">
             <div class="fx-row fx-bid mono">
-              <span class="fx-lbl">B</span>
+              <span class="fx-lbl">Bid</span>
               <span class="fx-val text-bid">{p.bid ? Number(p.bid).toFixed(dec) : (px ? Number(px).toFixed(dec) : '—')}</span>
             </div>
             <div class="fx-row fx-ask mono">
-              <span class="fx-lbl">A</span>
+              <span class="fx-lbl">Ask</span>
               <span class="fx-val text-ask">{p.ask ? Number(p.ask).toFixed(dec) : (px ? Number(px).toFixed(dec) : '—')}</span>
             </div>
             <div class="fx-spr-row mono">
-              <span class="spr-tag">spr {p.spread_pips != null ? p.spread_pips : '1.0'}p</span>
+              <span class="spr-tag">spread {p.spread_pips != null ? p.spread_pips : '1.0'}p</span>
             </div>
           </div>
         {:else}

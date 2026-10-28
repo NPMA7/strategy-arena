@@ -10,7 +10,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && \
     update-ca-certificates && rm -rf /var/lib/apt/lists/*
 
-RUN pip install --no-cache-dir aiohttp
+RUN pip install --no-cache-dir aiohttp rpyc mt5linux
 
 COPY server/mt5_bridge_server.py /app/server/mt5_bridge_server.py
 

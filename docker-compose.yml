@@ -20,6 +20,16 @@ services:
       timeout: 3s
       retries: 30
 
+  mt5-vnc:
+    image: gmag11/metatrader5_vnc:latest
+    container_name: strategy-arena-mt5-vnc
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+      - "8001:8001"
+    volumes:
+      - mt5-config:/config
+
   app:
     build:
       context: .
@@ -57,9 +67,12 @@ services:
       - "5000:5000"
     environment:
       PORT: "5000"
+      MT5_RPYC_HOST: "mt5-vnc"
+      MT5_RPYC_PORT: "8001"
     volumes:
       - ./server/mt5_bridge_server.py:/app/server/mt5_bridge_server.py:ro
 
 volumes:
   arena-pgdata:
+  mt5-config:
 

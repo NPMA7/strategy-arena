@@ -19,82 +19,122 @@ PORT = int(os.getenv("PORT", "5000"))
 
 # Data Bid, Ask, Spread & Daily Change riil persis sesuai MetaTrader 5 Headway-Demo
 HEADWAY_DATA: dict[str, dict] = {
-    "XAUUSD": {"name": "Gold Spot vs USD", "bid": 4044.61, "ask": 4044.95, "change": -0.40, "digits": 2, "pip": 0.1, "base": "XAU", "quote": "USD"},
-    "EURUSD": {"name": "Euro vs US Dollar", "bid": 1.11227, "ask": 1.11235, "change": 0.00, "digits": 5, "pip": 0.0001, "base": "EUR", "quote": "USD"},
-    "GBPUSD": {"name": "British Pound vs USD", "bid": 1.32797, "ask": 1.32804, "change": -0.17, "digits": 5, "pip": 0.0001, "base": "GBP", "quote": "USD"},
-    "USDJPY": {"name": "US Dollar vs Japanese Yen", "bid": 157.909, "ask": 157.919, "change": -0.02, "digits": 3, "pip": 0.01, "base": "USD", "quote": "JPY"},
-    "USDCAD": {"name": "US Dollar vs Canadian Dollar", "bid": 1.40482, "ask": 1.40497, "change": 0.04, "digits": 5, "pip": 0.0001, "base": "USD", "quote": "CAD"},
-    "AUDCAD": {"name": "Aussie vs Canadian Dollar", "bid": 0.98760, "ask": 0.98773, "change": 0.06, "digits": 5, "pip": 0.0001, "base": "AUD", "quote": "CAD"},
-    "AUDJPY": {"name": "Aussie vs Japanese Yen", "bid": 111.018, "ask": 111.030, "change": 0.18, "digits": 3, "pip": 0.01, "base": "AUD", "quote": "JPY"},
-    "AUDUSD": {"name": "Aussie vs US Dollar", "bid": 0.70308, "ask": 0.70319, "change": 0.18, "digits": 5, "pip": 0.0001, "base": "AUD", "quote": "USD"},
-    "EURGBP": {"name": "Euro vs British Pound", "bid": 0.83769, "ask": 0.83781, "change": 0.21, "digits": 5, "pip": 0.0001, "base": "EUR", "quote": "GBP"},
-    "EURAUD": {"name": "Euro vs Aussie", "bid": 1.58221, "ask": 1.58235, "change": 0.02, "digits": 5, "pip": 0.0001, "base": "EUR", "quote": "AUD"},
-    "EURJPY": {"name": "Euro vs Japanese Yen", "bid": 175.665, "ask": 175.674, "change": 0.00, "digits": 3, "pip": 0.01, "base": "EUR", "quote": "JPY"},
-    "EURNZD": {"name": "Euro vs Kiwi", "bid": 1.98392, "ask": 1.98410, "change": 1.32, "digits": 5, "pip": 0.0001, "base": "EUR", "quote": "NZD"},
-    "GBPJPY": {"name": "British Pound vs Japanese Yen", "bid": 209.693, "ask": 209.710, "change": -0.18, "digits": 3, "pip": 0.01, "base": "GBP", "quote": "JPY"},
-    "GBPAUD": {"name": "British Pound vs Aussie", "bid": 1.88883, "ask": 1.88889, "change": -0.26, "digits": 5, "pip": 0.0001, "base": "GBP", "quote": "AUD"},
-    "GBPCAD": {"name": "British Pound vs Canadian Dollar", "bid": 1.86544, "ask": 1.86565, "change": -0.21, "digits": 5, "pip": 0.0001, "base": "GBP", "quote": "CAD"},
-    "GBPNZD": {"name": "British Pound vs Kiwi", "bid": 2.36824, "ask": 2.36858, "change": 1.23, "digits": 5, "pip": 0.0001, "base": "GBP", "quote": "NZD"},
-    "NZDUSD": {"name": "Kiwi vs US Dollar", "bid": 0.56066, "ask": 0.56075, "change": -1.31, "digits": 5, "pip": 0.0001, "base": "NZD", "quote": "USD"},
-    "NZDCAD": {"name": "Kiwi vs Canadian Dollar", "bid": 0.78760, "ask": 0.78776, "change": -1.30, "digits": 5, "pip": 0.0001, "base": "NZD", "quote": "CAD"},
-    "CADJPY": {"name": "Canadian Dollar vs Japanese Yen", "bid": 112.450, "ask": 112.466, "change": 0.05, "digits": 3, "pip": 0.01, "base": "CAD", "quote": "JPY"},
-    "CHFJPY": {"name": "Swiss Franc vs Japanese Yen", "bid": 190.526, "ask": 190.548, "change": -0.08, "digits": 3, "pip": 0.01, "base": "CHF", "quote": "JPY"},
-    "NZDJPY": {"name": "Kiwi vs Japanese Yen", "bid": 89.750, "ask": 89.768, "change": -0.15, "digits": 3, "pip": 0.01, "base": "NZD", "quote": "JPY"},
-    "AUDNZD": {"name": "Aussie vs Kiwi", "bid": 1.10171, "ask": 1.10187, "change": 0.02, "digits": 5, "pip": 0.0001, "base": "AUD", "quote": "NZD"},
-    "USOIL":  {"name": "Crude Oil WTI (XTIUSD)", "bid": 105.510, "ask": 105.630, "change": 1.43, "digits": 3, "pip": 0.01, "base": "USOIL", "quote": "USD"},
-    "USDCHF": {"name": "US Dollar vs Swiss Franc", "bid": 0.82842, "ask": 0.82855, "change": -0.10, "digits": 5, "pip": 0.0001, "base": "USD", "quote": "CHF"},
-    "EURCHF": {"name": "Euro vs Swiss Franc", "bid": 0.92135, "ask": 0.92149, "change": -0.05, "digits": 5, "pip": 0.0001, "base": "EUR", "quote": "CHF"},
-    "GBPCHF": {"name": "British Pound vs Swiss Franc", "bid": 1.10069, "ask": 1.10087, "change": -0.20, "digits": 5, "pip": 0.0001, "base": "GBP", "quote": "CHF"},
 }
 
+MT5_RPYC_HOST = os.getenv("MT5_RPYC_HOST", "mt5-vnc")
+MT5_RPYC_PORT = int(os.getenv("MT5_RPYC_PORT", "8001"))
+
 current_ticks: dict[str, dict] = {}
+_mt5_instance = None
+_last_mt5_attempt = 0.0
+
+
+def get_live_mt5():
+    """Mendapatkan koneksi aktif ke MetaTrader 5 Linux di container via mt5linux/RPyC."""
+    global _mt5_instance, _last_mt5_attempt
+    now = time.time()
+    if _mt5_instance is not None:
+        return _mt5_instance
+    if now - _last_mt5_attempt < 3.0:
+        return None
+    _last_mt5_attempt = now
+    try:
+        from mt5linux import MetaTrader5
+        client = MetaTrader5(host=MT5_RPYC_HOST, port=MT5_RPYC_PORT)
+        if client.initialize():
+            log.info("✓ Terhubung langsung ke MetaTrader 5 Linux (KasmVNC) di %s:%d", MT5_RPYC_HOST, MT5_RPYC_PORT)
+            _mt5_instance = client
+            return _mt5_instance
+    except Exception as exc:
+        pass
+    return None
 
 
 async def tick_updater_loop():
-    """Background loop mengupdate live tick pergerakan micro-pip setiap 500ms."""
+    """Background loop mengupdate live tick pergerakan dari MetaTrader 5 realtime."""
+    global _mt5_instance
     while True:
         try:
             now_sec = time.time()
             now_ms = int(now_sec * 1000)
+            mt5 = get_live_mt5()
 
             for sym, meta in HEADWAY_DATA.items():
                 digits = meta["digits"]
                 pip = meta["pip"]
-                base_bid = meta["bid"]
-                base_ask = meta["ask"]
-                spr_points = round(base_ask - base_bid, digits)
-                spr_pips = round(spr_points / pip, 1)
 
-                prev = current_ticks.get(sym)
-                target_mid = (base_bid + base_ask) / 2.0
-                cur_mid = prev["price"] if prev else target_mid
+                # 1. Coba ambil tick riil langsung dari MT5 jika terhubung
+                got_live_tick = False
+                if mt5:
+                    try:
+                        tick = mt5.symbol_info_tick(sym)
+                        if tick and getattr(tick, "bid", 0) > 0 and getattr(tick, "ask", 0) > 0:
+                            bid = round(float(tick.bid), digits)
+                            ask = round(float(tick.ask), digits)
+                            mid = round((bid + ask) / 2.0, digits)
+                            spr_points = round(ask - bid, digits)
+                            spr_pips = round(spr_points / pip, 1)
+                            tick_time = int(getattr(tick, "time", now_sec))
+                            tick_msc = int(getattr(tick, "time_msc", now_ms)) if getattr(tick, "time_msc", 0) > 0 else now_ms
+                            current_ticks[sym] = {
+                                "symbol": sym,
+                                "name": meta["name"],
+                                "base": meta["base"],
+                                "quote": meta["quote"],
+                                "bid": bid,
+                                "ask": ask,
+                                "last": mid,
+                                "price": bid,
+                                "spread": spr_points,
+                                "spread_pips": spr_pips,
+                                "change": meta["change"],
+                                "digits": digits,
+                                "pip": pip,
+                                "time": tick_time,
+                                "time_msc": tick_msc,
+                                "source": "mt5-live",
+                            }
+                            got_live_tick = True
+                    except Exception as exc:
+                        _mt5_instance = None
 
-                # Variasi mikro tick terikat ketat ke harga broker Headway asli (0.1 - 0.2 pip)
-                reversion = 0.25 * (target_mid - cur_mid)
-                shock = random.gauss(0, pip * 0.10)
-                mid = round(cur_mid + reversion + shock, digits)
+                # 2. Jika MT5 belum terhubung/tengah login, update harga dari Headway-Demo
+                if not got_live_tick:
+                    base_bid = meta["bid"]
+                    base_ask = meta["ask"]
+                    spr_points = round(base_ask - base_bid, digits)
+                    spr_pips = round(spr_points / pip, 1)
 
-                half_spr = spr_points / 2.0
-                bid = round(mid - half_spr, digits)
-                ask = round(mid + half_spr, digits)
+                    prev = current_ticks.get(sym)
+                    target_mid = (base_bid + base_ask) / 2.0
+                    cur_mid = prev["price"] if prev else target_mid
 
-                current_ticks[sym] = {
-                    "symbol": sym,
-                    "name": meta["name"],
-                    "base": meta["base"],
-                    "quote": meta["quote"],
-                    "bid": bid,
-                    "ask": ask,
-                    "last": mid,
-                    "price": mid,
-                    "spread": spr_points,
-                    "spread_pips": spr_pips,
-                    "change": meta["change"],
-                    "digits": digits,
-                    "pip": pip,
-                    "time": int(now_sec),
-                    "time_msc": now_ms,
-                }
+                    reversion = 0.25 * (target_mid - cur_mid)
+                    shock = random.gauss(0, pip * 0.10)
+                    mid = round(cur_mid + reversion + shock, digits)
+
+                    half_spr = spr_points / 2.0
+                    bid = round(mid - half_spr, digits)
+                    ask = round(mid + half_spr, digits)
+
+                    current_ticks[sym] = {
+                        "symbol": sym,
+                        "name": meta["name"],
+                        "base": meta["base"],
+                        "quote": meta["quote"],
+                        "bid": bid,
+                        "ask": ask,
+                        "last": mid,
+                        "price": bid,
+                        "spread": spr_points,
+                        "spread_pips": spr_pips,
+                        "change": meta["change"],
+                        "digits": digits,
+                        "pip": pip,
+                        "time": int(now_sec),
+                        "time_msc": now_ms,
+                        "source": "headway-calibrated",
+                    }
 
             await asyncio.sleep(0.5)
         except Exception as exc:
@@ -104,6 +144,7 @@ async def tick_updater_loop():
 
 # Route Handlers
 async def handle_health(request):
+    mt5 = get_live_mt5()
     return web.json_response({
         "status": "healthy",
         "service": "mt5-bridge",
@@ -112,12 +153,13 @@ async def handle_health(request):
         "broker": "Headway",
         "live_feed": "MetaTrader 5 Real-Time Price Bridge (Headway)",
         "connected": True,
+        "mt5_live_connected": bool(mt5 is not None),
         "symbols_count": len(current_ticks),
-        "gold_price": current_ticks.get("XAUUSD", {}).get("price", 4051.30),
-        "oil_price": current_ticks.get("USOIL", {}).get("price", 105.53),
-        "eurusd": current_ticks.get("EURUSD", {}).get("price", 1.11229),
-        "usdjpy": current_ticks.get("USDJPY", {}).get("price", 157.868),
-        "gbpusd": current_ticks.get("GBPUSD", {}).get("price", 1.32838),
+        "gold_price": current_ticks.get("XAUUSD", {}).get("price", 4044.61),
+        "oil_price": current_ticks.get("USOIL", {}).get("price", 105.51),
+        "eurusd": current_ticks.get("EURUSD", {}).get("price", 1.11227),
+        "usdjpy": current_ticks.get("USDJPY", {}).get("price", 157.909),
+        "gbpusd": current_ticks.get("GBPUSD", {}).get("price", 1.32797),
     })
 
 
@@ -137,15 +179,37 @@ async def handle_symbol_tick(request):
             "spread": t["spread"],
             "spread_pips": t["spread_pips"],
             "time": t["time"],
+            "source": t.get("source", "live"),
         })
     return web.json_response({"error": f"Symbol {sym} not found"}, status=404)
 
 
 async def handle_fetch_data_pos(request):
-    """Mengembalikan bar candle M1 realistis terkalibrasi persis ke broker Headway."""
+    """Mengembalikan bar candle M1 riil langsung dari MT5 terminal jika terhubung."""
     sym = request.query.get("symbol", "EURUSD").upper()
     num_bars = int(request.query.get("num_bars", "100"))
     num_bars = min(max(num_bars, 10), 500)
+
+    # Coba ambil candle asli dari MT5 jika aktif
+    mt5 = get_live_mt5()
+    if mt5:
+        try:
+            rates = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M1, 0, num_bars)
+            if rates is not None and len(rates) > 0:
+                bars = []
+                for r in rates:
+                    bars.append({
+                        "time": int(r["time"]),
+                        "open": float(r["open"]),
+                        "high": float(r["high"]),
+                        "low": float(r["low"]),
+                        "close": float(r["close"]),
+                        "tick_volume": int(r.get("tick_volume", 100)),
+                        "spread": int(r.get("spread", 1)),
+                    })
+                return web.json_response(bars)
+        except Exception:
+            pass
 
     meta = HEADWAY_DATA.get(sym, HEADWAY_DATA["EURUSD"])
     base = current_ticks.get(sym, {}).get("price", (meta["bid"] + meta["ask"]) / 2.0)

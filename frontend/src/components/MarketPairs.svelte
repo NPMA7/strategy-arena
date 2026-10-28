@@ -58,20 +58,25 @@
             </span>
           {/if}
         </div>
-        <div class="tile-px mono {change === 'up' ? 'text-up' : change === 'down' ? 'text-down' : ''}">
-          {#if isForex}
-            {px ? Number(px).toFixed(dec) : '—'}
-          {:else}
-            {px ? formatPrice(px) : '—'}
-          {/if}
-        </div>
+
         {#if isForex}
-          <div class="tile-ba mono">
-            <span class="ba-val"><span class="ba-lbl">B</span>{p.bid ? Number(p.bid).toFixed(dec) : (px ? Number(px).toFixed(dec) : '—')}</span>
-            <span class="ba-val"><span class="ba-lbl">A</span>{p.ask ? Number(p.ask).toFixed(dec) : (px ? Number(px).toFixed(dec) : '—')}</span>
-            <span class="spr-tag">spr {p.spread_pips ?? '1.2'}p</span>
+          <div class="tile-fx-body">
+            <div class="fx-row fx-bid mono">
+              <span class="fx-lbl">B</span>
+              <span class="fx-val text-bid">{p.bid ? Number(p.bid).toFixed(dec) : (px ? Number(px).toFixed(dec) : '—')}</span>
+            </div>
+            <div class="fx-row fx-ask mono">
+              <span class="fx-lbl">A</span>
+              <span class="fx-val text-ask">{p.ask ? Number(p.ask).toFixed(dec) : (px ? Number(px).toFixed(dec) : '—')}</span>
+            </div>
+            <div class="fx-spr-row mono">
+              <span class="spr-tag">spr {p.spread_pips != null ? p.spread_pips : '1.0'}p</span>
+            </div>
           </div>
         {:else}
+          <div class="tile-px mono {change === 'up' ? 'text-up' : change === 'down' ? 'text-down' : ''}">
+            {px ? formatPrice(px) : '—'}
+          </div>
           <div class="tile-vol mono muted">
             vol {formatUSD(p.quote_volume ?? 50000000, 0)}
           </div>
@@ -121,8 +126,8 @@
     overflow-y: scroll;
     scrollbar-gutter: stable;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-    gap: 4px;
+    grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
+    gap: 5px;
     padding: 8px;
     background: #06090e;
   }
@@ -136,6 +141,10 @@
     flex-direction: column;
     gap: 2px;
     transition: background 0.12s, border-color 0.12s;
+  }
+
+  .tile-forex {
+    padding: 7px 9px;
   }
 
   .tile:hover {
@@ -207,34 +216,55 @@
     text-overflow: ellipsis;
   }
 
-  .tile-ba {
+  .tile-fx-body {
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    gap: 2.5px;
+    margin-top: 3px;
+  }
+
+  .fx-row {
+    display: flex;
+    align-items: baseline;
     justify-content: space-between;
-    font-size: 8.5px;
-    color: #94a3b8;
-    gap: 2px;
+    line-height: 1.2;
+  }
+
+  .fx-lbl {
+    font-size: 9.5px;
+    font-weight: 700;
+    color: #64748b;
+    width: 14px;
+    flex-shrink: 0;
+  }
+
+  .fx-val {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  .text-bid {
+    color: #f43f5e;
+  }
+
+  .text-ask {
+    color: #38bdf8;
+  }
+
+  .fx-spr-row {
+    display: flex;
+    justify-content: flex-end;
     margin-top: 1px;
   }
 
-  .ba-val {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .ba-lbl {
-    color: #64748b;
-    margin-right: 1.5px;
-    font-size: 7.5px;
-  }
-
   .spr-tag {
-    font-size: 8px;
+    font-size: 8.5px;
+    font-weight: 500;
     color: #cbd5e1;
     background: rgba(255, 255, 255, 0.06);
-    padding: 0 3px;
-    border-radius: 2px;
-    flex-shrink: 0;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 1px 4px;
+    border-radius: 3px;
   }
 </style>

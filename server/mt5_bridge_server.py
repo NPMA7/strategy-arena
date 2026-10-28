@@ -19,32 +19,32 @@ PORT = int(os.getenv("PORT", "5000"))
 
 # Data Bid, Ask, Spread & Daily Change riil persis sesuai MetaTrader 5 Headway-Demo
 HEADWAY_DATA: dict[str, dict] = {
-    "XAUUSD": {"name": "Gold Spot vs USD", "bid": 4051.12, "ask": 4051.48, "change": -0.24, "digits": 2, "pip": 0.1, "base": "XAU", "quote": "USD"},
-    "EURUSD": {"name": "Euro vs US Dollar", "bid": 1.11224, "ask": 1.11234, "change": -0.01, "digits": 5, "pip": 0.0001, "base": "EUR", "quote": "USD"},
-    "GBPUSD": {"name": "British Pound vs USD", "bid": 1.32832, "ask": 1.32845, "change": -0.14, "digits": 5, "pip": 0.0001, "base": "GBP", "quote": "USD"},
-    "USDJPY": {"name": "US Dollar vs Japanese Yen", "bid": 157.863, "ask": 157.873, "change": -0.04, "digits": 3, "pip": 0.01, "base": "USD", "quote": "JPY"},
-    "USDCAD": {"name": "US Dollar vs Canadian Dollar", "bid": 1.40588, "ask": 1.40603, "change": 0.12, "digits": 5, "pip": 0.0001, "base": "USD", "quote": "CAD"},
-    "AUDCAD": {"name": "Aussie vs Canadian Dollar", "bid": 0.98776, "ask": 0.98790, "change": 0.08, "digits": 5, "pip": 0.0001, "base": "AUD", "quote": "CAD"},
-    "AUDJPY": {"name": "Aussie vs Japanese Yen", "bid": 110.918, "ask": 110.933, "change": 0.09, "digits": 3, "pip": 0.01, "base": "AUD", "quote": "JPY"},
-    "AUDUSD": {"name": "Aussie vs US Dollar", "bid": 0.70264, "ask": 0.70276, "change": 0.11, "digits": 5, "pip": 0.0001, "base": "AUD", "quote": "USD"},
-    "EURGBP": {"name": "Euro vs British Pound", "bid": 0.83745, "ask": 0.83759, "change": 0.18, "digits": 5, "pip": 0.0001, "base": "EUR", "quote": "GBP"},
-    "EURAUD": {"name": "Euro vs Aussie", "bid": 1.58310, "ask": 1.58329, "change": 0.08, "digits": 5, "pip": 0.0001, "base": "EUR", "quote": "AUD"},
-    "EURJPY": {"name": "Euro vs Japanese Yen", "bid": 175.609, "ask": 175.618, "change": -0.03, "digits": 3, "pip": 0.01, "base": "EUR", "quote": "JPY"},
-    "EURNZD": {"name": "Euro vs Kiwi", "bid": 1.98723, "ask": 1.98752, "change": 1.49, "digits": 5, "pip": 0.0001, "base": "EUR", "quote": "NZD"},
-    "GBPJPY": {"name": "British Pound vs Japanese Yen", "bid": 209.681, "ask": 209.708, "change": -0.19, "digits": 3, "pip": 0.01, "base": "GBP", "quote": "JPY"},
-    "GBPAUD": {"name": "British Pound vs Aussie", "bid": 1.89038, "ask": 1.89054, "change": -0.18, "digits": 5, "pip": 0.0001, "base": "GBP", "quote": "AUD"},
-    "GBPCAD": {"name": "British Pound vs Canadian Dollar", "bid": 1.86732, "ask": 1.86760, "change": -0.11, "digits": 5, "pip": 0.0001, "base": "GBP", "quote": "CAD"},
-    "GBPNZD": {"name": "British Pound vs Kiwi", "bid": 2.37282, "ask": 2.37336, "change": 1.43, "digits": 5, "pip": 0.0001, "base": "GBP", "quote": "NZD"},
-    "NZDUSD": {"name": "Kiwi vs US Dollar", "bid": 0.55968, "ask": 0.55979, "change": -1.48, "digits": 5, "pip": 0.0001, "base": "NZD", "quote": "USD"},
-    "NZDCAD": {"name": "Kiwi vs Canadian Dollar", "bid": 0.78684, "ask": 0.78704, "change": -1.40, "digits": 5, "pip": 0.0001, "base": "NZD", "quote": "CAD"},
-    "CADJPY": {"name": "Canadian Dollar vs Japanese Yen", "bid": 112.444, "ask": 112.460, "change": 0.05, "digits": 3, "pip": 0.01, "base": "CAD", "quote": "JPY"},
-    "CHFJPY": {"name": "Swiss Franc vs Japanese Yen", "bid": 190.515, "ask": 190.537, "change": -0.08, "digits": 3, "pip": 0.01, "base": "CHF", "quote": "JPY"},
-    "NZDJPY": {"name": "Kiwi vs Japanese Yen", "bid": 89.739, "ask": 89.757, "change": -0.15, "digits": 3, "pip": 0.01, "base": "NZD", "quote": "JPY"},
-    "AUDNZD": {"name": "Aussie vs Kiwi", "bid": 1.10176, "ask": 1.10192, "change": 0.02, "digits": 5, "pip": 0.0001, "base": "AUD", "quote": "NZD"},
-    "USOIL":  {"name": "Crude Oil WTI (XTIUSD)", "bid": 105.470, "ask": 105.590, "change": 1.43, "digits": 3, "pip": 0.01, "base": "USOIL", "quote": "USD"},
-    "USDCHF": {"name": "US Dollar vs Swiss Franc", "bid": 0.82845, "ask": 0.82858, "change": -0.10, "digits": 5, "pip": 0.0001, "base": "USD", "quote": "CHF"},
-    "EURCHF": {"name": "Euro vs Swiss Franc", "bid": 0.92140, "ask": 0.92154, "change": -0.05, "digits": 5, "pip": 0.0001, "base": "EUR", "quote": "CHF"},
-    "GBPCHF": {"name": "British Pound vs Swiss Franc", "bid": 1.10050, "ask": 1.10068, "change": -0.20, "digits": 5, "pip": 0.0001, "base": "GBP", "quote": "CHF"},
+    "XAUUSD": {"name": "Gold Spot vs USD", "bid": 4046.51, "ask": 4046.86, "change": -0.35, "digits": 2, "pip": 0.1, "base": "XAU", "quote": "USD"},
+    "EURUSD": {"name": "Euro vs US Dollar", "bid": 1.11243, "ask": 1.11250, "change": 0.01, "digits": 5, "pip": 0.0001, "base": "EUR", "quote": "USD"},
+    "GBPUSD": {"name": "British Pound vs USD", "bid": 1.32849, "ask": 1.32857, "change": -0.13, "digits": 5, "pip": 0.0001, "base": "GBP", "quote": "USD"},
+    "USDJPY": {"name": "US Dollar vs Japanese Yen", "bid": 157.873, "ask": 157.883, "change": -0.04, "digits": 3, "pip": 0.01, "base": "USD", "quote": "JPY"},
+    "USDCAD": {"name": "US Dollar vs Canadian Dollar", "bid": 1.40560, "ask": 1.40575, "change": 0.10, "digits": 5, "pip": 0.0001, "base": "USD", "quote": "CAD"},
+    "AUDCAD": {"name": "Aussie vs Canadian Dollar", "bid": 0.98753, "ask": 0.98766, "change": 0.06, "digits": 5, "pip": 0.0001, "base": "AUD", "quote": "CAD"},
+    "AUDJPY": {"name": "Aussie vs Japanese Yen", "bid": 110.920, "ask": 110.934, "change": 0.09, "digits": 3, "pip": 0.01, "base": "AUD", "quote": "JPY"},
+    "AUDUSD": {"name": "Aussie vs US Dollar", "bid": 0.70265, "ask": 0.70275, "change": 0.12, "digits": 5, "pip": 0.0001, "base": "AUD", "quote": "USD"},
+    "EURGBP": {"name": "Euro vs British Pound", "bid": 0.83747, "ask": 0.83761, "change": 0.18, "digits": 5, "pip": 0.0001, "base": "EUR", "quote": "GBP"},
+    "EURAUD": {"name": "Euro vs Aussie", "bid": 1.58344, "ask": 1.58358, "change": 0.10, "digits": 5, "pip": 0.0001, "base": "EUR", "quote": "AUD"},
+    "EURJPY": {"name": "Euro vs Japanese Yen", "bid": 175.645, "ask": 175.654, "change": -0.01, "digits": 3, "pip": 0.01, "base": "EUR", "quote": "JPY"},
+    "EURNZD": {"name": "Euro vs Kiwi", "bid": 1.98701, "ask": 1.98716, "change": 1.48, "digits": 5, "pip": 0.0001, "base": "EUR", "quote": "NZD"},
+    "GBPJPY": {"name": "British Pound vs Japanese Yen", "bid": 209.721, "ask": 209.740, "change": -0.17, "digits": 3, "pip": 0.01, "base": "GBP", "quote": "JPY"},
+    "GBPAUD": {"name": "British Pound vs Aussie", "bid": 1.89073, "ask": 1.89082, "change": -0.16, "digits": 5, "pip": 0.0001, "base": "GBP", "quote": "AUD"},
+    "GBPCAD": {"name": "British Pound vs Canadian Dollar", "bid": 1.86722, "ask": 1.86742, "change": -0.12, "digits": 5, "pip": 0.0001, "base": "GBP", "quote": "CAD"},
+    "GBPNZD": {"name": "British Pound vs Kiwi", "bid": 2.37249, "ask": 2.37285, "change": 1.42, "digits": 5, "pip": 0.0001, "base": "GBP", "quote": "NZD"},
+    "NZDUSD": {"name": "Kiwi vs US Dollar", "bid": 0.55987, "ask": 0.55995, "change": -1.45, "digits": 5, "pip": 0.0001, "base": "NZD", "quote": "USD"},
+    "NZDCAD": {"name": "Kiwi vs Canadian Dollar", "bid": 0.78694, "ask": 0.78709, "change": -1.38, "digits": 5, "pip": 0.0001, "base": "NZD", "quote": "CAD"},
+    "CADJPY": {"name": "Canadian Dollar vs Japanese Yen", "bid": 112.450, "ask": 112.466, "change": 0.05, "digits": 3, "pip": 0.01, "base": "CAD", "quote": "JPY"},
+    "CHFJPY": {"name": "Swiss Franc vs Japanese Yen", "bid": 190.526, "ask": 190.548, "change": -0.08, "digits": 3, "pip": 0.01, "base": "CHF", "quote": "JPY"},
+    "NZDJPY": {"name": "Kiwi vs Japanese Yen", "bid": 89.750, "ask": 89.768, "change": -0.15, "digits": 3, "pip": 0.01, "base": "NZD", "quote": "JPY"},
+    "AUDNZD": {"name": "Aussie vs Kiwi", "bid": 1.10171, "ask": 1.10187, "change": 0.02, "digits": 5, "pip": 0.0001, "base": "AUD", "quote": "NZD"},
+    "USOIL":  {"name": "Crude Oil WTI (XTIUSD)", "bid": 105.510, "ask": 105.630, "change": 1.43, "digits": 3, "pip": 0.01, "base": "USOIL", "quote": "USD"},
+    "USDCHF": {"name": "US Dollar vs Swiss Franc", "bid": 0.82843, "ask": 0.82856, "change": -0.10, "digits": 5, "pip": 0.0001, "base": "USD", "quote": "CHF"},
+    "EURCHF": {"name": "Euro vs Swiss Franc", "bid": 0.92137, "ask": 0.92151, "change": -0.05, "digits": 5, "pip": 0.0001, "base": "EUR", "quote": "CHF"},
+    "GBPCHF": {"name": "British Pound vs Swiss Franc", "bid": 1.10069, "ask": 1.10087, "change": -0.20, "digits": 5, "pip": 0.0001, "base": "GBP", "quote": "CHF"},
 }
 
 current_ticks: dict[str, dict] = {}
@@ -66,11 +66,12 @@ async def tick_updater_loop():
                 spr_pips = round(spr_points / pip, 1)
 
                 prev = current_ticks.get(sym)
-                cur_mid = prev["price"] if prev else (base_bid + base_ask) / 2.0
+                target_mid = (base_bid + base_ask) / 2.0
+                cur_mid = prev["price"] if prev else target_mid
 
-                # Variasi mikro tick (stokastik real-time bergerak per sepersepuluh pip)
-                reversion = 0.02 * (((base_bid + base_ask) / 2.0) - cur_mid)
-                shock = random.gauss(0, pip * 0.4)
+                # Variasi mikro tick terikat ketat ke harga broker Headway asli (0.1 - 0.2 pip)
+                reversion = 0.25 * (target_mid - cur_mid)
+                shock = random.gauss(0, pip * 0.10)
                 mid = round(cur_mid + reversion + shock, digits)
 
                 half_spr = spr_points / 2.0

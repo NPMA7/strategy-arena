@@ -123,6 +123,7 @@ class DB:
             await con.execute("""
                 ALTER TABLE trades ADD COLUMN IF NOT EXISTS mode TEXT NOT NULL DEFAULT 'spot';
                 ALTER TABLE trades ADD COLUMN IF NOT EXISTS leverage INTEGER NOT NULL DEFAULT 1;
+                CREATE INDEX IF NOT EXISTS trades_strategy_closed ON trades (strategy, mode, closed_at DESC);
             """)
 
             # equity_curve: tambahkan mode
@@ -689,7 +690,6 @@ CREATE TABLE IF NOT EXISTS trades (
     equity_after DOUBLE PRECISION NOT NULL,
     leverage    INTEGER NOT NULL DEFAULT 1
 );
-CREATE INDEX IF NOT EXISTS trades_strategy_closed ON trades (strategy, mode, closed_at DESC);
 CREATE INDEX IF NOT EXISTS trades_closed ON trades (closed_at DESC);
 
 CREATE TABLE IF NOT EXISTS equity_curve (

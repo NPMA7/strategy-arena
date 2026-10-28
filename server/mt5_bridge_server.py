@@ -1,142 +1,226 @@
 """MT5 Quant Bridge Server — Dedicated Microservice untuk MetaTrader 5 (Headway-Demo).
-Menyediakan REST API di port 5000 untuk 22 pair Forex & Metals dengan data Bid, Ask, Spread riil.
+Menyediakan REST API di port 5000 untuk 22 pair Forex & Commodities dengan data Bid, Ask, Spread riil 100% dari MetaTrader 5.
 """
 
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import os
-import random
 import time
 from aiohttp import web
+import rpyc
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] mt5-bridge: %(message)s")
 log = logging.getLogger("mt5-bridge")
 
 PORT = int(os.getenv("PORT", "5000"))
+MT5_RPYC_HOST = os.getenv("MT5_RPYC_HOST", "mt5-vnc")
+MT5_RPYC_PORT = int(os.getenv("MT5_RPYC_PORT", "18812"))
 
-# Data Bid, Ask, Spread & Daily Change riil persis sesuai MetaTrader 5 Headway-Demo
-HEADWAY_DATA: dict[str, dict] = {
+# 22 Pair Forex & Komoditas Strategy Arena beserta spesifikasi broker Headway
+PAIRS: dict[str, dict] = {
+    "EURUSD": {"name": "Euro vs US Dollar", "digits": 5, "pip": 0.0001, "base": "EUR", "quote": "USD", "broker_symbol": "EURUSD"},
+    "GBPUSD": {"name": "British Pound vs USD", "digits": 5, "pip": 0.0001, "base": "GBP", "quote": "USD", "broker_symbol": "GBPUSD"},
+    "USDJPY": {"name": "US Dollar vs Japanese Yen", "digits": 3, "pip": 0.01, "base": "USD", "quote": "JPY", "broker_symbol": "USDJPY"},
+    "USDCHF": {"name": "US Dollar vs Swiss Franc", "digits": 5, "pip": 0.0001, "base": "USD", "quote": "CHF", "broker_symbol": "USDCHF"},
+    "AUDUSD": {"name": "Aussie vs US Dollar", "digits": 5, "pip": 0.0001, "base": "AUD", "quote": "USD", "broker_symbol": "AUDUSD"},
+    "USDCAD": {"name": "US Dollar vs Canadian Dollar", "digits": 5, "pip": 0.0001, "base": "USD", "quote": "CAD", "broker_symbol": "USDCAD"},
+    "NZDUSD": {"name": "Kiwi vs US Dollar", "digits": 5, "pip": 0.0001, "base": "NZD", "quote": "USD", "broker_symbol": "NZDUSD"},
+    "GBPJPY": {"name": "British Pound vs Japanese Yen", "digits": 3, "pip": 0.01, "base": "GBP", "quote": "JPY", "broker_symbol": "GBPJPY"},
+    "EURJPY": {"name": "Euro vs Japanese Yen", "digits": 3, "pip": 0.01, "base": "EUR", "quote": "JPY", "broker_symbol": "EURJPY"},
+    "AUDJPY": {"name": "Aussie vs Japanese Yen", "digits": 3, "pip": 0.01, "base": "AUD", "quote": "JPY", "broker_symbol": "AUDJPY"},
+    "CADJPY": {"name": "Canadian Dollar vs Japanese Yen", "digits": 3, "pip": 0.01, "base": "CAD", "quote": "JPY", "broker_symbol": "CADJPY"},
+    "CHFJPY": {"name": "Swiss Franc vs Japanese Yen", "digits": 3, "pip": 0.01, "base": "CHF", "quote": "JPY", "broker_symbol": "CHFJPY"},
+    "NZDJPY": {"name": "Kiwi vs Japanese Yen", "digits": 3, "pip": 0.01, "base": "NZD", "quote": "JPY", "broker_symbol": "NZDJPY"},
+    "EURGBP": {"name": "Euro vs British Pound", "digits": 5, "pip": 0.0001, "base": "EUR", "quote": "GBP", "broker_symbol": "EURGBP"},
+    "EURCHF": {"name": "Euro vs Swiss Franc", "digits": 5, "pip": 0.0001, "base": "EUR", "quote": "CHF", "broker_symbol": "EURCHF"},
+    "GBPCHF": {"name": "British Pound vs Swiss Franc", "digits": 5, "pip": 0.0001, "base": "GBP", "quote": "CHF", "broker_symbol": "GBPCHF"},
+    "AUDNZD": {"name": "Aussie vs Kiwi", "digits": 5, "pip": 0.0001, "base": "AUD", "quote": "NZD", "broker_symbol": "AUDNZD"},
+    "AUDCAD": {"name": "Aussie vs Canadian Dollar", "digits": 5, "pip": 0.0001, "base": "AUD", "quote": "CAD", "broker_symbol": "AUDCAD"},
+    "EURAUD": {"name": "Euro vs Aussie", "digits": 5, "pip": 0.0001, "base": "EUR", "quote": "AUD", "broker_symbol": "EURAUD"},
+    "GBPAUD": {"name": "British Pound vs Aussie", "digits": 5, "pip": 0.0001, "base": "GBP", "quote": "AUD", "broker_symbol": "GBPAUD"},
+    "XAUUSD": {"name": "Gold Spot vs USD", "digits": 2, "pip": 0.1, "base": "XAU", "quote": "USD", "broker_symbol": "XAUUSD"},
+    "USOIL": {"name": "WTI Crude Oil", "digits": 2, "pip": 0.01, "base": "OIL", "quote": "USD", "broker_symbol": "XTIUSD"},
 }
 
-MT5_RPYC_HOST = os.getenv("MT5_RPYC_HOST", "mt5-vnc")
-MT5_RPYC_PORT = int(os.getenv("MT5_RPYC_PORT", "8001"))
+BROKER_MAP = {k: v["broker_symbol"] for k, v in PAIRS.items()}
 
 current_ticks: dict[str, dict] = {}
-_mt5_instance = None
-_last_mt5_attempt = 0.0
+day_open_prices: dict[str, float] = {}
+
+cached_account_info: dict = {
+    "login": 6310591,
+    "server": "Headway-Demo",
+    "balance": 0.0,
+    "connected": False,
+}
+
+_rpyc_conn = None
+_last_conn_attempt = 0.0
 
 
-def get_live_mt5():
-    """Mendapatkan koneksi aktif ke MetaTrader 5 Linux di container via mt5linux/RPyC."""
-    global _mt5_instance, _last_mt5_attempt
+def _sync_connect_rpyc():
+    """Mengelola koneksi persisten ke server RPyC MT5 di mt5-vnc (dieksekusi di worker thread)."""
+    global _rpyc_conn, _last_conn_attempt, cached_account_info
     now = time.time()
-    if _mt5_instance is not None:
-        return _mt5_instance
-    if now - _last_mt5_attempt < 3.0:
+    if _rpyc_conn is not None:
+        try:
+            if not _rpyc_conn.closed:
+                return _rpyc_conn
+        except Exception:
+            _rpyc_conn = None
+
+    if now - _last_conn_attempt < 3.0:
         return None
-    _last_mt5_attempt = now
+    _last_conn_attempt = now
+
     try:
-        from mt5linux import MetaTrader5
-        client = MetaTrader5(host=MT5_RPYC_HOST, port=MT5_RPYC_PORT)
-        if client.initialize():
-            log.info("✓ Terhubung langsung ke MetaTrader 5 Linux (KasmVNC) di %s:%d", MT5_RPYC_HOST, MT5_RPYC_PORT)
-            _mt5_instance = client
-            return _mt5_instance
+        log.info("Mencoba menghubungkan ke RPyC MT5 di %s:%d...", MT5_RPYC_HOST, MT5_RPYC_PORT)
+        conn = rpyc.classic.connect(MT5_RPYC_HOST, MT5_RPYC_PORT)
+        conn._config["sync_request_timeout"] = 10
+
+        # Initialize MT5 and remote batch routines
+        conn.execute("""
+import sys
+if 'C:\\\\mt5libs' not in sys.path:
+    sys.path.append('C:\\\\mt5libs')
+import MetaTrader5 as mt5
+
+def _arena_init():
+    ok = mt5.initialize(path="C:\\\\MT5\\\\terminal64.exe", portable=True)
+    if not ok:
+        ok = mt5.initialize()
+    if ok:
+        info = mt5.account_info()
+        if not info or info.login != 6310591:
+            mt5.login(6310591, password="@sTRAGEYaRENA200", server="Headway-Demo")
+    return ok
+
+def _arena_select_symbols(symbols):
+    for s in symbols:
+        mt5.symbol_select(s, True)
+    return True
+
+def _arena_get_ticks(pairs_map):
+    res = {}
+    for arena_sym, broker_sym in pairs_map.items():
+        t = mt5.symbol_info_tick(broker_sym)
+        if t and t.bid > 0 and t.ask > 0:
+            res[arena_sym] = (float(t.bid), float(t.ask), float(t.last), int(t.time), int(t.time_msc))
+    return res
+
+def _arena_get_bars(broker_sym, num_bars):
+    rates = mt5.copy_rates_from_pos(broker_sym, mt5.TIMEFRAME_M1, 0, num_bars)
+    if rates is None:
+        return []
+    out = []
+    for r in rates:
+        out.append({
+            "time": int(r["time"]),
+            "open": float(r["open"]),
+            "high": float(r["high"]),
+            "low": float(r["low"]),
+            "close": float(r["close"]),
+            "tick_volume": int(r["tick_volume"]),
+            "spread": int(r["spread"]),
+        })
+    return out
+""")
+
+        init_ok = conn.eval("_arena_init()")
+        if init_ok:
+            conn.eval(f"_arena_select_symbols({list(BROKER_MAP.values())})")
+            log.info("✓ Sukses terhubung dan menginisialisasi MT5 di %s:%d", MT5_RPYC_HOST, MT5_RPYC_PORT)
+            _rpyc_conn = conn
+            cached_account_info["connected"] = True
+            try:
+                acc = conn.eval("mt5.account_info()")
+                if acc:
+                    cached_account_info["login"] = int(acc.login)
+                    cached_account_info["server"] = str(acc.server)
+                    cached_account_info["balance"] = float(acc.balance)
+            except Exception:
+                pass
+            return _rpyc_conn
+        else:
+            err = conn.eval("mt5.last_error()")
+            log.warning("MT5 initialize() di remote RPyC mengembalikan False: %s", err)
+            cached_account_info["connected"] = False
+            return None
     except Exception as exc:
-        pass
-    return None
+        log.warning("Gagal connect ke RPyC MT5 (%s:%d): %s", MT5_RPYC_HOST, MT5_RPYC_PORT, exc)
+        _rpyc_conn = None
+        cached_account_info["connected"] = False
+        return None
+
+
+def _sync_fetch_ticks(conn):
+    """Fetch ticks synchronously in worker thread."""
+    global cached_account_info
+    if conn is None:
+        return None
+    try:
+        ticks_raw = conn.eval(f"_arena_get_ticks({BROKER_MAP})")
+        return ticks_raw
+    except Exception as exc:
+        log.warning("Gagal fetch ticks dari MT5: %s", exc)
+        return None
 
 
 async def tick_updater_loop():
-    """Background loop mengupdate live tick pergerakan dari MetaTrader 5 realtime."""
-    global _mt5_instance
+    """Background polling loop yang mengambil harga live MT5 langsung dari broker Headway."""
+    global _rpyc_conn
     while True:
         try:
             now_sec = time.time()
             now_ms = int(now_sec * 1000)
-            mt5 = get_live_mt5()
+            conn = await asyncio.to_thread(_sync_connect_rpyc)
 
-            for sym, meta in HEADWAY_DATA.items():
-                digits = meta["digits"]
-                pip = meta["pip"]
+            if conn is not None:
+                ticks_raw = await asyncio.to_thread(_sync_fetch_ticks, conn)
+                if ticks_raw and isinstance(ticks_raw, dict):
+                    for sym, (bid, ask, last, t_sec, t_msc) in ticks_raw.items():
+                        meta = PAIRS.get(sym)
+                        if not meta:
+                            continue
+                        digits = meta["digits"]
+                        pip = meta["pip"]
 
-                # 1. Coba ambil tick riil langsung dari MT5 jika terhubung
-                got_live_tick = False
-                if mt5:
-                    try:
-                        tick = mt5.symbol_info_tick(sym)
-                        if tick and getattr(tick, "bid", 0) > 0 and getattr(tick, "ask", 0) > 0:
-                            bid = round(float(tick.bid), digits)
-                            ask = round(float(tick.ask), digits)
-                            mid = round((bid + ask) / 2.0, digits)
-                            spr_points = round(ask - bid, digits)
-                            spr_pips = round(spr_points / pip, 1)
-                            tick_time = int(getattr(tick, "time", now_sec))
-                            tick_msc = int(getattr(tick, "time_msc", now_ms)) if getattr(tick, "time_msc", 0) > 0 else now_ms
-                            current_ticks[sym] = {
-                                "symbol": sym,
-                                "name": meta["name"],
-                                "base": meta["base"],
-                                "quote": meta["quote"],
-                                "bid": bid,
-                                "ask": ask,
-                                "last": mid,
-                                "price": bid,
-                                "spread": spr_points,
-                                "spread_pips": spr_pips,
-                                "change": meta["change"],
-                                "digits": digits,
-                                "pip": pip,
-                                "time": tick_time,
-                                "time_msc": tick_msc,
-                                "source": "mt5-live",
-                            }
-                            got_live_tick = True
-                    except Exception as exc:
-                        _mt5_instance = None
+                        bid = round(bid, digits)
+                        ask = round(ask, digits)
+                        mid = round((bid + ask) / 2.0, digits)
+                        spr_points = round(ask - bid, digits)
+                        spr_pips = round(spr_points / pip, 1)
 
-                # 2. Jika MT5 belum terhubung/tengah login, update harga dari Headway-Demo
-                if not got_live_tick:
-                    base_bid = meta["bid"]
-                    base_ask = meta["ask"]
-                    spr_points = round(base_ask - base_bid, digits)
-                    spr_pips = round(spr_points / pip, 1)
+                        if sym not in day_open_prices:
+                            day_open_prices[sym] = mid
+                        day_open = day_open_prices[sym]
+                        change_pct = round(((mid - day_open) / day_open) * 100.0, 2) if day_open > 0 else 0.0
 
-                    prev = current_ticks.get(sym)
-                    target_mid = (base_bid + base_ask) / 2.0
-                    cur_mid = prev["price"] if prev else target_mid
+                        current_ticks[sym] = {
+                            "symbol": sym,
+                            "name": meta["name"],
+                            "base": meta["base"],
+                            "quote": meta["quote"],
+                            "bid": bid,
+                            "ask": ask,
+                            "last": mid,
+                            "price": bid,
+                            "spread": spr_points,
+                            "spread_pips": spr_pips,
+                            "change": change_pct,
+                            "digits": digits,
+                            "pip": pip,
+                            "time": t_sec if t_sec > 0 else int(now_sec),
+                            "time_msc": t_msc if t_msc > 0 else now_ms,
+                            "source": "mt5-live",
+                        }
+                elif ticks_raw is None:
+                    _rpyc_conn = None
+                    cached_account_info["connected"] = False
 
-                    reversion = 0.25 * (target_mid - cur_mid)
-                    shock = random.gauss(0, pip * 0.10)
-                    mid = round(cur_mid + reversion + shock, digits)
-
-                    half_spr = spr_points / 2.0
-                    bid = round(mid - half_spr, digits)
-                    ask = round(mid + half_spr, digits)
-
-                    current_ticks[sym] = {
-                        "symbol": sym,
-                        "name": meta["name"],
-                        "base": meta["base"],
-                        "quote": meta["quote"],
-                        "bid": bid,
-                        "ask": ask,
-                        "last": mid,
-                        "price": bid,
-                        "spread": spr_points,
-                        "spread_pips": spr_pips,
-                        "change": meta["change"],
-                        "digits": digits,
-                        "pip": pip,
-                        "time": int(now_sec),
-                        "time_msc": now_ms,
-                        "source": "headway-calibrated",
-                    }
-
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(0.3)
         except Exception as exc:
             log.warning("Tick loop exception: %s", exc)
             await asyncio.sleep(1)
@@ -144,22 +228,22 @@ async def tick_updater_loop():
 
 # Route Handlers
 async def handle_health(request):
-    mt5 = get_live_mt5()
     return web.json_response({
         "status": "healthy",
         "service": "mt5-bridge",
-        "server": "Headway-Demo",
-        "account": 6310591,
+        "server": cached_account_info.get("server") or "Headway-Demo",
+        "account": cached_account_info.get("login") or 6310591,
+        "balance": cached_account_info.get("balance", 0.0),
         "broker": "Headway",
         "live_feed": "MetaTrader 5 Real-Time Price Bridge (Headway)",
         "connected": True,
-        "mt5_live_connected": bool(mt5 is not None),
+        "mt5_live_connected": cached_account_info.get("connected", False),
         "symbols_count": len(current_ticks),
-        "gold_price": current_ticks.get("XAUUSD", {}).get("price", 4044.61),
-        "oil_price": current_ticks.get("USOIL", {}).get("price", 105.51),
-        "eurusd": current_ticks.get("EURUSD", {}).get("price", 1.11227),
-        "usdjpy": current_ticks.get("USDJPY", {}).get("price", 157.909),
-        "gbpusd": current_ticks.get("GBPUSD", {}).get("price", 1.32797),
+        "gold_price": current_ticks.get("XAUUSD", {}).get("price", 0.0),
+        "oil_price": current_ticks.get("USOIL", {}).get("price", 0.0),
+        "eurusd": current_ticks.get("EURUSD", {}).get("price", 0.0),
+        "usdjpy": current_ticks.get("USDJPY", {}).get("price", 0.0),
+        "gbpusd": current_ticks.get("GBPUSD", {}).get("price", 0.0),
     })
 
 
@@ -179,7 +263,7 @@ async def handle_symbol_tick(request):
             "spread": t["spread"],
             "spread_pips": t["spread_pips"],
             "time": t["time"],
-            "source": t.get("source", "live"),
+            "source": t.get("source", "mt5-live"),
         })
     return web.json_response({"error": f"Symbol {sym} not found"}, status=404)
 
@@ -189,56 +273,18 @@ async def handle_fetch_data_pos(request):
     sym = request.query.get("symbol", "EURUSD").upper()
     num_bars = int(request.query.get("num_bars", "100"))
     num_bars = min(max(num_bars, 10), 500)
+    broker_sym = BROKER_MAP.get(sym, sym)
 
-    # Coba ambil candle asli dari MT5 jika aktif
-    mt5 = get_live_mt5()
-    if mt5:
+    conn = get_rpyc_connection()
+    if conn:
         try:
-            rates = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M1, 0, num_bars)
-            if rates is not None and len(rates) > 0:
-                bars = []
-                for r in rates:
-                    bars.append({
-                        "time": int(r["time"]),
-                        "open": float(r["open"]),
-                        "high": float(r["high"]),
-                        "low": float(r["low"]),
-                        "close": float(r["close"]),
-                        "tick_volume": int(r.get("tick_volume", 100)),
-                        "spread": int(r.get("spread", 1)),
-                    })
+            bars = conn.eval(f"_arena_get_bars('{broker_sym}', {num_bars})")
+            if bars and isinstance(bars, list) and len(bars) > 0:
                 return web.json_response(bars)
-        except Exception:
-            pass
+        except Exception as exc:
+            log.warning("Gagal fetch bars dari MT5 untuk %s: %s", sym, exc)
 
-    meta = HEADWAY_DATA.get(sym, HEADWAY_DATA["EURUSD"])
-    base = current_ticks.get(sym, {}).get("price", (meta["bid"] + meta["ask"]) / 2.0)
-    digits = meta["digits"]
-    pip = meta["pip"]
-
-    now_sec = int(time.time())
-    start_sec = now_sec - (num_bars * 60)
-
-    bars = []
-    p = base * (1.0 + random.uniform(-0.002, 0.002))
-    for i in range(num_bars):
-        t = start_sec + (i * 60)
-        o = p
-        drift = random.gauss(0, pip * 1.5)
-        c = round(o + drift, digits)
-        h = round(max(o, c) + abs(random.gauss(0, pip * 1.0)), digits)
-        l = round(min(o, c) - abs(random.gauss(0, pip * 1.0)), digits)
-        bars.append({
-            "time": t,
-            "open": o,
-            "high": h,
-            "low": l,
-            "close": c,
-            "tick_volume": random.randint(40, 200),
-            "spread": int((meta["ask"] - meta["bid"]) / pip),
-        })
-        p = c
-    return web.json_response(bars)
+    return web.json_response([], status=503)
 
 
 async def init_app():

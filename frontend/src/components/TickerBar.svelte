@@ -51,15 +51,23 @@
         {#each pairs as p (p.symbol + '_g1')}
           {@const price = arena.prices[p.symbol] ?? p.last_close}
           {@const flash = arena.priceChanges[p.symbol]}
-          <div class="ticker-item">
+          {@const dec = p.digits ?? (p.symbol.includes('JPY') || p.symbol === 'USOIL' ? 3 : (p.symbol === 'XAUUSD' ? 2 : 5))}
+          {@const bid = p.bid ?? price}
+          {@const ask = p.ask ?? (price && p.spread ? price + p.spread : price)}
+          {@const spr = p.spread_pips ?? '0.8'}
+          <div class="ticker-item {isForex ? 'ticker-item-fx' : ''}">
             <span class="ticker-sym">{isForex ? p.symbol : (p.base || p.symbol.replace('USDT', ''))}</span>
-            <span class="ticker-price mono {flash === 'up' ? 'flash-up' : flash === 'down' ? 'flash-down' : ''}">
-              {#if isForex}
-                {price ? Number(price).toFixed(p.symbol.includes('JPY') || p.symbol === 'USOIL' ? 3 : (p.symbol === 'XAUUSD' ? 2 : 5)) : '---'}
-              {:else}
+            {#if isForex}
+              <div class="fx-ticker-3row mono {flash === 'up' ? 'flash-up' : flash === 'down' ? 'flash-down' : ''}">
+                <span class="fx-b">B {bid ? Number(bid).toFixed(dec) : '---'}</span>
+                <span class="fx-a">A {ask ? Number(ask).toFixed(dec) : '---'}</span>
+                <span class="fx-s">{spr}p</span>
+              </div>
+            {:else}
+              <span class="ticker-price mono {flash === 'up' ? 'flash-up' : flash === 'down' ? 'flash-down' : ''}">
                 ${price ? formatPrice(price) : '---'}
-              {/if}
-            </span>
+              </span>
+            {/if}
           </div>
         {/each}
       </div>
@@ -69,15 +77,23 @@
         {#each pairs as p (p.symbol + '_g2')}
           {@const price = arena.prices[p.symbol] ?? p.last_close}
           {@const flash = arena.priceChanges[p.symbol]}
-          <div class="ticker-item">
+          {@const dec = p.digits ?? (p.symbol.includes('JPY') || p.symbol === 'USOIL' ? 3 : (p.symbol === 'XAUUSD' ? 2 : 5))}
+          {@const bid = p.bid ?? price}
+          {@const ask = p.ask ?? (price && p.spread ? price + p.spread : price)}
+          {@const spr = p.spread_pips ?? '0.8'}
+          <div class="ticker-item {isForex ? 'ticker-item-fx' : ''}">
             <span class="ticker-sym">{isForex ? p.symbol : (p.base || p.symbol.replace('USDT', ''))}</span>
-            <span class="ticker-price mono {flash === 'up' ? 'flash-up' : flash === 'down' ? 'flash-down' : ''}">
-              {#if isForex}
-                {price ? Number(price).toFixed(p.symbol.includes('JPY') || p.symbol === 'USOIL' ? 3 : (p.symbol === 'XAUUSD' ? 2 : 5)) : '---'}
-              {:else}
+            {#if isForex}
+              <div class="fx-ticker-3row mono {flash === 'up' ? 'flash-up' : flash === 'down' ? 'flash-down' : ''}">
+                <span class="fx-b">B {bid ? Number(bid).toFixed(dec) : '---'}</span>
+                <span class="fx-a">A {ask ? Number(ask).toFixed(dec) : '---'}</span>
+                <span class="fx-s">{spr}p</span>
+              </div>
+            {:else}
+              <span class="ticker-price mono {flash === 'up' ? 'flash-up' : flash === 'down' ? 'flash-down' : ''}">
                 ${price ? formatPrice(price) : '---'}
-              {/if}
-            </span>
+              </span>
+            {/if}
           </div>
         {/each}
       </div>
@@ -187,6 +203,41 @@
     align-items: center;
     gap: 6px;
     white-space: nowrap;
+  }
+
+  .ticker-item-fx {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 1px 6px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 4px;
+  }
+
+  .fx-ticker-3row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .fx-b {
+    color: #38bdf8;
+  }
+
+  .fx-a {
+    color: #f43f5e;
+  }
+
+  .fx-s {
+    color: #10b981;
+    font-size: 9.5px;
+    font-weight: 700;
+    background: rgba(16, 185, 129, 0.12);
+    padding: 1px 4px;
+    border-radius: 3px;
   }
 
   .ticker-sym {

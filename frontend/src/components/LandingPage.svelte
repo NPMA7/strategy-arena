@@ -16,11 +16,17 @@
     return list.slice(0, 3);
   });
 
+  let topForex = $derived.by(() => {
+    const list = [...arena.forexAccounts];
+    list.sort((a, b) => (b.equity ?? 0) - (a.equity ?? 0));
+    return list.slice(0, 3);
+  });
+
   function enterTerminal(mode, stratId = null) {
     if (stratId) {
       arena.selectedStrategyId = stratId;
     }
-    arena.navigate(mode === 'futures' ? '/crypto-futures' : '/crypto-spot');
+    arena.navigate(mode === 'forex' ? '/forex' : (mode === 'futures' ? '/crypto-futures' : '/crypto-spot'));
   }
 </script>
 
@@ -73,6 +79,9 @@
         <button class="nav-btn btn-futures" onclick={() => enterTerminal('futures')}>
           <span>Terminal Futures</span>
         </button>
+        <button class="nav-btn btn-forex" onclick={() => enterTerminal('forex')}>
+          <span>Terminal Forex</span>
+        </button>
       </div>
     </div>
   </header>
@@ -83,9 +92,9 @@
       <!-- Left Column: Copy & Direct CTAs -->
       <div class="hero-content">
         <div class="eyebrow mono">
-          <span>LIVE BINANCE WEBSOCKET</span>
+          <span>LIVE BINANCE & METATRADER 5</span>
           <span class="bullet">·</span>
-          <span>100++ PAIR USDT</span>
+          <span>120++ PAIRS MULTI-ASSET</span>
         </div>
 
         <h1 class="hero-title">
@@ -94,19 +103,24 @@
         </h1>
 
         <p class="hero-desc">
-          50++ algoritma kuantitatif independen bertarung tanpa emosi di pasar kripto Binance real-time. Dilengkapi mark-to-market live per detik, kalkulasi leverage hingga 20x, simulasi funding rate 8 jam, dan fee komisi nyata.
+          76 algoritma kuantitatif independen bertarung tanpa emosi di pasar kripto Binance dan Forex & Metals MT5 secara real-time. Dilengkapi mark-to-market live per detik, kalkulasi leverage hingga 40x, simulasi funding rate & spread komisi nyata.
         </p>
 
         <!-- CTAs -->
         <div class="hero-ctas">
           <button class="cta-primary" onclick={() => enterTerminal('futures')}>
             <div class="cta-title">Masuk Arena Futures</div>
-            <div class="cta-sub mono">LEVERAGE HINGGA 20X · FUNDING 0.01%</div>
+            <div class="cta-sub mono">LEVERAGE 1-20X · 50++ STRATEGI</div>
+          </button>
+
+          <button class="cta-forex" onclick={() => enterTerminal('forex')}>
+            <div class="cta-title">Masuk Arena Forex</div>
+            <div class="cta-sub mono">22 PAIR FX & METALS · 22 STRATEGI</div>
           </button>
 
           <button class="cta-secondary" onclick={() => enterTerminal('spot')}>
             <div class="cta-title">Masuk Arena Spot</div>
-            <div class="cta-sub mono">NO-LEVERAGE</div>
+            <div class="cta-sub mono">NO-LEVERAGE · 35++ STRATEGI</div>
           </button>
         </div>
 
@@ -215,6 +229,38 @@
             {/each}
           </div>
         </div>
+
+        <!-- Top Forex Column -->
+        <div class="podium-col">
+          <div class="col-header">
+            <span class="col-tag forex-tag">FOREX & METALS</span>
+            <span class="col-meta mono">22 Model · ~30x Leverage</span>
+          </div>
+
+          <div class="card-stack">
+            {#each topForex as s, idx}
+              <div
+                class="podium-card"
+                role="button"
+                tabindex="0"
+                onclick={() => enterTerminal('forex', s.id)}
+                onkeydown={(e) => e.key === 'Enter' && enterTerminal('forex', s.id)}
+              >
+                <div class="card-left">
+                  <span class="rank-badge mono">#{idx + 1}</span>
+                  <div>
+                    <div class="strat-name">{s.name}</div>
+                    <div class="strat-sub mono">{s.leverage || 30}x Lev · {s.trades || 0} Trade · WR {s.trades > 0 ? ((s.wins / s.trades) * 100).toFixed(0) : 0}%</div>
+                  </div>
+                </div>
+                <div class="card-right">
+                  <div class="strat-eq mono">{formatUSD(s.equity)}</div>
+                  <div class="strat-ret mono {s.returnPct >= 0 ? 'up' : 'down'}">{formatPercent(s.returnPct)}</div>
+                </div>
+              </div>
+            {/each}
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -280,6 +326,7 @@
       <div class="foot-links">
         <button class="foot-btn" onclick={() => enterTerminal('spot')}>Terminal Spot</button>
         <button class="foot-btn" onclick={() => enterTerminal('futures')}>Terminal Futures</button>
+        <button class="foot-btn" onclick={() => enterTerminal('forex')}>Terminal Forex</button>
         <a href="/api/bootstrap" target="_blank" class="foot-btn">API Bootstrap</a>
       </div>
     </div>
@@ -404,6 +451,17 @@
     background: #fbbf24;
   }
 
+  .btn-forex {
+    background: rgba(16, 185, 129, 0.12);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    font-weight: 600;
+  }
+
+  .btn-forex:hover {
+    background: rgba(16, 185, 129, 0.22);
+  }
+
   /* Hero Section */
   .hero-section {
     padding: 56px 24px 72px;
@@ -485,6 +543,37 @@
     font-size: 9.5px;
     font-weight: 700;
     opacity: 0.85;
+    margin-top: 3px;
+  }
+
+  .cta-forex {
+    background: rgba(16, 185, 129, 0.08);
+    color: #ffffff;
+    border: 1px solid rgba(16, 185, 129, 0.35);
+    padding: 12px 22px;
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s ease;
+  }
+
+  .cta-forex:hover {
+    border-color: #10b981;
+    background: rgba(16, 185, 129, 0.16);
+    transform: translateY(-1px);
+  }
+
+  .cta-forex .cta-title {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: #10b981;
+  }
+
+  .cta-forex .cta-sub {
+    font-size: 9.5px;
+    font-weight: 600;
+    color: #64748b;
     margin-top: 3px;
   }
 
@@ -590,7 +679,7 @@
 
   .podium-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
     gap: 20px;
   }
 
@@ -622,6 +711,10 @@
 
   .futures-tag {
     color: #38bdf8;
+  }
+
+  .forex-tag {
+    color: #10b981;
   }
 
   .col-meta {

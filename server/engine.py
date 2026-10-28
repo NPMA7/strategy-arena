@@ -23,7 +23,7 @@ from .strategies import (
     LONG, MAX_POS, SHORT, SIGNAL_FN, STRATEGY_IDS, STRATEGY_META, THRESHOLD,
     SINGLE_POS_CAP, TOTAL_NOTIONAL_CAP, TOTAL_RISK_CAP, DEFAULT_LEVERAGE,
     SPOT_FEE, FUTURES_TAKER_FEE, FUNDING_RATE_DEFAULT, FUNDING_INTERVAL_SEC,
-    SPOT_STRATEGIES, FUTURES_STRATEGIES, get_strategy_rr,
+    SPOT_STRATEGIES, FUTURES_STRATEGIES, FOREX_STRATEGIES, get_strategy_rr,
 )
 
 START_EQUITY = 10_000.0
@@ -44,8 +44,15 @@ STRAT_COLORS = [
 
 def _new_account(idx: int, mode: str = "spot") -> dict:
     sid = STRATEGY_IDS[idx]
-    leverage = DEFAULT_LEVERAGE.get(sid, 5) if mode == "futures" else 1
-    fee = FUTURES_TAKER_FEE if mode == "futures" else SPOT_FEE
+    if mode == "forex":
+        leverage = DEFAULT_LEVERAGE.get(sid, 30)
+        fee = 0.0001
+    elif mode == "futures":
+        leverage = DEFAULT_LEVERAGE.get(sid, 5)
+        fee = FUTURES_TAKER_FEE
+    else:
+        leverage = 1
+        fee = SPOT_FEE
     return {
         "id": sid,
         "name": STRATEGY_META[sid]["name"],
@@ -73,9 +80,14 @@ def _new_account(idx: int, mode: str = "spot") -> dict:
 
 class Engine:
     def __init__(self, rings: dict[str, BarRing], mode: str = "spot") -> None:
-        self.mode = mode  # "spot" or "futures"
+        self.mode = mode  # "spot", "futures", or "forex"
         self.rings = rings
-        self.strategy_ids = FUTURES_STRATEGIES if mode == "futures" else SPOT_STRATEGIES
+        if mode == "forex":
+            self.strategy_ids = FOREX_STRATEGIES
+        elif mode == "futures":
+            self.strategy_ids = FUTURES_STRATEGIES
+        else:
+            self.strategy_ids = SPOT_STRATEGIES
         self.accounts: dict[str, dict] = {}
         for i, sid in enumerate(STRATEGY_IDS):
             if sid in self.strategy_ids:
@@ -253,8 +265,8 @@ class Engine:
     def _portfolio_risk(self, acct: dict) -> tuple[float, float]:
         """Return (total_committed, total_risk) across all open positions.
         Spot: committed = notional (maks 100% equity).
-        Futures: committed = margin_used (maks 100% equity)."""
-        if self.mode == "futures":
+        Futures & Forex: committed = margin_used (maks 100% equity)."""
+        if self.mode in ("futures", "forex"):
             tc = sum(p.get("margin_used", p["notional"] / max(1, p.get("leverage", 1))) for p in acct["pos"].values())
         else:
             tc = sum(p["notional"] for p in acct["pos"].values())
@@ -275,14 +287,14 @@ class Engine:
 
         # Risk-based position limit: alokasi margin per posisi dibatasi SINGLE_POS_CAP (20% equity = $2.000)
         # sehingga tiap strategi dapat memegang hingga MAX_POS (5) pair berbeda secara simultan
-        leverage = acct.get("leverage", 1) if self.mode == "futures" else 1
+        leverage = acct.get("leverage", 1) if self.mode in ("futures", "forex") else 1
         stop_dist = SL_MULT * atr if (atr and atr > 0) else price * 0.02
         stop_dist = max(stop_dist, price * 0.0035)
 
         # Sizing berbasis risiko murni: loss saat SL terkena adalah ~2% equity ($200 dari modal $10.000)
         target_risk = acct["equity"] * RISK
         risk_based_notional = target_risk / (stop_dist / price)
-        if self.mode == "futures":
+        if self.mode in ("futures", "forex"):
             max_notional_cap = acct["equity"] * SINGLE_POS_CAP * leverage
             est_notional = min(risk_based_notional, max_notional_cap)
             est_committed = est_notional / leverage
@@ -335,7 +347,7 @@ class Engine:
         # Margin yang dijaminkan dibatasi maks SINGLE_POS_CAP (20% equity = $2.000)
         target_risk = acct["equity"] * RISK
         risk_based_notional = target_risk / (stop_dist / price)
-        if self.mode == "futures":
+        if self.mode in ("futures", "forex"):
             max_notional_cap = acct["equity"] * SINGLE_POS_CAP * leverage
             notional = min(risk_based_notional, max_notional_cap)
             margin_used = notional / leverage
@@ -362,7 +374,7 @@ class Engine:
         }
         self.signal_count += 1
         side_label = "LONG" if side == LONG else "SHORT"
-        lev_str = f" {leverage}x" if self.mode == "futures" else ""
+        lev_str = f" {leverage}x" if self.mode in ("futures", "forex") else ""
         msg = f"OPEN {side_label}{lev_str} {symbol} @ {price:.6g} | size ${notional:.0f} | SL {stop:.6g} | TP {target:.6g} (RR 1:{rr_ratio:.1f})"
         self._push_event([acct["id"]], symbol, "entry", msg)
 

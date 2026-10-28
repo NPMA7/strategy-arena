@@ -3,9 +3,7 @@
   import { formatUSD, formatPrice } from '../lib/formatters.js';
 
   let searchQuery = $state('');
-  let allPositions = $derived(
-    arena.mode === 'spot' ? (arena.spot?.positions || []) : (arena.futures?.positions || [])
-  );
+  let allPositions = $derived(arena.allActivePositions);
 
   let filteredPositions = $derived.by(() => {
     const list = allPositions || [];

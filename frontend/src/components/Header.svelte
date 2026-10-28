@@ -67,13 +67,17 @@
         <span class="count-badge num">50++ Strats</span>
       </button>
 
-      <div class="switcher-btn disabled" title="Direncanakan untuk Phase 2">
-        <span class="label">Saham</span>
-        <span class="tag-soon">Segera</span>
-      </div>
+      <button
+        class="switcher-btn {arena.mode === 'forex' ? 'active-forex' : ''}"
+        onclick={() => handleModeChange('forex')}
+      >
+        <span class="indicator-dot dot-emerald"></span>
+        <span class="label">Forex</span>
+        <span class="count-badge num">22++ Strats</span>
+      </button>
 
       <div class="switcher-btn disabled" title="Direncanakan untuk Phase 2">
-        <span class="label">Forex</span>
+        <span class="label">Saham</span>
         <span class="tag-soon">Segera</span>
       </div>
     </nav>
@@ -215,6 +219,13 @@
     border: 1px solid var(--border-cyan);
   }
 
+  .switcher-btn.active-forex {
+    background-color: var(--bg-surface-elevated);
+    color: #10b981;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid rgba(16, 185, 129, 0.4);
+  }
+
   .switcher-btn.disabled {
     opacity: 0.45;
     cursor: not-allowed;
@@ -232,6 +243,10 @@
 
   .dot-cyan {
     background-color: var(--color-cyan);
+  }
+
+  .dot-emerald {
+    background-color: #10b981;
   }
 
   .count-badge {

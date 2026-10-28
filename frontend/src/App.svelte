@@ -11,11 +11,7 @@
   import { arena } from './lib/store.svelte.js';
 
   let totalTrades = $derived(arena.totalTrades);
-  let openPositionsCount = $derived(
-    arena.mode === 'spot'
-      ? (arena.spot?.positions?.length || 0)
-      : (arena.futures?.positions?.length || 0)
-  );
+  let openPositionsCount = $derived(arena.allActivePositions.length);
 </script>
 
 {#if arena.currentRoute === 'landing'}
@@ -25,7 +21,7 @@
     <!-- Top Navigation & Market Switcher (Modern Header) -->
     <Header />
 
-    <!-- Live Binance Spot/Futures Ticker Bar -->
+    <!-- Live Binance Spot/Futures / MT5 Forex Ticker Bar -->
     <TickerBar />
 
     <!-- Main Trading Floor Shell -->
@@ -43,7 +39,7 @@
         </div>
       </div>
 
-      <!-- Split Market & Realtime Logs: Pasar 100 Pair USDT + Log Realtime (Equal Height) -->
+      <!-- Split Market & Realtime Logs: Pasar Pair + Log Realtime (Equal Height) -->
       <div class="grid market-logs-grid">
         <div class="cell bottom-left">
           <MarketPairs />
@@ -56,7 +52,7 @@
       <!-- Institutional Footer Bar -->
       <footer class="floor-foot">
         <span class="foot-left">
-          Data: Binance REST + WebSocket · Database menyimpan candle, akun, trade, kurva ekuitas
+          Data: {arena.mode === 'forex' ? 'MT5 Bridge / MetaQuotes Realtime Feed' : 'Binance REST + WebSocket'} · Database menyimpan candle, akun, trade, kurva ekuitas
         </span>
         <span class="foot-right mono">
           {openPositionsCount} posisi terbuka

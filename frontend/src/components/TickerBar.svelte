@@ -33,13 +33,14 @@
   });
 
   let isFutures = $derived(arena.mode === 'futures');
+  let isForex = $derived(arena.mode === 'forex');
 </script>
 
 <div class="ticker-bar-root">
   <!-- Market Mode Identifier Pill -->
   <div class="ticker-label">
-    <span class="dot {isFutures ? 'dot-futures' : 'dot-spot'}">●</span>
-    <span class="label-text">CRYPTO PAIRS</span>
+    <span class="dot {isForex ? 'dot-forex' : (isFutures ? 'dot-futures' : 'dot-spot')}">●</span>
+    <span class="label-text">{isForex ? 'FOREX & METALS' : (isFutures ? 'FUTURES PAIRS' : 'SPOT PAIRS')}</span>
   </div>
 
   <!-- Infinite Smooth Animated Marquee Ticker -->
@@ -51,9 +52,13 @@
           {@const price = arena.prices[p.symbol] ?? p.last_close}
           {@const flash = arena.priceChanges[p.symbol]}
           <div class="ticker-item">
-            <span class="ticker-sym">{p.base || p.symbol.replace('USDT', '')}</span>
+            <span class="ticker-sym">{isForex ? p.symbol : (p.base || p.symbol.replace('USDT', ''))}</span>
             <span class="ticker-price mono {flash === 'up' ? 'flash-up' : flash === 'down' ? 'flash-down' : ''}">
-              ${price ? formatPrice(price) : '---'}
+              {#if isForex}
+                {price ? Number(price).toFixed(p.symbol.includes('JPY') || p.symbol === 'USOIL' ? 3 : (p.symbol === 'XAUUSD' ? 2 : 5)) : '---'}
+              {:else}
+                ${price ? formatPrice(price) : '---'}
+              {/if}
             </span>
           </div>
         {/each}
@@ -65,9 +70,13 @@
           {@const price = arena.prices[p.symbol] ?? p.last_close}
           {@const flash = arena.priceChanges[p.symbol]}
           <div class="ticker-item">
-            <span class="ticker-sym">{p.base || p.symbol.replace('USDT', '')}</span>
+            <span class="ticker-sym">{isForex ? p.symbol : (p.base || p.symbol.replace('USDT', ''))}</span>
             <span class="ticker-price mono {flash === 'up' ? 'flash-up' : flash === 'down' ? 'flash-down' : ''}">
-              ${price ? formatPrice(price) : '---'}
+              {#if isForex}
+                {price ? Number(price).toFixed(p.symbol.includes('JPY') || p.symbol === 'USOIL' ? 3 : (p.symbol === 'XAUUSD' ? 2 : 5)) : '---'}
+              {:else}
+                ${price ? formatPrice(price) : '---'}
+              {/if}
             </span>
           </div>
         {/each}
@@ -111,13 +120,18 @@
   }
 
   .dot-spot {
-    color: #10b981;
-    text-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+    color: #fbbf24;
+    text-shadow: 0 0 6px rgba(251, 191, 36, 0.6);
   }
 
   .dot-futures {
     color: #38bdf8;
     text-shadow: 0 0 6px rgba(56, 189, 248, 0.6);
+  }
+
+  .dot-forex {
+    color: #10b981;
+    text-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
   }
 
   .label-text {

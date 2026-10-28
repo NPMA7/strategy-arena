@@ -141,7 +141,7 @@
   <div class="phead">
     <div class="phead-left">
       <h2>
-        Papan peringkat — {rawAccounts.length} strategi {arena.mode === 'spot' ? 'spot' : 'futures'}, modal $10.000 masing-masing
+        Papan peringkat — {rawAccounts.length} strategi {arena.mode === 'spot' ? 'spot' : (arena.mode === 'futures' ? 'futures' : 'forex & metals')}, modal $10.000 masing-masing
       </h2>
     </div>
 

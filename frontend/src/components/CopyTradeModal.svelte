@@ -11,7 +11,9 @@
       ? arena.spot.accounts
       : selectedMode === 'futures'
       ? arena.futures.accounts
-      : [...arena.futures.accounts, ...arena.spot.accounts]
+      : selectedMode === 'forex'
+      ? arena.forex.accounts
+      : [...arena.forex.accounts, ...arena.futures.accounts, ...arena.spot.accounts]
   );
 
   let host = $derived(window.location.host);
@@ -132,8 +134,10 @@ curl -s "${protoHttp}//${host}/api/v1/signals/strategies?mode=${selectedMode}&ap
         <div class="filter-col">
           <label for="selMode">PILIH PASAR:</label>
           <select id="selMode" bind:value={selectedMode}>
-            <option value="futures">Futures Arena (53 Strategi · 200x)</option>
-            <option value="spot">Spot Arena (39 Strategi · Long Only)</option>
+            <option value="futures">Crypto Futures Arena (50++ Strategi)</option>
+            <option value="spot">Crypto Spot Arena (35++ Strategi)</option>
+            <option value="forex">Forex & Metals Arena (22++ Strategi)</option>
+            <option value="all">Semua Pasar (Cross-Market Stream)</option>
           </select>
         </div>
 

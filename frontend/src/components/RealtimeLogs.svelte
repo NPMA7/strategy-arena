@@ -1,9 +1,7 @@
 <script>
   import { arena } from '../lib/store.svelte.js';
 
-  let events = $derived(
-    arena.mode === 'spot' ? (arena.spot?.events || []) : (arena.futures?.events || [])
-  );
+  let events = $derived(arena.activeEvents);
 </script>
 
 <section class="panel logs-panel">

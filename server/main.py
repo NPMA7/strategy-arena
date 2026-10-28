@@ -23,6 +23,8 @@ from .bars import BarRing
 from .binance import BinanceFeed
 from .db import DB
 from .engine import Engine, START_EQUITY, MIN_BARS
+from .forex_feed import ForexFeed
+from .strategies import FOREX_PAIRS, FOREX_STRATEGIES
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-7s %(name)s | %(message)s")
 log = logging.getLogger("arena")
@@ -37,8 +39,11 @@ db = DB()
 rings: dict[str, BarRing] = {}
 spot_engine: Engine | None = None
 futures_engine: Engine | None = None
+forex_engine: Engine | None = None
 feed: BinanceFeed | None = None
+forex_feed: ForexFeed | None = None
 futures_symbols: set[str] = set()  # symbols eligible for futures trading
+forex_symbols: set[str] = set(FOREX_PAIRS)
 state = {
     "started": time.time(),
     "last_publish": 0.0,
@@ -120,17 +125,22 @@ async def on_trade(symbol: str, price: float, qty: float, ts_ms: float) -> None:
         ring = rings[symbol] = BarRing()
     bar_closed = ring.on_trade(ts_ms, price, qty)
     if bar_closed:
-        # Spot engine processes ALL pairs
-        if spot_engine is not None:
+        # Spot engine processes ALL crypto pairs
+        if spot_engine is not None and symbol not in forex_symbols:
             spot_engine.on_bar_closed(symbol, ring.views(), price)
-        # Futures engine only processes futures-eligible pairs
+        # Futures engine only processes futures-eligible crypto pairs
         if futures_engine is not None and symbol in futures_symbols:
             futures_engine.on_bar_closed(symbol, ring.views(), price)
-    # Check stops on both engines every tick
-    if spot_engine is not None:
+        # Forex engine processes forex pairs
+        if forex_engine is not None and symbol in forex_symbols:
+            forex_engine.on_bar_closed(symbol, ring.views(), price)
+    # Check stops on engines every tick
+    if spot_engine is not None and symbol not in forex_symbols:
         spot_engine.check_stops(symbol, price)
     if futures_engine is not None and symbol in futures_symbols:
         futures_engine.check_stops(symbol, price)
+    if forex_engine is not None and symbol in forex_symbols:
+        forex_engine.check_stops(symbol, price)
 
 
 def get_all_prices() -> dict[str, float]:
@@ -145,6 +155,15 @@ def get_all_prices() -> dict[str, float]:
                 out[sym] = round(r.last_close, 8)
             elif p.get("last_close"):
                 out[sym] = round(float(p["last_close"]), 8)
+    if forex_feed:
+        for p in forex_feed.pairs():
+            sym = p["symbol"]
+            r = rings.get(sym)
+            dec = 5 if ("JPY" in sym or sym == "USOIL") else (2 if sym == "XAUUSD" else 5)
+            if r and r.n > 0 and r.last_close > 0:
+                out[sym] = round(r.last_close, dec)
+            elif p.get("last_close"):
+                out[sym] = round(float(p["last_close"]), dec)
     for s, r in rings.items():
         if r.n > 0 and r.last_close > 0 and s not in out:
             out[s] = round(r.last_close, 8)
@@ -152,7 +171,7 @@ def get_all_prices() -> dict[str, float]:
 
 
 async def publisher() -> None:
-    """Kirim state kedua mode ke UI dan persist snapshot kedua engine ke Postgres."""
+    """Kirim state semua mode ke UI dan persist snapshot semua engine ke Postgres."""
     last_trade_flush = 0.0
     while True:
         await asyncio.sleep(PRICE_TICK_SEC)
@@ -161,41 +180,47 @@ async def publisher() -> None:
         now = time.time()
         spot_snap = spot_engine.snapshot()
         fut_snap = futures_engine.snapshot()
+        forex_snap = forex_engine.snapshot() if forex_engine else {"accounts": [], "positions": [], "curves": {}}
         prices = get_all_prices()
         for a in spot_snap["accounts"]:
             a["ret"] = a["equity"] / START_EQUITY - 1.0
         for a in fut_snap["accounts"]:
+            a["ret"] = a["equity"] / START_EQUITY - 1.0
+        for a in forex_snap["accounts"]:
             a["ret"] = a["equity"] / START_EQUITY - 1.0
         payload = {
             "type": "state",
             "t": int(now * 1000),
             "uptime": int(now - state["started"]),
             "feed": {
-                "connected": feed.connected if feed else False,
-                "symbols": len(feed.symbols) if feed else 0,
-                "messages": feed.messages if feed else 0,
+                "connected": (feed.connected if feed else False) or (forex_feed.connected if forex_feed else False),
+                "symbols": (len(feed.symbols) if feed else 0) + (len(forex_symbols) if forex_feed else 0),
+                "messages": (feed.messages if feed else 0) + (forex_feed.ticks_count if forex_feed else 0),
                 "last_msg_age": round(now - feed.last_msg, 2) if feed and feed.last_msg else None,
             },
             "stats": {
-                "bars": spot_engine.bars_processed,
+                "bars": spot_engine.bars_processed + (forex_engine.bars_processed if forex_engine else 0),
                 "spot_signals": spot_engine.signal_count,
                 "futures_signals": futures_engine.signal_count,
+                "forex_signals": forex_engine.signal_count if forex_engine else 0,
             },
             "prices": prices,
-            "pairs": feed.pairs() if feed else [],
+            "pairs": (feed.pairs() if feed else []) + (forex_feed.pairs() if forex_feed else []),
             "spot": {"accounts": spot_snap["accounts"], "positions": spot_snap["positions"], "curves": spot_snap.get("curves", {}), "events": spot_engine.events[-40:], "pairs": feed.pairs() if feed else []},
             "futures": {"accounts": fut_snap["accounts"], "positions": fut_snap["positions"], "curves": fut_snap.get("curves", {}), "events": futures_engine.events[-40:], "pairs": feed.get_futures_pairs() if feed else []},
+            "forex": {"accounts": forex_snap["accounts"], "positions": forex_snap["positions"], "curves": forex_snap.get("curves", {}), "events": forex_engine.events[-40:] if forex_engine else [], "pairs": forex_feed.pairs() if forex_feed else []},
         }
         await hub.broadcast(_dumps(payload))
 
-        # Persist snapshot periodik kedua engine (spot & futures) dan sinyal copy-trade
+        # Persist snapshot periodik ketiga engine (spot, futures, forex) dan sinyal copy-trade
         if now - last_trade_flush >= SNAPSHOT_SEC:
             last_trade_flush = now
             spot_flushed = spot_engine.drain()
             fut_flushed = futures_engine.drain()
+            forex_flushed = forex_engine.drain() if forex_engine else {}
 
             # Siarkan sinyal baru ke WebSocket /ws/signals
-            all_signals = spot_flushed.get("new_signals", []) + fut_flushed.get("new_signals", [])
+            all_signals = spot_flushed.get("new_signals", []) + fut_flushed.get("new_signals", []) + forex_flushed.get("new_signals", [])
             for sig in all_signals:
                 asyncio.create_task(signal_hub.broadcast_signal(sig))
 
@@ -210,7 +235,12 @@ async def publisher() -> None:
                     "positions": fut_snap["positions"],
                     **fut_flushed,
                 },
-                "new_events": spot_engine.events[-10:] + futures_engine.events[-10:],
+                "forex": {
+                    "accounts": forex_snap["accounts"],
+                    "positions": forex_snap["positions"],
+                    **forex_flushed,
+                },
+                "new_events": spot_engine.events[-10:] + futures_engine.events[-10:] + (forex_engine.events[-10:] if forex_engine else []),
             }
             try:
                 await db.persist_snapshots(snap_data)
@@ -242,7 +272,7 @@ async def pair_refresh_loop() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global spot_engine, futures_engine, feed, futures_symbols
+    global spot_engine, futures_engine, forex_engine, feed, forex_feed, futures_symbols, forex_symbols
     connected = False
     for attempt in range(30):
         try:
@@ -271,9 +301,10 @@ async def lifespan(app: FastAPI):
     # Dapatkan public API key dari DB
     state["public_api_key"] = await db.get_public_api_key()
 
-    # Dual engine: spot (long only) + futures (long/short, leverage, funding)
+    # Triple engine: spot (long only) + futures (long/short, leverage, funding) + forex (22 pairs, 22 strats)
     spot_engine = Engine(rings, mode="spot")
     futures_engine = Engine(rings, mode="futures")
+    forex_engine = Engine(rings, mode="forex")
 
     # Pulihkan saldo, trade, drawdowns, dan posisi terbuka dari PostgreSQL
     saved_state = await db.load_full_state()
@@ -291,7 +322,23 @@ async def lifespan(app: FastAPI):
             saved_state.get("futures_curves", {})
         )
         log.info("Engine futures dipulihkan: %d akun, %d posisi", len(saved_state["futures_accounts"]), len(saved_state.get("futures_positions", [])))
+    if saved_state.get("forex_accounts"):
+        forex_engine.restore_state(
+            saved_state["forex_accounts"],
+            saved_state.get("forex_positions", []),
+            saved_state.get("forex_curves", {})
+        )
+        log.info("Engine forex dipulihkan: %d akun, %d posisi", len(saved_state["forex_accounts"]), len(saved_state.get("forex_positions", [])))
 
+    # Start Forex Feed & seed 240 M1 bars into rings so indicators can run immediately
+    forex_feed = ForexFeed(on_trade)
+    forex_feed.seed_rings(rings)
+    for a in forex_engine.accounts.values():
+        a["warmed"] = True
+    await forex_feed.start()
+    log.info("Forex feed aktif: %d pair (%d strategi)", len(forex_symbols), len(forex_engine.accounts))
+
+    # Binance Crypto Feed
     feed = BinanceFeed(on_trade)
     try:
         await feed.start()
@@ -309,7 +356,7 @@ async def lifespan(app: FastAPI):
             a["warmed"] = True
         for a in futures_engine.accounts.values():
             a["warmed"] = True
-        log.info("feed seeded & accounts warmed: %d pair", len(feed.symbols))
+        log.info("crypto feed seeded & accounts warmed: %d pair", len(feed.symbols))
     except Exception as exc:
         log.error("gagal memulai feed Binance: %r", exc, exc_info=True)
 
@@ -317,10 +364,14 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(publisher(), name="publisher"),
         asyncio.create_task(pair_refresh_loop(), name="pairs"),
     ]
-    log.info("arena siap — %d pair, %d strategi × 2 mode (spot+futures)", len(feed.symbols) if feed else 0, len(spot_engine.accounts))
+    total_strats = len(spot_engine.accounts) + len(futures_engine.accounts) + len(forex_engine.accounts)
+    log.info("arena siap — %d crypto + %d forex pair, %d strategi across 3 mode (spot+futures+forex)",
+             len(feed.symbols) if feed else 0, len(forex_symbols), total_strats)
     yield
     for t in tasks:
         t.cancel()
+    if forex_feed:
+        await forex_feed.stop()
     await asyncio.gather(*tasks, return_exceptions=True)
 
 
@@ -331,20 +382,24 @@ app = FastAPI(title="Strategy Arena", lifespan=lifespan)
 async def health():
     return {
         "ok": True,
-        "feed_connected": feed.connected if feed else False,
-        "symbols": len(feed.symbols) if feed else 0,
-        "bars": spot_engine.bars_processed if spot_engine else 0,
-        "messages": feed.messages if feed else 0,
+        "feed_connected": (feed.connected if feed else False) or (forex_feed.connected if forex_feed else False),
+        "symbols": (len(feed.symbols) if feed else 0) + (len(forex_symbols) if forex_feed else 0),
+        "bars": (spot_engine.bars_processed if spot_engine else 0) + (forex_engine.bars_processed if forex_engine else 0),
+        "messages": (feed.messages if feed else 0) + (forex_feed.ticks_count if forex_feed else 0),
         "clients": len(hub.clients),
         "uptime": int(time.time() - state["started"]),
         "spot_signals": spot_engine.signal_count if spot_engine else -1,
         "futures_signals": futures_engine.signal_count if futures_engine else -1,
+        "forex_signals": forex_engine.signal_count if forex_engine else -1,
         "spot_engine_id": id(spot_engine),
         "futures_engine_id": id(futures_engine),
+        "forex_engine_id": id(forex_engine),
         "spot_mode": spot_engine.mode if spot_engine else None,
         "futures_mode": futures_engine.mode if futures_engine else None,
+        "forex_mode": forex_engine.mode if forex_engine else None,
         "spot_positions": sum(len(a["pos"]) for a in spot_engine.accounts.values()) if spot_engine else -1,
         "futures_positions": sum(len(a["pos"]) for a in futures_engine.accounts.values()) if futures_engine else -1,
+        "forex_positions": sum(len(a["pos"]) for a in forex_engine.accounts.values()) if forex_engine else -1,
     }
 
 
@@ -408,12 +463,19 @@ async def resources():
 @app.get("/api/bootstrap")
 async def bootstrap():
     data = await db.read_bootstrap()
+    all_strats = []
+    if spot_engine:
+        all_strats.extend(spot_engine.snapshot()["accounts"])
+    if futures_engine:
+        all_strats.extend(futures_engine.snapshot()["accounts"])
+    if forex_engine:
+        all_strats.extend(forex_engine.snapshot()["accounts"])
     data["strategies"] = [
         {"id": a["id"], "name": a["name"], "family": a["family"], "color": a["color"]}
-        for a in (spot_engine.snapshot()["accounts"] if spot_engine else [])
+        for a in all_strats
     ]
     data["stats"] = await db.stats()
-    data["feed"] = {"connected": feed.connected if feed else False, "symbols": len(feed.symbols) if feed else 0}
+    data["feed"] = {"connected": (feed.connected if feed else False) or (forex_feed.connected if forex_feed else False), "symbols": (len(feed.symbols) if feed else 0) + (len(forex_symbols) if forex_feed else 0)}
     return JSONResponse(data)
 
 
@@ -429,8 +491,8 @@ async def symbol_bars(symbol: str, limit: int = 180):
 
 @app.post("/api/reset")
 async def reset_arena():
-    """Hapus seluruh data simulasi di database dan reset kedua engine (spot & futures) ke state awal dari 0."""
-    global spot_engine, futures_engine
+    """Hapus seluruh data simulasi di database dan reset semua engine (spot, futures, forex) ke state awal dari 0."""
+    global spot_engine, futures_engine, forex_engine
     log.info("Resetting entire arena to 0...")
     await db.clear_all_data()
     now = time.time()
@@ -438,9 +500,12 @@ async def reset_arena():
     await db.set_meta("started_at", str(now))
     spot_engine = Engine(rings, mode="spot")
     futures_engine = Engine(rings, mode="futures")
+    forex_engine = Engine(rings, mode="forex")
     for a in spot_engine.accounts.values():
         a["warmed"] = True
     for a in futures_engine.accounts.values():
+        a["warmed"] = True
+    for a in forex_engine.accounts.values():
         a["warmed"] = True
     return {"ok": True, "message": "Arena berhasil di-reset ke 0 (modal $10.000, 0 trade, 0 MC)"}
 
@@ -492,6 +557,8 @@ async def list_strategies_api(
         engines.append(("spot", spot_engine))
     if mode in ("futures", "all") and futures_engine:
         engines.append(("futures", futures_engine))
+    if mode in ("forex", "all") and forex_engine:
+        engines.append(("forex", forex_engine))
 
     for m_label, eng in engines:
         snap = eng.snapshot()
@@ -517,7 +584,7 @@ async def list_strategies_api(
 @app.get("/api/v1/signals/positions")
 async def get_active_positions_api(
     strategy: str = Query("all", description="ID strategi atau 'all'"),
-    mode: str = Query("all", description="Mode: spot, futures, atau all"),
+    mode: str = Query("all", description="Mode: spot, futures, forex, atau all"),
     api_key: str = Depends(get_validated_api_key)
 ):
     """Mendapatkan posisi aktif saat ini untuk sinkronisasi portofolio bot copy-trading."""
@@ -529,6 +596,8 @@ async def get_active_positions_api(
         engines.append(("spot", spot_engine))
     if mode in ("futures", "all") and futures_engine:
         engines.append(("futures", futures_engine))
+    if mode in ("forex", "all") and forex_engine:
+        engines.append(("forex", forex_engine))
 
     for m_label, eng in engines:
         for sid, acct in eng.accounts.items():
@@ -571,7 +640,7 @@ async def get_active_positions_api(
 @app.get("/api/v1/signals/feed")
 async def get_signals_feed_api(
     strategy: str = Query("all", description="ID strategi atau 'all'"),
-    mode: str = Query("all", description="Mode: spot, futures, atau all"),
+    mode: str = Query("all", description="Mode: spot, futures, forex, atau all"),
     limit: int = Query(50, ge=1, le=200),
     action: str = Query("all", description="Filter action: OPEN, CLOSE, all"),
     api_key: str = Depends(get_validated_api_key)
@@ -617,6 +686,8 @@ async def ws_signals_endpoint(
         engines.append(("spot", spot_engine))
     if mode in ("futures", "all") and futures_engine:
         engines.append(("futures", futures_engine))
+    if mode in ("forex", "all") and forex_engine:
+        engines.append(("forex", forex_engine))
 
     for m_label, eng in engines:
         for sid, acct in eng.accounts.items():
@@ -659,19 +730,23 @@ async def ws_endpoint(ws: WebSocket):
     await ws.accept()
     await hub.add(ws)
     try:
-        if spot_engine and futures_engine:
+        if spot_engine and futures_engine and forex_engine:
             spot_snap = spot_engine.snapshot()
             fut_snap = futures_engine.snapshot()
+            forex_snap = forex_engine.snapshot()
             for a in spot_snap["accounts"]:
                 a["ret"] = a["equity"] / START_EQUITY - 1.0
             for a in fut_snap["accounts"]:
                 a["ret"] = a["equity"] / START_EQUITY - 1.0
+            for a in forex_snap["accounts"]:
+                a["ret"] = a["equity"] / START_EQUITY - 1.0
             await ws.send_text(_dumps({
                 "type": "hello",
-                "pairs": feed.pairs() if feed else [],
+                "pairs": (feed.pairs() if feed else []) + (forex_feed.pairs() if forex_feed else []),
                 "prices": get_all_prices(),
                 "spot": {"accounts": spot_snap["accounts"], "positions": spot_snap["positions"], "curves": spot_snap.get("curves", {}), "events": spot_engine.events[-40:]},
                 "futures": {"accounts": fut_snap["accounts"], "positions": fut_snap["positions"], "curves": fut_snap.get("curves", {}), "events": futures_engine.events[-40:], "pairs": feed.get_futures_pairs() if feed else []},
+                "forex": {"accounts": forex_snap["accounts"], "positions": forex_snap["positions"], "curves": forex_snap.get("curves", {}), "events": forex_engine.events[-40:], "pairs": forex_feed.pairs() if forex_feed else []},
             }))
         while True:
             await ws.receive_text()  # ping dari klien
@@ -707,6 +782,14 @@ async def spot_dashboard():
 
 @app.get("/crypto-futures")
 async def futures_dashboard():
+    dist_index = os.path.join(DIST_DIR, "index.html")
+    if os.path.exists(dist_index):
+        return FileResponse(dist_index)
+    raise HTTPException(status_code=404, detail="Frontend Svelte build tidak ditemukan. Jalankan 'npm run build' di folder frontend/")
+
+
+@app.get("/forex")
+async def forex_dashboard():
     dist_index = os.path.join(DIST_DIR, "index.html")
     if os.path.exists(dist_index):
         return FileResponse(dist_index)

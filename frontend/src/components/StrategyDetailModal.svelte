@@ -259,7 +259,7 @@
       sharpe,
       sortino,
       refillCount: strat.refillCount || 0,
-      feeRate: arena.mode === 'futures' ? '0.04% - 0.05%' : '0.04%',
+      feeRate: arena.mode === 'forex' ? '0.01% (Spread)' : (arena.mode === 'futures' ? '0.04% - 0.05%' : '0.04%'),
       leverage: strat.leverage || 1,
     };
   });
@@ -578,7 +578,7 @@
               {formatUSD(strategy.equity)}
             </span>
             <span class="eq-sub mono">
-              {formatPercent(strategy.returnPct)} · {arena.mode === 'futures' ? `FUTURES ${strategy.leverage || 1}X` : 'SPOT 1X'} · {openPositionsCount} POSISI TERBUKA
+              {formatPercent(strategy.returnPct)} · {arena.mode === 'forex' ? `FOREX ${strategy.leverage || 30}X` : (arena.mode === 'futures' ? `FUTURES ${strategy.leverage || 1}X` : 'SPOT 1X')} · {openPositionsCount} POSISI TERBUKA
             </span>
           </div>
           <button class="m-close" onclick={() => (isOpen = false)} aria-label="Tutup Modal">×</button>
@@ -765,7 +765,7 @@
             <div class="stat-card">
               <span class="s-label mono">LEVERAGE & MARGIN</span>
               <b class="s-val mono">{deepStats.leverage}x</b>
-              <span class="s-sub mono">{arena.mode === 'futures' ? 'Binance Futures (Funding 8h)' : 'Binance Spot (No-Loan)'}</span>
+              <span class="s-sub mono">{arena.mode === 'forex' ? 'MetaTrader 5 / MetaQuotes Multi-Asset' : (arena.mode === 'futures' ? 'Binance Futures (Funding 8h)' : 'Binance Spot (No-Loan)')}</span>
             </div>
 
             <!-- Box 12: Margin Call Counter -->

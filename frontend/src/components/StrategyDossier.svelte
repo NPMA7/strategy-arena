@@ -8,7 +8,7 @@
   let detailModalOpen = $state(false);
   let positions = $derived.by(() => {
     if (!strategy) return [];
-    const all = arena.mode === 'spot' ? (arena.spot?.positions || []) : (arena.futures?.positions || []);
+    const all = arena.allActivePositions;
     return all.filter((p) => p.strategy === strategy.id);
   });
   let canvasRef = $state(null);

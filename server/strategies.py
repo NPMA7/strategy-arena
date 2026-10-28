@@ -606,6 +606,297 @@ def momentum_weeks(s):
     return 0.0
 
 
+# ── Forex Specific Quantitative Strategies (22 Models) ───────────────
+def fx_lob_alpha(s):
+    """London Open Breakout: Breakout sesi London dengan konfirmasi volume & EMA."""
+    hour = int((s.ts[s.i] // 3600000) % 24)
+    if hour not in (7, 8, 9):
+        return 0.0
+    c, hh, ll, atr = s.c[s.i], s.hh20[s.i - 1], s.ll20[s.i - 1], s.atr14[s.i]
+    if not _ok(c, hh, ll, atr) or atr <= 0:
+        return 0.0
+    if c > hh and c > s.ema9[s.i]:
+        return min(1.0, 0.5 + (c - hh) / atr)
+    if c < ll and c < s.ema9[s.i]:
+        return -min(1.0, 0.5 + (ll - c) / atr)
+    return 0.0
+
+
+def fx_tokyo_fader(s):
+    """Asian Range Mean-Reversion: Fading rentang sempit sesi Tokyo."""
+    hour = int((s.ts[s.i] // 3600000) % 24)
+    if hour >= 7:
+        return 0.0
+    c, bu, bl, rsi = s.c[s.i], s.bb_u[s.i], s.bb_l[s.i], s.rsi14[s.i]
+    if not _ok(c, bu, bl, rsi):
+        return 0.0
+    if c < bl and rsi < 28:
+        return 0.8
+    if c > bu and rsi > 72:
+        return -0.8
+    return 0.0
+
+
+def fx_frankfurt_probe(s):
+    """Frankfurt Liquidity Probe: Menjebak likuiditas awal jam 06:00 UTC."""
+    hour = int((s.ts[s.i] // 3600000) % 24)
+    if hour != 6:
+        return 0.0
+    c, l, h, ll, hh = s.c[s.i], s.l[s.i], s.h[s.i], s.ll10[s.i - 1], s.hh10[s.i - 1]
+    if not _ok(c, l, h, ll, hh):
+        return 0.0
+    if l < ll and c > s.bb_m[s.i]:
+        return 0.75
+    if h > hh and c < s.bb_m[s.i]:
+        return -0.75
+    return 0.0
+
+
+def fx_ny_reversal(s):
+    """New York Institutional Fixing Reversal: Jam 15:00 - 17:00 UTC."""
+    hour = int((s.ts[s.i] // 3600000) % 24)
+    if hour not in (15, 16, 17):
+        return 0.0
+    c, bu, bl, atr, rsi = s.c[s.i], s.bb_u[s.i], s.bb_l[s.i], s.atr14[s.i], s.rsi14[s.i]
+    if not _ok(c, bu, bl, atr, rsi):
+        return 0.0
+    if c > bu + 0.3 * atr and rsi > 72:
+        return -0.8
+    if c < bl - 0.3 * atr and rsi < 28:
+        return 0.8
+    return 0.0
+
+
+def fx_sunday_gap(s):
+    """Sunday Gap Fill: Fade lonjakan harga pembukaan terhadap penutupan."""
+    c0, o1 = s.c[s.i - 1], s.o[s.i]
+    atr = s.atr14[s.i]
+    if not _ok(c0, o1, atr) or atr <= 0:
+        return 0.0
+    diff = o1 - c0
+    if diff > 0.8 * atr:
+        return -0.85
+    if diff < -0.8 * atr:
+        return 0.85
+    return 0.0
+
+
+def fx_aud_nzd_arb(s):
+    """Aussie-Kiwi Cointegration Arb: Deviasi statistik Z-Score."""
+    c, e50, atr = s.c[s.i], s.ema50[s.i], s.atr14[s.i]
+    if not _ok(c, e50, atr) or atr <= 0:
+        return 0.0
+    z = (c - e50) / atr
+    if z < -2.0:
+        return 0.85
+    if z > 2.0:
+        return -0.85
+    return 0.0
+
+
+def fx_triangular_synth(s):
+    """Cross-Rate Triangular Arbitrage Synth: Inefisiensi harga mikro."""
+    c, sma, hist, stoch = s.c[s.i], s.sma20[s.i], s.macd_hist[s.i], s.stoch_k[s.i]
+    if not _ok(c, sma, hist, stoch):
+        return 0.0
+    if c > sma and hist > 0 and stoch < 35:
+        return 0.75
+    if c < sma and hist < 0 and stoch > 65:
+        return -0.75
+    return 0.0
+
+
+def fx_oil_cad_divergence(s):
+    """Commodity-Petro Currency Divergence."""
+    c, e21, e50, rsi = s.c[s.i], s.ema21[s.i], s.ema50[s.i], s.rsi14[s.i]
+    if not _ok(c, e21, e50, rsi):
+        return 0.0
+    if e21 > e50 and c < e21 and rsi < 45:
+        return 0.75
+    if e21 < e50 and c > e21 and rsi > 55:
+        return -0.75
+    return 0.0
+
+
+def fx_gold_safehaven_relay(s):
+    """Safe-Haven Risk Divergence Relay (Gold/Metals)."""
+    c, hh, ll, pdi, mdi, adx = s.c[s.i], s.hh20[s.i - 1], s.ll20[s.i - 1], s.plus_di[s.i], s.minus_di[s.i], s.adx[s.i]
+    if not _ok(c, hh, ll, pdi, mdi, adx):
+        return 0.0
+    if c > hh and pdi > mdi and adx > 22:
+        return 0.85
+    if c < ll and mdi > pdi and adx > 22:
+        return -0.85
+    return 0.0
+
+
+def fx_dragon_momentum(s):
+    """The Dragon Momentum Rider (GBPJPY): Volatilitas tinggi."""
+    c, hh, ll, e9, atr = s.c[s.i], s.hh20[s.i - 1], s.ll20[s.i - 1], s.ema9[s.i], s.atr14[s.i]
+    if not _ok(c, hh, ll, e9, atr):
+        return 0.0
+    if c > hh and c > e9:
+        return 0.85
+    if c < ll and c < e9:
+        return -0.85
+    return 0.0
+
+
+def fx_bb_squeeze(s):
+    """Bollinger Bandwidth Volatility Explosion."""
+    w0, w1 = s.bb_w[s.i - 1], s.bb_w[s.i]
+    c, bu, bl = s.c[s.i], s.bb_u[s.i], s.bb_l[s.i]
+    if not _ok(w0, w1, c, bu, bl) or w0 <= 0:
+        return 0.0
+    if w1 > w0 * 1.15 and c > bu:
+        return 0.8
+    if w1 > w0 * 1.15 and c < bl:
+        return -0.8
+    return 0.0
+
+
+def fx_atr_expansion(s):
+    """ATR Expansion Channel Breakout."""
+    h, l, c, o, atr = s.h[s.i], s.l[s.i], s.c[s.i], s.o[s.i], s.atr14[s.i]
+    if not _ok(h, l, c, o, atr) or atr <= 0:
+        return 0.0
+    if (h - l) > 1.5 * atr and c > o:
+        return 0.8
+    if (h - l) > 1.5 * atr and c < o:
+        return -0.8
+    return 0.0
+
+
+def fx_gold_flash_spike(s):
+    """Gold Flash-Spike Mean Reversion."""
+    h, l, c, atr, rsi = s.h[s.i], s.l[s.i], s.c[s.i], s.atr14[s.i], s.rsi14[s.i]
+    if not _ok(h, l, c, atr, rsi) or atr <= 0:
+        return 0.0
+    if (h - l) > 1.8 * atr and c < (h + l) / 2 and rsi > 68:
+        return -0.85
+    if (h - l) > 1.8 * atr and c > (h + l) / 2 and rsi < 32:
+        return 0.85
+    return 0.0
+
+
+def fx_ema_ribbon(s):
+    """Multi-Timeframe EMA Ribbon Alignment."""
+    e9, e21, e50, e200, c = s.ema9[s.i], s.ema21[s.i], s.ema50[s.i], s.ema200[s.i], s.c[s.i]
+    if not _ok(e9, e21, e50, e200, c):
+        return 0.0
+    if e9 > e21 > e50 > e200 and c > e9:
+        return 0.85
+    if e9 < e21 < e50 < e200 and c < e9:
+        return -0.85
+    return 0.0
+
+
+def fx_supertrend_trailing(s):
+    """SuperTrend Dynamic Trailing System."""
+    c0, c1 = s.c[s.i - 1], s.c[s.i]
+    sma, atr = s.sma20[s.i], s.atr14[s.i]
+    if not _ok(c0, c1, sma, atr):
+        return 0.0
+    up = sma + 1.2 * atr
+    dn = sma - 1.2 * atr
+    if c0 <= up and c1 > up:
+        return 0.8
+    if c0 >= dn and c1 < dn:
+        return -0.8
+    return 0.0
+
+
+def fx_ichimoku_quantum(s):
+    """Ichimoku Kumo Cloud Quantum Breakout."""
+    h10, l10 = s.hh10[s.i], s.ll10[s.i]
+    h20, l20 = s.hh20[s.i], s.ll20[s.i]
+    c, s50 = s.c[s.i], s.sma50[s.i]
+    if not _ok(h10, l10, h20, l20, c, s50):
+        return 0.0
+    tenkan = (h10 + l10) / 2
+    kijun = (h20 + l20) / 2
+    if tenkan > kijun and c > s50:
+        return 0.8
+    if tenkan < kijun and c < s50:
+        return -0.8
+    return 0.0
+
+
+def fx_heikin_ashi_smooth(s):
+    """Heikin-Ashi Smoothed Trend Continuum."""
+    c, o, adx = s.c[s.i], s.o[s.i], s.adx[s.i]
+    c1, o1 = s.c[s.i - 1], s.o[s.i - 1]
+    if not _ok(c, o, c1, o1, adx):
+        return 0.0
+    if c > o and c1 > o1 and adx > 22:
+        return 0.75
+    if c < o and c1 < o1 and adx > 22:
+        return -0.75
+    return 0.0
+
+
+def fx_hedging_grid(s):
+    """Dynamic Hedging Grid (Range-Optimized)."""
+    c, sma, atr, adx = s.c[s.i], s.sma20[s.i], s.atr14[s.i], s.adx[s.i]
+    if not _ok(c, sma, atr, adx) or adx >= 20:
+        return 0.0
+    if c < sma - 1.2 * atr:
+        return 0.7
+    if c > sma + 1.2 * atr:
+        return -0.7
+    return 0.0
+
+
+def fx_camarilla_fader(s):
+    """Camarilla Pivot Points Multi-Confluence."""
+    c, h, l, ll, hh = s.c[s.i], s.h[s.i], s.l[s.i], s.ll20[s.i - 1], s.hh20[s.i - 1]
+    rng = h - l
+    if not _ok(c, h, l, ll, hh) or rng <= 0:
+        return 0.0
+    if c < ll and (c - l) > 0.6 * rng:
+        return 0.75
+    if c > hh and (h - c) > 0.6 * rng:
+        return -0.75
+    return 0.0
+
+
+def fx_orderflow_sweep(s):
+    """Support/Resistance Order Flow Imbalance."""
+    c, o, l, h, ll, hh, e9 = s.c[s.i], s.o[s.i], s.l[s.i], s.h[s.i], s.ll20[s.i - 1], s.hh20[s.i - 1], s.ema9[s.i]
+    if not _ok(c, o, l, h, ll, hh, e9):
+        return 0.0
+    if l < ll and c > o and c > e9:
+        return 0.8
+    if h > hh and c < o and c < e9:
+        return -0.8
+    return 0.0
+
+
+def fx_carry_yield_momentum(s):
+    """Synthetic Carry-Trade Yield Momentum."""
+    c, e50, e200, rsi = s.c[s.i], s.ema50[s.i], s.ema200[s.i], s.rsi14[s.i]
+    if not _ok(c, e50, e200, rsi):
+        return 0.0
+    if c > e200 and e50 > e200 and rsi > 52:
+        return 0.75
+    if c < e200 and e50 < e200 and rsi < 48:
+        return -0.75
+    return 0.0
+
+
+def fx_economic_straddle(s):
+    """Economic Event Straddle & Volatility Rider."""
+    h, l, c, o, atr = s.h[s.i], s.l[s.i], s.c[s.i], s.o[s.i], s.atr14[s.i]
+    rng = h - l
+    if not _ok(h, l, c, o, atr) or atr <= 0 or rng <= 0:
+        return 0.0
+    if rng > 1.8 * atr and c > o + 0.5 * rng:
+        return 0.85
+    if rng > 1.8 * atr and c < o - 0.5 * rng:
+        return -0.85
+    return 0.0
+
+
 STRATEGIES: list[tuple[str, str, str, Callable]] = [
     # id, nama, keluarga, fungsi sinyal
     ("ict_momentum", "ICT Momentum", "ICT", order_block),
@@ -662,6 +953,29 @@ STRATEGIES: list[tuple[str, str, str, Callable]] = [
     ("paint_bar", "Paint Bar Pattern", "Price action", paint_bar),
     ("price_action_2b", "2B Reversal", "Price action", price_action_2b),
     ("fractal_break", "Fractal Breakout", "Breakout", fractal_break),
+    # ── 22 Strategi Kuantitatif Spesifik Forex ──
+    ("fx_lob_alpha", "London Open Breakout", "Breakout", fx_lob_alpha),
+    ("fx_tokyo_fader", "Asian Range Fader", "Mean reversion", fx_tokyo_fader),
+    ("fx_frankfurt_probe", "Frankfurt Liquidity Probe", "Order flow", fx_frankfurt_probe),
+    ("fx_ny_reversal", "New York Fixing Reversal", "Mean reversion", fx_ny_reversal),
+    ("fx_sunday_gap", "Sunday Gap Fill Engine", "Statistik", fx_sunday_gap),
+    ("fx_aud_nzd_arb", "Aussie-Kiwi Cointegration", "Statistik", fx_aud_nzd_arb),
+    ("fx_triangular_synth", "Triangular Arbitrage Synth", "Statistik", fx_triangular_synth),
+    ("fx_oil_cad_divergence", "Petro-CAD Divergence", "Trend", fx_oil_cad_divergence),
+    ("fx_gold_safehaven_relay", "Safe-Haven Gold Relay", "Trend", fx_gold_safehaven_relay),
+    ("fx_dragon_momentum", "The Dragon Momentum Rider", "Momentum", fx_dragon_momentum),
+    ("fx_bb_squeeze", "BB Squeeze Volatility", "Volatility", fx_bb_squeeze),
+    ("fx_atr_expansion", "ATR Expansion Breakout", "Breakout", fx_atr_expansion),
+    ("fx_gold_flash_spike", "Gold Flash-Spike Reversal", "Oscillator", fx_gold_flash_spike),
+    ("fx_ema_ribbon", "Multi-TF EMA Ribbon", "Trend", fx_ema_ribbon),
+    ("fx_supertrend_trailing", "SuperTrend Dynamic Trailing", "Trailing", fx_supertrend_trailing),
+    ("fx_ichimoku_quantum", "Ichimoku Kumo Quantum", "Trend", fx_ichimoku_quantum),
+    ("fx_heikin_ashi_smooth", "Heikin-Ashi Trend Continuum", "Trend", fx_heikin_ashi_smooth),
+    ("fx_hedging_grid", "Dynamic Hedging Grid", "Struktur", fx_hedging_grid),
+    ("fx_camarilla_fader", "Camarilla Multi-Confluence", "Struktur", fx_camarilla_fader),
+    ("fx_orderflow_sweep", "Order Flow Liquidity Sweep", "Order flow", fx_orderflow_sweep),
+    ("fx_carry_yield_momentum", "Synthetic Carry-Trade Yield", "Trend", fx_carry_yield_momentum),
+    ("fx_economic_straddle", "Economic Straddle Breakout", "Breakout", fx_economic_straddle),
 ]
 
 DEFAULT_SL = {"atr": 2.0}
@@ -700,6 +1014,13 @@ _leverage_map = {
     # Statistical & Time (10-15x)
     "vwap_band": 12, "vwap_trend": 10, "price_ema_dev": 12, "price_ema_dev2": 15,
     "value_area": 10, "time_session": 10, "time_open": 12,
+    # ── Forex Specific (20-40x) ──
+    "fx_lob_alpha": 30, "fx_tokyo_fader": 30, "fx_frankfurt_probe": 30, "fx_ny_reversal": 30,
+    "fx_sunday_gap": 25, "fx_aud_nzd_arb": 40, "fx_triangular_synth": 40, "fx_oil_cad_divergence": 25,
+    "fx_gold_safehaven_relay": 20, "fx_dragon_momentum": 25, "fx_bb_squeeze": 30, "fx_atr_expansion": 25,
+    "fx_gold_flash_spike": 20, "fx_ema_ribbon": 30, "fx_supertrend_trailing": 30, "fx_ichimoku_quantum": 25,
+    "fx_heikin_ashi_smooth": 30, "fx_hedging_grid": 20, "fx_camarilla_fader": 30, "fx_orderflow_sweep": 30,
+    "fx_carry_yield_momentum": 35, "fx_economic_straddle": 25,
 }
 DEFAULT_LEVERAGE.update(_leverage_map)
 # Fallback: strategi tanpa mapping dapat 10x
@@ -764,8 +1085,19 @@ FUTURES_STRATEGIES = [
     "macd_div",
 ]
 
+# ── Forex strategy assignment (22 Quantitative Models) ───────────────
+FOREX_STRATEGIES = [
+    "fx_lob_alpha", "fx_tokyo_fader", "fx_frankfurt_probe", "fx_ny_reversal", "fx_sunday_gap",
+    "fx_aud_nzd_arb", "fx_triangular_synth", "fx_oil_cad_divergence", "fx_gold_safehaven_relay",
+    "fx_dragon_momentum", "fx_bb_squeeze", "fx_atr_expansion", "fx_gold_flash_spike",
+    "fx_ema_ribbon", "fx_supertrend_trailing", "fx_ichimoku_quantum", "fx_heikin_ashi_smooth",
+    "fx_hedging_grid", "fx_camarilla_fader", "fx_orderflow_sweep", "fx_carry_yield_momentum",
+    "fx_economic_straddle",
+]
+
 # Deduplicate while preserving order
 FUTURES_STRATEGIES = list(dict.fromkeys(FUTURES_STRATEGIES))
+FOREX_STRATEGIES = list(dict.fromkeys(FOREX_STRATEGIES))
 
 # Validate all IDs exist
 _all_ids = set(STRATEGY_IDS)
@@ -773,6 +1105,17 @@ for sid in SPOT_STRATEGIES:
     assert sid in _all_ids, f"Spot strategy {sid} not in STRATEGIES"
 for sid in FUTURES_STRATEGIES:
     assert sid in _all_ids, f"Futures strategy {sid} not in STRATEGIES"
+for sid in FOREX_STRATEGIES:
+    assert sid in _all_ids, f"Forex strategy {sid} not in STRATEGIES"
+
+# ── Forex pair selection ──────────────────────────────────────────────
+FOREX_PAIRS = [
+    "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "AUDUSD", "USDCAD", "NZDUSD",
+    "GBPJPY", "EURJPY", "AUDJPY", "CADJPY", "CHFJPY", "NZDJPY",
+    "EURGBP", "EURCHF", "GBPCHF",
+    "AUDNZD", "AUDCAD", "EURAUD", "GBPAUD",
+    "XAUUSD", "USOIL",
+]
 
 # ── Futures pair selection ────────────────────────────────────────────
 # Futures API (fapi.binance.com) sering diblokir oleh ISP.

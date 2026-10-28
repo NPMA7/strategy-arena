@@ -2,8 +2,13 @@
   import { arena } from '../lib/store.svelte.js';
   import { formatUSD, formatPrice } from '../lib/formatters.js';
 
+  let isForex = $derived(arena.mode === 'forex');
+
   let pairs = $derived.by(() => {
-    if (arena.mode === 'futures') {
+    if (arena.mode === 'forex') {
+      const fx = arena.forex?.pairs;
+      if (fx && Array.isArray(fx) && fx.length > 0) return fx;
+    } else if (arena.mode === 'futures') {
       const fut = arena.futures?.pairs;
       if (fut && Array.isArray(fut) && fut.length > 0) return fut;
     } else {
@@ -32,7 +37,7 @@
   <div class="phead">
     <h2>Pasar</h2>
     <span class="sub muted">
-      {pairs.length} pair USDT · peringkat volume 24 jam · tiles: {pairs.length}
+      {pairs.length} pair {isForex ? 'Forex & Metals' : 'USDT'} · {isForex ? 'MT5 / MetaQuotes Live Stream' : 'peringkat volume 24 jam'} · tiles: {pairs.length}
     </span>
   </div>
 
@@ -42,11 +47,15 @@
       {@const change = arena.priceChanges[p.symbol]}
       <div class="tile" data-symbol={p.symbol}>
         <div class="tile-top">
-          <b>{p.base || p.symbol.replace('USDT', '')}</b>
-          <span class="muted-sub">/USDT</span>
+          <b>{isForex ? (p.base || p.symbol.slice(0, 3)) : (p.base || p.symbol.replace('USDT', ''))}</b>
+          <span class="muted-sub">/{isForex ? (p.quote || (p.symbol.length === 6 ? p.symbol.slice(3) : '')) : 'USDT'}</span>
         </div>
         <div class="tile-px mono {change === 'up' ? 'text-up' : change === 'down' ? 'text-down' : ''}">
-          {px ? formatPrice(px) : '—'}
+          {#if isForex}
+            {px ? Number(px).toFixed(p.symbol.includes('JPY') || p.symbol === 'USOIL' ? 3 : (p.symbol === 'XAUUSD' ? 2 : 5)) : '—'}
+          {:else}
+            {px ? formatPrice(px) : '—'}
+          {/if}
         </div>
         <div class="tile-vol mono muted">
           vol {formatUSD(p.quote_volume ?? 50000000, 0)}

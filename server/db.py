@@ -229,7 +229,7 @@ class DB:
     async def persist_snapshots(self, data: dict[str, Any]) -> None:
         """Persist kedua engine (Spot & Futures) bersamaan: akun, posisi, trade, sinyal, kurva, event."""
         # 1. Selalu tampung trade baru ke buffer agar TIDAK PERNAH hilang jika snapshot lock sedang sibuk
-        for mode in ("spot", "futures"):
+        for mode in ("spot", "futures", "forex"):
             for t in data.get(mode, {}).get("new_trades", []):
                 self._new_trades.append((
                     t["strategy"], mode, t["symbol"], t["side"], t["qty"], t["entry"], t["exit"],
@@ -237,7 +237,7 @@ class DB:
                     t.get("leverage", 1)
                 ))
 
-        for mode in ("spot", "futures"):
+        for mode in ("spot", "futures", "forex"):
             for s in data.get(mode, {}).get("new_signals", []):
                 self._new_signals.append((
                     s["id"], s["ts"], s["mode"], s["strategy"], s["strategy_name"], s["symbol"],
@@ -251,9 +251,9 @@ class DB:
         async with self._snapshot_lock:
             now = int(time.time() * 1000)
 
-            # 1. Accounts (Spot + Futures)
+            # 1. Accounts (Spot + Futures + Forex)
             acct_rows = []
-            for mode in ("spot", "futures"):
+            for mode in ("spot", "futures", "forex"):
                 m_data = data.get(mode)
                 if not m_data:
                     continue
@@ -264,16 +264,17 @@ class DB:
                         a.get("funding_paid", 0.0), a.get("mc_count", 0), now
                     ))
 
-            # 2. Positions (Spot + Futures)
+            # 2. Positions (Spot + Futures + Forex)
             spot_pos = data.get("spot", {}).get("positions", [])
             fut_pos = data.get("futures", {}).get("positions", [])
+            forex_pos = data.get("forex", {}).get("positions", [])
 
             # 3. Trades dari buffer
             trade_rows = list(self._new_trades)
 
             # 4. Curves
             curve_rows = []
-            for mode in ("spot", "futures"):
+            for mode in ("spot", "futures", "forex"):
                 for sid, ts, eq in data.get(mode, {}).get("equity_points", []):
                     curve_rows.append((sid, mode, ts, eq))
 
@@ -338,6 +339,24 @@ class DB:
                                  p["target"], p["opened_at"], p["notional"], p.get("margin_used", p["notional"]),
                                  p["risk_amount"], p.get("score", 0.0), p.get("leverage", 1), p.get("rr", 1.8), p.get("reason"))
                                 for p in fut_pos
+                            ],
+                        )
+
+                    await con.execute("DELETE FROM positions WHERE mode = 'forex'")
+                    if forex_pos:
+                        await con.executemany(
+                            """INSERT INTO positions (strategy, mode, symbol, side, qty, entry, stop, target,
+                                                     opened_at, notional, margin_used, risk_amount, score, leverage, rr, reason)
+                               VALUES ($1,'forex',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+                               ON CONFLICT (strategy, symbol, mode) DO UPDATE SET
+                                 side=EXCLUDED.side, qty=EXCLUDED.qty, entry=EXCLUDED.entry, stop=EXCLUDED.stop,
+                                 target=EXCLUDED.target, notional=EXCLUDED.notional, margin_used=EXCLUDED.margin_used,
+                                 risk_amount=EXCLUDED.risk_amount""",
+                            [
+                                (p["strategy"], p["symbol"], p["side"], p["qty"], p["entry"], p["stop"],
+                                 p["target"], p["opened_at"], p["notional"], p.get("margin_used", p["notional"]),
+                                 p["risk_amount"], p.get("score", 0.0), p.get("leverage", 1), p.get("rr", 1.8), p.get("reason"))
+                                for p in forex_pos
                             ],
                         )
 
@@ -410,8 +429,10 @@ class DB:
         async with self.pool.acquire() as con:
             spot_accts = await con.fetch("SELECT * FROM accounts WHERE mode = 'spot'")
             fut_accts = await con.fetch("SELECT * FROM accounts WHERE mode = 'futures'")
+            forex_accts = await con.fetch("SELECT * FROM accounts WHERE mode = 'forex'")
             spot_pos = await con.fetch("SELECT * FROM positions WHERE mode = 'spot'")
             fut_pos = await con.fetch("SELECT * FROM positions WHERE mode = 'futures'")
+            forex_pos = await con.fetch("SELECT * FROM positions WHERE mode = 'forex'")
 
             # 60 titik ekuitas terakhir per strategi
             cutoff = int(time.time() * 1000) - 2 * 3600 * 1000
@@ -421,19 +442,28 @@ class DB:
             )
             spot_curves: dict[str, list[float]] = {}
             fut_curves: dict[str, list[float]] = {}
+            forex_curves: dict[str, list[float]] = {}
             for r in curve_rows:
                 m = r["mode"]
                 sid = r["strategy"]
-                target = fut_curves if m == "futures" else spot_curves
+                if m == "forex":
+                    target = forex_curves
+                elif m == "futures":
+                    target = fut_curves
+                else:
+                    target = spot_curves
                 target.setdefault(sid, []).append(r["equity"])
 
         return {
             "spot_accounts": [dict(r) for r in spot_accts],
             "futures_accounts": [dict(r) for r in fut_accts],
+            "forex_accounts": [dict(r) for r in forex_accts],
             "spot_positions": [dict(r) for r in spot_pos],
             "futures_positions": [dict(r) for r in fut_pos],
+            "forex_positions": [dict(r) for r in forex_pos],
             "spot_curves": spot_curves,
             "futures_curves": fut_curves,
+            "forex_curves": forex_curves,
         }
 
     # ── sinyal copy-trading ─────────────────────────────────────────────

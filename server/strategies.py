@@ -317,6 +317,52 @@ def fib_retrace(s):
     return 0.0
 
 
+def fib_golden_pocket(s):
+    """Entry di Golden Pocket (61.8% - 65% retracement) dari swing 60 bar dengan konfirmasi candlestick & EMA50."""
+    i = s.i
+    if i < 60:
+        return 0.0
+    swing_hi = float(s.h[i - 59:i + 1].max())
+    swing_lo = float(s.l[i - 59:i + 1].min())
+    rng = swing_hi - swing_lo
+    if rng <= 0:
+        return 0.0
+    c = s.c[i]
+    e50 = s.ema50[i]
+    if not _ok(e50):
+        return 0.0
+    # Bullish GP: koreksi turun 61.8% - 66% dari swing low ke swing high
+    fib_depth_bull = (swing_hi - c) / rng
+    if 0.60 <= fib_depth_bull <= 0.68 and c > e50 and c > s.o[i]:
+        return 0.75
+    # Bearish GP: koreksi naik 61.8% - 66% dari swing high ke swing low
+    fib_depth_bear = (c - swing_lo) / rng
+    if 0.60 <= fib_depth_bear <= 0.68 and c < e50 and c < s.o[i]:
+        return -0.75
+    return 0.0
+
+
+def fib_expansion_1618(s):
+    """Breakout ekspansi Fibonacci 1.272–1.618 ekstensi dengan dorongan momentum."""
+    i = s.i
+    if i < 40:
+        return 0.0
+    recent_hi = float(s.h[i - 20:i].max())
+    recent_lo = float(s.l[i - 20:i].min())
+    rng = recent_hi - recent_lo
+    if rng <= 0:
+        return 0.0
+    c = s.c[i]
+    # Breakout ke zona ekstensi 1.272
+    target_ext_bull = recent_hi + rng * 0.272
+    target_ext_bear = recent_lo - rng * 0.272
+    if c > target_ext_bull and s.c[i - 1] <= target_ext_bull and c > s.ema21[i]:
+        return 0.7
+    if c < target_ext_bear and s.c[i - 1] >= target_ext_bear and c < s.ema21[i]:
+        return -0.7
+    return 0.0
+
+
 def pivot_bounce(s):
     i = s.i
     piv = (s.h[i - 1] + s.l[i - 1] + s.c[i - 1]) / 3
@@ -1106,8 +1152,10 @@ STRATEGIES: list[tuple[str, str, str, Callable]] = [
     ("ichimoku", "Ichimoku Kumo", "Trend", ichimoku),
     ("supertrend", "SuperTrend ATR", "Volatility", supertrend),
     ("chandelier", "Chandelier Exit", "Trailing", chandelier_exit),
-    ("fib_retrace", "Fib Retracement 38-62", "Fibonaci", fib_retrace),
-    ("fib_ext", "Fib Extension Trend", "Fibonaci", lambda s: trend_stack(s) if 0.25 <= ((s.c[s.i] - float(s.l[s.i - 49:s.i + 1].min())) / max(float(s.h[s.i - 49:s.i + 1].max()) - float(s.l[s.i - 49:s.i + 1].min()), 1e-9)) <= 0.5 else 0.0),
+    ("fib_retrace", "Fib Retracement 38-62", "Fibonacci", fib_retrace),
+    ("fib_ext", "Fib Extension Trend", "Fibonacci", lambda s: trend_stack(s) if 0.25 <= ((s.c[s.i] - float(s.l[s.i - 49:s.i + 1].min())) / max(float(s.h[s.i - 49:s.i + 1].max()) - float(s.l[s.i - 49:s.i + 1].min()), 1e-9)) <= 0.5 else 0.0),
+    ("fib_golden_pocket", "Fib Golden Pocket 61.8", "Fibonacci", fib_golden_pocket),
+    ("fib_expansion_1618", "Fib Extension 1.618", "Fibonacci", fib_expansion_1618),
     ("vwap_band", "VWAP Deviation", "Statistik", vwap_band),
     ("vwap_trend", "VWAP Trend Follow", "Statistik", lambda s: trend_stack(s) if s.c[s.i] > s.ema50[s.i] else -trend_stack(s) if _ok(s.ema50[s.i]) else 0.0),
     ("vol_breakout", "Volume Breakout", "Breakout", volume_breakout),
@@ -1205,7 +1253,7 @@ _leverage_map = {
     "mean_sd_band": 15, "rsi2_extreme": 20, "gap_fill": 15,
     # ICT / Structure — 10-15x
     "ict_momentum": 15, "ict_fvg": 12, "ict_obs": 15, "snr_bounce": 10,
-    "turtle_soup": 15, "fib_retrace": 8, "fib_ext": 8,
+    "turtle_soup": 15, "fib_retrace": 8, "fib_ext": 8, "fib_golden_pocket": 10, "fib_expansion_1618": 12,
     # Price action & Order flow (hingga 20x)
     "price_action_2b": 15, "engulfing": 15, "inside_bar": 15, "paint_bar": 15,
     "wicks_reject": 15, "delta_flow": 20,
@@ -1247,64 +1295,17 @@ def get_strategy_rr(sid: str) -> float:
     return 1.8
 
 # ── Spot vs Futures strategy assignment ──────────────────────────────
-# Spot: strategi yang cocok untuk long-only, akumulasi, swing.
-# Futures: semua strategi termasuk yang butuh short + leverage awareness.
-# Beberapa strategi eksklusif per mode.
+# ── Universal Multi-Market Strategy Suite (86 Models) ────────────────
+# Semua 86 model kuantitatif bersifat UNIVERSAL: dapat beroperasi di Spot, Futures, maupun Forex.
+# - Spot: 86 strategi (Long-only, 1x equity, fee 0.05%).
+# - Futures: 86 strategi (Long + Short, configurable leverage 5-20x, funding rate).
+# - Forex: 86 strategi (Long + Short, MT5 Direct lot sizing, spread broker riil, no funding fee).
 
-SPOT_STRATEGIES = [
-    # Trend following — ideal untuk spot hold
-    "trend_stack", "golden_50_200", "ema_macd_fast", "ichimoku",
-    "vol_trend_sma", "ewma_trend", "adx_trend", "trend_pullback", "mean_ma_cross",
-    # Breakout — spot accumulation pada breakout
-    "donchian_55", "donchian_20", "keltner", "squeeze", "vol_breakout", "swing_break",
-    # Momentum — ride the wave
-    "macd_cross", "roc_momentum", "momentum_60", "hot_momentum",
-    # Mean reversion — buy the dip
-    "bb_rev", "rsi_30_70", "zscore_rev", "mean_sd_band", "rsi2_extreme",
-    # Fib / Structure — spot entry points
-    "fib_retrace", "fib_ext", "snr_bounce", "turtle_soup",
-    # Price action — spot-friendly patterns
-    "engulfing", "inside_bar", "paint_bar", "price_action_2b",
-    # Statistical / VWAP
-    "vwap_band", "vwap_trend", "price_ema_dev", "price_ema_dev2", "value_area",
-    # Time-based
-    "time_session", "time_open",
-]
+UNIVERSAL_STRATEGIES = list(STRATEGY_IDS)
 
-FUTURES_STRATEGIES = [
-    # Semua spot strategies juga valid di futures (dengan leverage)
-    *SPOT_STRATEGIES,
-    # Plus futures-exclusive strategies:
-    # Short-biased / mean reversion agresif
-    "stoch_cross", "gap_fill", "rotation",
-    # Volatility / scalping — butuh leverage
-    "supertrend", "chandelier", "tr_break", "vol_target",
-    # ICT / Order flow — institutional style
-    "ict_momentum", "ict_fvg", "ict_obs",
-    # Fractal / microstructure
-    "fractal_break", "wicks_reject", "delta_flow",
-    # MACD divergence — better with leverage
-    "macd_div",
-]
-
-# ── Forex strategy assignment (32 Quantitative Models) ───────────────
-FOREX_STRATEGIES = [
-    "fx_lob_alpha", "fx_tokyo_fader", "fx_frankfurt_probe", "fx_ny_reversal", "fx_sunday_gap",
-    "fx_aud_nzd_arb", "fx_triangular_synth", "fx_oil_cad_divergence", "fx_gold_safehaven_relay",
-    "fx_dragon_momentum", "fx_bb_squeeze", "fx_atr_expansion", "fx_gold_flash_spike",
-    "fx_ema_ribbon", "fx_supertrend_trailing", "fx_ichimoku_quantum", "fx_heikin_ashi_smooth",
-    "fx_hedging_grid", "fx_camarilla_fader", "fx_orderflow_sweep", "fx_carry_yield_momentum",
-    "fx_economic_straddle",
-    # ── 10 New Advanced Quantitative Forex Models (SMC, ICT, Candle Action, VSA) ──
-    "fx_smc_orderblock", "fx_ict_fair_value_gap", "fx_smc_liquidity_sweep",
-    "fx_ict_optimal_trade_entry", "fx_momentum_candle_burst", "fx_three_line_strike",
-    "fx_pinbar_liquidity_reject", "fx_london_ny_overlap", "fx_supply_demand_zone",
-    "fx_volume_spread_analysis",
-]
-
-# Deduplicate while preserving order
-FUTURES_STRATEGIES = list(dict.fromkeys(FUTURES_STRATEGIES))
-FOREX_STRATEGIES = list(dict.fromkeys(FOREX_STRATEGIES))
+SPOT_STRATEGIES = list(UNIVERSAL_STRATEGIES)
+FUTURES_STRATEGIES = list(UNIVERSAL_STRATEGIES)
+FOREX_STRATEGIES = list(UNIVERSAL_STRATEGIES)
 
 # Validate all IDs exist
 _all_ids = set(STRATEGY_IDS)

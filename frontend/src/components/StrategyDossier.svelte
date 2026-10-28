@@ -1,6 +1,6 @@
 <script>
   import { arena } from '../lib/store.svelte.js';
-  import { formatUSD, formatPercent, formatPrice } from '../lib/formatters.js';
+  import { formatUSD, formatPercent, formatPrice, calculateForexPnl } from '../lib/formatters.js';
   import { getStrategyCategory, getRuleText } from '../lib/constants.js';
   import StrategyDetailModal from './StrategyDetailModal.svelte';
 
@@ -49,33 +49,33 @@
     }
   });
 
-  // Effective 24h curve combining history with live equity tick
+  // Effective 24h curve combining history with live balance tick
   let effective24hData = $derived.by(() => {
     const strat = strategy;
     if (!strat) return [];
     const now = Date.now();
-    const liveEq = strat.equity ?? 10000;
+    const liveBal = strat.balance ?? strat.cash ?? strat.equity ?? 10000;
 
     let pts = [...curveHistory];
     if (pts.length === 0) {
       return [
         { ts: now - 3600 * 1000, equity: 10000 },
-        { ts: now, equity: liveEq },
+        { ts: now, equity: liveBal },
       ];
     }
 
     const lastPt = pts[pts.length - 1];
-    if (Math.abs(now - lastPt.ts) > 4000 || Math.abs(liveEq - lastPt.equity) > 0.01) {
-      pts.push({ ts: now, equity: liveEq });
+    if (Math.abs(now - lastPt.ts) > 4000 || Math.abs(liveBal - lastPt.equity) > 0.01) {
+      pts.push({ ts: now, equity: liveBal });
     }
     return pts;
   });
 
-  // Compute rank and total
+  // Compute rank and total based on balance
   let allAccounts = $derived(arena.activeAccounts);
   let rank = $derived.by(() => {
     if (!strategy) return 1;
-    const sorted = [...allAccounts].sort((a, b) => (b.equity ?? 0) - (a.equity ?? 0));
+    const sorted = [...allAccounts].sort((a, b) => (b.balance ?? b.cash ?? b.equity ?? 0) - (a.balance ?? a.cash ?? a.equity ?? 0));
     const idx = sorted.findIndex((a) => a.id === strategy.id);
     return idx >= 0 ? idx + 1 : 1;
   });
@@ -338,8 +338,8 @@
 
       <div class="dos-actions">
         <div class="dos-eq">
-          <b class="mono {isPositive ? 'up' : 'down'}">{formatUSD(strategy.equity)}</b>
-          <span>{positions.length > 0 ? `${positions.length} POSISI TERBUKA` : '0 POSISI TERBUKA'}</span>
+          <b class="mono {isPositive ? 'up' : 'down'}">{formatUSD(strategy.balance ?? strategy.cash ?? strategy.equity)}</b>
+          <span>BALANCE BERSIH · {positions.length > 0 ? `${positions.length} POSISI TERBUKA` : '0 POSISI TERBUKA'}</span>
         </div>
       </div>
     </div>
@@ -424,7 +424,10 @@
               {#each positions as p (p.strategy + '_' + p.symbol)}
                 {@const currentMark = arena.prices[p.symbol] ?? p.mark ?? p.entry}
                 {@const sideSign = (p.side === 'LONG' || p.side === 1) ? 1 : -1}
-                {@const liveUpnl = p.qty > 0 && currentMark > 0 ? (currentMark - p.entry) * p.qty * sideSign : (p.upnl ?? 0)}
+                {@const isPosForex = arena.mode === 'forex' || p.mode === 'forex' || p.lot != null}
+                {@const liveUpnl = isPosForex
+                  ? calculateForexPnl(p.symbol, p.entry, currentMark, p.side, p.lot || 0.10, arena.prices)
+                  : (p.qty > 0 && currentMark > 0 ? (currentMark - p.entry) * p.qty * sideSign : (p.upnl ?? 0))}
                 {@const isUp = liveUpnl >= 0}
                 <tr>
                   <td class="font-bold">{p.symbol}</td>
@@ -435,7 +438,7 @@
                   </td>
                   <td class="mono muted">
                     {#if arena.mode === 'forex'}
-                      {(p.lot ? p.lot : (p.qty ? (p.qty >= 1000 ? (p.qty / 100000).toFixed(2) : p.qty.toFixed(2)) : '0.10'))} Lot
+                      {((p.lot != null && Number(p.lot) > 0) ? Number(p.lot).toFixed(2) : (p.qty >= 1000 ? (p.qty / 100000).toFixed(2) : Number(p.qty || 0.10).toFixed(2)))} Lot
                     {:else}
                       {p.leverage}x
                     {/if}

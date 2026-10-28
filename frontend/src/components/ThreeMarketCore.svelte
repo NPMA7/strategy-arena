@@ -152,7 +152,7 @@
     const bladeGeo = new THREE.BoxGeometry(26, 4, 16);
     const bladeMat = new THREE.MeshPhongMaterial({ color: 0x0f172a, specular: 0x38bdf8 });
     const bladePositionsZ = [-20, 0, 20];
-    const bladePairs = ['BTC/USDT', 'ETH/USDT', '100+ PAIRS'];
+    const bladePairs = ['BINANCE TICK', 'MT5 HEADWAY', '128+ PAIRS'];
     const bladeLeds = [];
 
     bladePositionsZ.forEach((bz, idx) => {
@@ -263,7 +263,7 @@
     coreGroup.add(scanBeam);
 
     // Quant Core Floating 3D Title Label
-    const coreTex = createLabelTexture('02 · NEURALINK QUANT CORE', '50++ STRATEGY ENGINES IN PARALLEL', '#f59e0b', '#0f0a05');
+    const coreTex = createLabelTexture('02 · NEURALINK QUANT CORE', '80+ UNIVERSAL STRATEGIES', '#f59e0b', '#0f0a05');
     const coreLabelMat = new THREE.MeshBasicMaterial({ map: coreTex, transparent: true });
     const coreLabelMesh = new THREE.Mesh(new THREE.PlaneGeometry(36, 11), coreLabelMat);
     coreLabelMesh.rotation.x = -Math.PI / 2;
@@ -271,9 +271,7 @@
     coreGroup.add(coreLabelMesh);
 
     // -------------------------------------------------------------
-    // 7. STAGE 3: DUAL EXECUTION TERMINALS (RIGHT SIDE, X = +54)
-    // Terminal 1: Crypto Spot Arena (1x Leverage, 39 Models)
-    // Terminal 2: Crypto Futures Arena (Leverage Hingga 20x, 53 Models)
+    // 7. STAGE 3: MULTI-ASSET EXECUTION TERMINALS (RIGHT SIDE, X = +54)
     // -------------------------------------------------------------
     const execGroup = new THREE.Group();
     execGroup.position.set(54, 0, 0);
@@ -301,13 +299,13 @@
     spotTower.position.set(0, 10, -18);
     execGroup.add(spotTower);
 
-    const spotTex = createLabelTexture('CRYPTO SPOT', '1X LEV · 39 STRATS', '#10b981', '#06130e');
+    const spotTex = createLabelTexture('CRYPTO SPOT', '1X LEV · 80++ STRATS', '#10b981', '#06130e');
     const spotLabelMesh = new THREE.Mesh(new THREE.PlaneGeometry(24, 8), new THREE.MeshBasicMaterial({ map: spotTex, transparent: true }));
     spotLabelMesh.rotation.x = -Math.PI / 2;
     spotLabelMesh.position.set(0, 14.2, -18);
     execGroup.add(spotLabelMesh);
 
-    // Terminal B: FUTURES ARENA TOWER (Z = +18)
+    // Terminal B: FUTURES & FOREX TOWER (Z = +18)
     const futuresTowerGeo = new THREE.BoxGeometry(26, 8, 24);
     const futuresTowerMat = new THREE.MeshPhongMaterial({
       color: 0x1c1305,
@@ -318,14 +316,14 @@
     futuresTower.position.set(0, 10, 18);
     execGroup.add(futuresTower);
 
-    const futuresTex = createLabelTexture('CRYPTO FUTURES', '20X LEV · 53 STRATS', '#f59e0b', '#180f03');
+    const futuresTex = createLabelTexture('FUTURES & FOREX', '80++ STRATS · DUAL VENUE', '#f59e0b', '#180f03');
     const futuresLabelMesh = new THREE.Mesh(new THREE.PlaneGeometry(24, 8), new THREE.MeshBasicMaterial({ map: futuresTex, transparent: true }));
     futuresLabelMesh.rotation.x = -Math.PI / 2;
     futuresLabelMesh.position.set(0, 14.2, 18);
     execGroup.add(futuresLabelMesh);
 
     // Execution Stage Floating 3D Title Label
-    const execTex = createLabelTexture('03 · DUAL EXECUTION ARENAS', 'MTM PER DETIK · SPOT & FUTURES 20X', '#10b981', '#050f14');
+    const execTex = createLabelTexture('03 · MULTI-ASSET ARENAS', 'MTM PER DETIK · SPOT, FUTURES & FOREX', '#10b981', '#050f14');
     const execLabelMesh = new THREE.Mesh(new THREE.PlaneGeometry(32, 10), new THREE.MeshBasicMaterial({ map: execTex, transparent: true }));
     execLabelMesh.rotation.x = -Math.PI / 2;
     execLabelMesh.position.set(0, 6.2, -40);
@@ -536,7 +534,7 @@
       <div class="step-num mono">01</div>
       <div class="card-info">
         <span class="card-title">MARKET INGESTION</span>
-        <span class="card-desc mono">100++ Pair Liquid Binance WebSocket</span>
+        <span class="card-desc mono">128+ Crypto & MT5 Forex Pairs</span>
       </div>
     </div>
 
@@ -546,7 +544,7 @@
       <div class="step-num mono">02</div>
       <div class="card-info">
         <span class="card-title">NEURALINK QUANT CORE</span>
-        <span class="card-desc mono">50++ Algoritma Independen Paralel</span>
+        <span class="card-desc mono">80++ Algoritma Universal Paralel</span>
       </div>
     </div>
 
@@ -555,8 +553,8 @@
     <div class="legend-card" class:active={activeStage === 'execution'}>
       <div class="step-num mono">03</div>
       <div class="card-info">
-        <span class="card-title">DUAL ARENA EXECUTION</span>
-        <span class="card-desc mono">Spot (1x) & Futures (Leverage 20x)</span>
+        <span class="card-title">MULTI-ASSET EXECUTION</span>
+        <span class="card-desc mono">Spot, Futures & MT5 Direct Forex</span>
       </div>
     </div>
   </div>

@@ -1,6 +1,6 @@
 <script>
   import { arena } from '../lib/store.svelte.js';
-  import { formatUSD, formatPrice, calculateForexPips } from '../lib/formatters.js';
+  import { formatUSD, formatPrice, calculateForexPips, calculateForexPnl } from '../lib/formatters.js';
 
   let isForex = $derived(arena.mode === 'forex');
   let searchQuery = $state('');
@@ -59,6 +59,7 @@
             <th>Strategi</th>
             <th>Pair</th>
             <th>Arah</th>
+            <th>{isForex ? 'Lot' : 'Size'}</th>
             <th class="{isForex ? 'r' : ''}">{isForex ? 'Pips' : 'Lev'}</th>
             <th class="r">Entry</th>
             <th class="r">Mark</th>
@@ -70,10 +71,10 @@
           {#each filteredPositions as p (p.strategy + '_' + p.symbol)}
             {@const currentMark = arena.prices[p.symbol] ?? p.mark ?? p.entry}
             {@const sideSign = (p.side === 'LONG' || p.side === 1) ? 1 : -1}
-            {@const liveUpnl = p.qty > 0 && currentMark > 0 ? (currentMark - p.entry) * p.qty * sideSign : (p.upnl ?? 0)}
+            {@const isPosForex = isForex || (p.strategy && p.strategy.startsWith('fx_')) || p.category === 'forex' || (p.lot != null)}
+            {@const liveUpnl = isPosForex ? calculateForexPnl(p.symbol, p.entry, currentMark, p.side, p.lot || 0.10, arena.prices) : (p.qty > 0 && currentMark > 0 ? (currentMark - p.entry) * p.qty * sideSign : (p.upnl ?? 0))}
             {@const isUp = liveUpnl >= 0}
             {@const isSelected = arena.selectedStrategyId === p.strategy}
-            {@const isPosForex = isForex || (p.strategy && p.strategy.startsWith('fx_')) || p.category === 'forex'}
             {@const pips = isPosForex ? calculateForexPips(p.symbol, p.entry, currentMark, p.side) : null}
             <tr
               class="pos-row {isSelected ? 'selected' : ''}"
@@ -88,6 +89,13 @@
                 <span class="chip {p.side === 'LONG' ? 'chip-long' : 'chip-short'}">
                   {p.side}
                 </span>
+              </td>
+              <td class="mono muted">
+                {#if isPosForex}
+                  {((p.lot != null && Number(p.lot) > 0) ? Number(p.lot).toFixed(2) : (p.qty >= 1000 ? (p.qty / 100000).toFixed(2) : Number(p.qty || 0.10).toFixed(2)))} Lot
+                {:else}
+                  {p.notional ? formatUSD(p.notional, 0) : p.qty.toFixed(3)}
+                {/if}
               </td>
               {#if isPosForex && pips !== null}
                 <td class="r mono font-bold {pips >= 0 ? 'up' : 'down'}">
@@ -118,7 +126,7 @@
     display: flex;
     flex-direction: column;
     height: 100%;
-    min-height: 0;
+    min-height: 380px;
     overflow: hidden;
   }
 
@@ -146,15 +154,6 @@
     letter-spacing: -0.01em;
   }
 
-  .count-badge {
-    font-size: 10px;
-    background: #111722;
-    color: #94a3b8;
-    padding: 1px 6px;
-    border-radius: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-  }
-
   .search-wrap input {
     background: #0c111a;
     border: 1px solid rgba(255, 255, 255, 0.09);
@@ -173,7 +172,7 @@
 
   .tablewrap {
     flex: 1 1 0;
-    min-height: 0;
+    min-height: 250px;
     overflow-y: scroll;
     scrollbar-gutter: stable;
   }

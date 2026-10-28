@@ -22,7 +22,7 @@ from fastapi.staticfiles import StaticFiles
 from .bars import BarRing
 from .binance import BinanceFeed
 from .db import DB
-from .engine import Engine, START_EQUITY, MIN_BARS
+from .engine import Engine, START_EQUITY, MIN_BARS, calculate_forex_pnl
 from .forex_feed import ForexFeed
 from .strategies import FOREX_PAIRS, FOREX_STRATEGIES
 
@@ -170,6 +170,47 @@ def get_all_prices() -> dict[str, float]:
     return out
 
 
+def build_live_state_payload() -> dict:
+    if spot_engine is None or futures_engine is None:
+        return {"type": "state", "spot": None, "futures": None, "forex": None}
+    now = time.time()
+    spot_snap = spot_engine.snapshot()
+    fut_snap = futures_engine.snapshot()
+    forex_snap = forex_engine.snapshot() if forex_engine else {"accounts": [], "positions": [], "curves": {}}
+    prices = get_all_prices()
+    for a in spot_snap["accounts"]:
+        a["balance"] = round(a.get("cash", a["equity"]), 2)
+        a["ret"] = a["balance"] / START_EQUITY - 1.0
+    for a in fut_snap["accounts"]:
+        a["balance"] = round(a.get("cash", a["equity"]), 2)
+        a["ret"] = a["balance"] / START_EQUITY - 1.0
+    for a in forex_snap["accounts"]:
+        a["balance"] = round(a.get("cash", a["equity"]), 2)
+        a["ret"] = a["balance"] / START_EQUITY - 1.0
+    return {
+        "type": "state",
+        "t": int(now * 1000),
+        "uptime": int(now - state["started"]),
+        "feed": {
+            "connected": (feed.connected if feed else False) or (forex_feed.connected if forex_feed else False),
+            "symbols": (len(feed.symbols) if feed else 0) + (len(forex_symbols) if forex_feed else 0),
+            "messages": (feed.messages if feed else 0) + (forex_feed.ticks_count if forex_feed else 0),
+            "last_msg_age": round(now - feed.last_msg, 2) if feed and feed.last_msg else None,
+        },
+        "stats": {
+            "bars": spot_engine.bars_processed + (forex_engine.bars_processed if forex_engine else 0),
+            "spot_signals": spot_engine.signal_count,
+            "futures_signals": futures_engine.signal_count,
+            "forex_signals": forex_engine.signal_count if forex_engine else 0,
+        },
+        "prices": prices,
+        "pairs": (feed.pairs() if feed else []) + (forex_feed.pairs() if forex_feed else []),
+        "spot": {"accounts": spot_snap["accounts"], "positions": spot_snap["positions"], "curves": spot_snap.get("curves", {}), "events": spot_engine.events[-40:], "pairs": feed.pairs() if feed else []},
+        "futures": {"accounts": fut_snap["accounts"], "positions": fut_snap["positions"], "curves": fut_snap.get("curves", {}), "events": futures_engine.events[-40:], "pairs": feed.get_futures_pairs() if feed else []},
+        "forex": {"accounts": forex_snap["accounts"], "positions": forex_snap["positions"], "curves": forex_snap.get("curves", {}), "events": forex_engine.events[-40:] if forex_engine else [], "pairs": forex_feed.pairs() if forex_feed else []},
+    }
+
+
 async def publisher() -> None:
     """Kirim state semua mode ke UI dan persist snapshot semua engine ke Postgres."""
     last_trade_flush = 0.0
@@ -178,38 +219,7 @@ async def publisher() -> None:
         if spot_engine is None or futures_engine is None:
             continue
         now = time.time()
-        spot_snap = spot_engine.snapshot()
-        fut_snap = futures_engine.snapshot()
-        forex_snap = forex_engine.snapshot() if forex_engine else {"accounts": [], "positions": [], "curves": {}}
-        prices = get_all_prices()
-        for a in spot_snap["accounts"]:
-            a["ret"] = a["equity"] / START_EQUITY - 1.0
-        for a in fut_snap["accounts"]:
-            a["ret"] = a["equity"] / START_EQUITY - 1.0
-        for a in forex_snap["accounts"]:
-            a["ret"] = a["equity"] / START_EQUITY - 1.0
-        payload = {
-            "type": "state",
-            "t": int(now * 1000),
-            "uptime": int(now - state["started"]),
-            "feed": {
-                "connected": (feed.connected if feed else False) or (forex_feed.connected if forex_feed else False),
-                "symbols": (len(feed.symbols) if feed else 0) + (len(forex_symbols) if forex_feed else 0),
-                "messages": (feed.messages if feed else 0) + (forex_feed.ticks_count if forex_feed else 0),
-                "last_msg_age": round(now - feed.last_msg, 2) if feed and feed.last_msg else None,
-            },
-            "stats": {
-                "bars": spot_engine.bars_processed + (forex_engine.bars_processed if forex_engine else 0),
-                "spot_signals": spot_engine.signal_count,
-                "futures_signals": futures_engine.signal_count,
-                "forex_signals": forex_engine.signal_count if forex_engine else 0,
-            },
-            "prices": prices,
-            "pairs": (feed.pairs() if feed else []) + (forex_feed.pairs() if forex_feed else []),
-            "spot": {"accounts": spot_snap["accounts"], "positions": spot_snap["positions"], "curves": spot_snap.get("curves", {}), "events": spot_engine.events[-40:], "pairs": feed.pairs() if feed else []},
-            "futures": {"accounts": fut_snap["accounts"], "positions": fut_snap["positions"], "curves": fut_snap.get("curves", {}), "events": futures_engine.events[-40:], "pairs": feed.get_futures_pairs() if feed else []},
-            "forex": {"accounts": forex_snap["accounts"], "positions": forex_snap["positions"], "curves": forex_snap.get("curves", {}), "events": forex_engine.events[-40:] if forex_engine else [], "pairs": forex_feed.pairs() if forex_feed else []},
-        }
+        payload = build_live_state_payload()
         await hub.broadcast(_dumps(payload))
 
         # Persist snapshot periodik ketiga engine (spot, futures, forex) dan sinyal copy-trade
@@ -463,6 +473,9 @@ async def resources():
 @app.get("/api/bootstrap")
 async def bootstrap():
     data = await db.read_bootstrap()
+    for a in data.get("accounts", []):
+        a["balance"] = round(a.get("cash", a.get("equity", START_EQUITY)), 2)
+        a["ret"] = a["balance"] / START_EQUITY - 1.0
     all_strats = []
     if spot_engine:
         all_strats.extend(spot_engine.snapshot()["accounts"])
@@ -477,6 +490,12 @@ async def bootstrap():
     data["stats"] = await db.stats()
     data["feed"] = {"connected": (feed.connected if feed else False) or (forex_feed.connected if forex_feed else False), "symbols": (len(feed.symbols) if feed else 0) + (len(forex_symbols) if forex_feed else 0)}
     return JSONResponse(data)
+
+
+@app.get("/api/state")
+async def get_live_state():
+    """Endpoint HTTP polling real-time untuk menjamin web selalu terupdate tanpa refresh."""
+    return JSONResponse(build_live_state_payload())
 
 
 @app.get("/api/strategy/{sid}")
@@ -563,13 +582,15 @@ async def list_strategies_api(
     for m_label, eng in engines:
         snap = eng.snapshot()
         for a in snap["accounts"]:
+            bal = round(a.get("balance", a.get("cash", a["equity"])), 2)
             out.append({
                 "strategy": a["id"],
                 "name": a["name"],
                 "family": a["family"],
                 "mode": m_label,
+                "balance": bal,
                 "equity": round(a["equity"], 2),
-                "return_pct": round((a["equity"] / START_EQUITY - 1.0) * 100, 2),
+                "return_pct": round((bal / START_EQUITY - 1.0) * 100, 2),
                 "trades": a["trades"],
                 "win_rate_pct": round(a["wins"] / a["trades"] * 100, 1) if a["trades"] > 0 else 0.0,
                 "max_drawdown_pct": round(a["max_dd"] * 100, 2),
@@ -577,7 +598,7 @@ async def list_strategies_api(
                 "open_positions": a.get("open", 0),
                 "leverage": a.get("leverage", 1),
             })
-    out.sort(key=lambda x: x["equity"], reverse=True)
+    out.sort(key=lambda x: x["balance"], reverse=True)
     return {"ok": True, "total": len(out), "strategies": out}
 
 
@@ -605,7 +626,10 @@ async def get_active_positions_api(
                 continue
             for sym, p in acct["pos"].items():
                 cur_px = prices.get(sym, p["entry"])
-                unrealized_pnl = (cur_px - p["entry"]) * p["qty"] * p["side"]
+                if m_label == "forex":
+                    unrealized_pnl = calculate_forex_pnl(sym, p["entry"], cur_px, p["side"], p.get("lot", 0.10), prices)
+                else:
+                    unrealized_pnl = (cur_px - p["entry"]) * p["qty"] * p["side"]
                 unrealized_pct = ((cur_px / p["entry"] - 1.0) * p["side"]) * p.get("leverage", 1) * 100
                 positions.append({
                     "strategy": sid,
@@ -618,6 +642,7 @@ async def get_active_positions_api(
                     "current_price": cur_px,
                     "stop_loss": p.get("stop"),
                     "take_profit": p.get("target"),
+                    "lot": p.get("lot", p["qty"]),
                     "quantity": p["qty"],
                     "leverage": p.get("leverage", 1),
                     "notional_usd": round(p.get("notional", p["qty"] * cur_px), 2),
@@ -703,6 +728,7 @@ async def ws_signals_endpoint(
                     "current_price": prices.get(sym, p["entry"]),
                     "stop_loss": p.get("stop"),
                     "take_profit": p.get("target"),
+                    "lot": p.get("lot", p["qty"]),
                     "quantity": p["qty"],
                     "leverage": p.get("leverage", 1),
                 })
@@ -735,11 +761,14 @@ async def ws_endpoint(ws: WebSocket):
             fut_snap = futures_engine.snapshot()
             forex_snap = forex_engine.snapshot()
             for a in spot_snap["accounts"]:
-                a["ret"] = a["equity"] / START_EQUITY - 1.0
+                a["balance"] = round(a.get("cash", a["equity"]), 2)
+                a["ret"] = a["balance"] / START_EQUITY - 1.0
             for a in fut_snap["accounts"]:
-                a["ret"] = a["equity"] / START_EQUITY - 1.0
+                a["balance"] = round(a.get("cash", a["equity"]), 2)
+                a["ret"] = a["balance"] / START_EQUITY - 1.0
             for a in forex_snap["accounts"]:
-                a["ret"] = a["equity"] / START_EQUITY - 1.0
+                a["balance"] = round(a.get("cash", a["equity"]), 2)
+                a["ret"] = a["balance"] / START_EQUITY - 1.0
             await ws.send_text(_dumps({
                 "type": "hello",
                 "pairs": (feed.pairs() if feed else []) + (forex_feed.pairs() if forex_feed else []),

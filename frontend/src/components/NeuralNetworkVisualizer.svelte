@@ -57,7 +57,7 @@
     },
     {
       id: 'h2',
-      name: 'Hidden Layer 2 · 86 Model Weights',
+      name: 'Hidden Layer 2 · 80++ Universal Model Weights',
       x: 370,
       nodes: [
         { id: 'h2_0', label: 'W₁', sub: '0.84', desc: 'EMA Stack 9/21/50 Model Weight' },
@@ -66,7 +66,7 @@
         { id: 'h2_3', label: 'W₄₂', sub: '0.88', desc: 'ICT Fair Value Gap Imbalance Weight' },
         { id: 'h2_4', label: 'W₅₆', sub: '0.79', desc: 'Petro-CAD Divergence Model Weight' },
         { id: 'h2_5', label: 'W₇₀', sub: '0.93', desc: 'Safe-Haven Gold Relay Model Weight' },
-        { id: 'h2_6', label: 'W₈₆', sub: '0.86', desc: 'Three Line Strike Price Action Weight' },
+        { id: 'h2_6', label: 'W₈₈', sub: '0.89', desc: 'Fibonacci Golden Pocket 61.8 & Expansion Weight' },
       ],
       yCoords: [84, 140, 196, 252, 308, 364, 420],
       stroke: '#0ea5e9',
@@ -80,7 +80,7 @@
       nodes: [
         { id: 'h3_0', label: 'NORM', sub: 'Z-Scr', desc: 'Statistical Z-Score Price Normalization' },
         { id: 'h3_1', label: 'RISK', sub: '2% SL', desc: 'Strict 2% Equity Portfolio Risk Controller ($200 Max SL)' },
-        { id: 'h3_2', label: 'MTM', sub: '1s MTM', desc: 'Live 1-Second Mark-to-Market Real-Time Equity Tracking' },
+        { id: 'h3_2', label: 'BAL', sub: 'Balance', desc: 'Realized Clean Balance & Live MTM Tracking' },
         { id: 'h3_3', label: 'FUND', sub: '8h Fee', desc: 'Crypto Futures 8-Hour Funding Rate Simulator' },
         { id: 'h3_4', label: 'LEVR', sub: '20x Cap', desc: 'Crypto Futures Leverage Multiplier Control (1-20x)' },
         { id: 'h3_5', label: 'LOT', sub: 'Direct', desc: 'MetaTrader 5 Direct Standard Lot Sizing (Tanpa Leverage Kripto)' },
@@ -236,11 +236,6 @@
       <span class="live-pulse-dot"></span>
       <span class="mono header-tag">STRATEGY ARENA · UNIFIED MULTI-ASSET NEURAL NETWORK</span>
     </div>
-    <div class="top-badges mono">
-      <span class="tag-live">LIVE TICK PIPELINE</span>
-      <span class="tag-pairs">28 FOREX + 100 CRYPTO</span>
-      <span class="tag-latency">86 ACTIVE STRATEGIES</span>
-    </div>
   </div>
 
   <!-- Main Responsive SVG Canvas -->
@@ -287,7 +282,7 @@
         stroke-linecap="round"
         stroke-linejoin="round"
       />
-      <text x="370" y="28" text-anchor="middle" class="svg-col-title">Deep Quantitative Neural Layers (86 Models · SMC / ICT / Trend)</text>
+      <text x="370" y="28" text-anchor="middle" class="svg-col-title">Deep Quantitative Neural Layers (80++ Models · SMC / ICT / Trend)</text>
 
       <!-- Column Title: Output layer -->
       <text x="680" y="48" text-anchor="middle" class="svg-col-title">Execution Engines</text>
@@ -389,11 +384,11 @@
       <div class="legend-strip mono">
         <div class="l-item">
           <span class="l-dot dot-blue"></span>
-          <span>INPUT (100+ CRYPTO & 28+ FOREX PAIRS)</span>
+          <span>INPUT (100+ PAIRS)</span>
         </div>
         <div class="l-item">
           <span class="l-dot dot-cyan"></span>
-          <span>HIDDEN (86+ QUANT, SMC & ICT ALGORITHMS)</span>
+          <span>HIDDEN (80+ QUANTS)</span>
         </div>
         <div class="l-item">
           <span class="l-dot dot-gold"></span>
@@ -448,41 +443,6 @@
     font-weight: 700;
     color: #e2e8f0;
     letter-spacing: 0.05em;
-  }
-
-  .top-badges {
-    display: flex;
-    gap: 8px;
-  }
-
-  .tag-live {
-    font-size: 10px;
-    background: rgba(16, 185, 129, 0.12);
-    color: #10b981;
-    border: 1px solid rgba(16, 185, 129, 0.25);
-    padding: 3px 8px;
-    border-radius: 4px;
-    font-weight: 600;
-  }
-
-  .tag-pairs {
-    font-size: 10px;
-    background: rgba(56, 189, 248, 0.12);
-    color: #38bdf8;
-    border: 1px solid rgba(56, 189, 248, 0.25);
-    padding: 3px 8px;
-    border-radius: 4px;
-    font-weight: 600;
-  }
-
-  .tag-latency {
-    font-size: 10px;
-    background: rgba(255, 255, 255, 0.05);
-    color: #94a3b8;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 3px 8px;
-    border-radius: 4px;
-    font-weight: 600;
   }
 
   /* SVG Container */

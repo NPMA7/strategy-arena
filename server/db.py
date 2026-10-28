@@ -101,13 +101,15 @@ class DB:
                 END $$;
             """)
 
-            # positions: tambahkan mode, leverage, target, score, rr
+            # positions: tambahkan mode, leverage, target, score, rr, lot
             await con.execute("""
                 ALTER TABLE positions ADD COLUMN IF NOT EXISTS mode TEXT NOT NULL DEFAULT 'spot';
                 ALTER TABLE positions ADD COLUMN IF NOT EXISTS leverage INTEGER NOT NULL DEFAULT 1;
                 ALTER TABLE positions ADD COLUMN IF NOT EXISTS margin_used DOUBLE PRECISION NOT NULL DEFAULT 0;
                 ALTER TABLE positions ADD COLUMN IF NOT EXISTS score DOUBLE PRECISION NOT NULL DEFAULT 0;
                 ALTER TABLE positions ADD COLUMN IF NOT EXISTS rr DOUBLE PRECISION NOT NULL DEFAULT 1.8;
+                ALTER TABLE positions ADD COLUMN IF NOT EXISTS lot DOUBLE PRECISION;
+                ALTER TABLE trades ADD COLUMN IF NOT EXISTS lot DOUBLE PRECISION;
             """)
             await con.execute("""
                 DO $$
@@ -346,15 +348,15 @@ class DB:
                     await con.execute("DELETE FROM positions WHERE mode = 'forex'")
                     if forex_pos:
                         await con.executemany(
-                            """INSERT INTO positions (strategy, mode, symbol, side, qty, entry, stop, target,
+                            """INSERT INTO positions (strategy, mode, symbol, side, qty, lot, entry, stop, target,
                                                      opened_at, notional, margin_used, risk_amount, score, leverage, rr, reason)
-                               VALUES ($1,'forex',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+                               VALUES ($1,'forex',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
                                ON CONFLICT (strategy, symbol, mode) DO UPDATE SET
-                                 side=EXCLUDED.side, qty=EXCLUDED.qty, entry=EXCLUDED.entry, stop=EXCLUDED.stop,
+                                 side=EXCLUDED.side, qty=EXCLUDED.qty, lot=EXCLUDED.lot, entry=EXCLUDED.entry, stop=EXCLUDED.stop,
                                  target=EXCLUDED.target, notional=EXCLUDED.notional, margin_used=EXCLUDED.margin_used,
                                  risk_amount=EXCLUDED.risk_amount""",
                             [
-                                (p["strategy"], p["symbol"], p["side"], p["qty"], p["entry"], p["stop"],
+                                (p["strategy"], p["symbol"], p["side"], p["qty"], p.get("lot"), p["entry"], p["stop"],
                                  p["target"], p["opened_at"], p["notional"], p.get("margin_used", p["notional"]),
                                  p["risk_amount"], p.get("score", 0.0), p.get("leverage", 1), p.get("rr", 1.8), p.get("reason"))
                                 for p in forex_pos
@@ -527,7 +529,7 @@ class DB:
                 "SELECT strategy, mode, equity, cash, peak, max_dd, trades, wins, gross_win, gross_loss, realized, funding_paid, mc_count, updated_at FROM accounts"
             )
             positions = await con.fetch(
-                "SELECT strategy, mode, symbol, side, qty, entry, stop, target, opened_at, notional, margin_used, risk_amount, score, leverage, rr, reason FROM positions"
+                "SELECT strategy, mode, symbol, side, qty, lot, entry, stop, target, opened_at, notional, margin_used, risk_amount, score, leverage, rr, reason FROM positions"
             )
             recent = await con.fetch(
                 """SELECT strategy, mode, symbol, side, qty, entry, exit, opened_at, closed_at, pnl, fee, reason, equity_after, leverage

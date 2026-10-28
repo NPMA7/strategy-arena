@@ -78,6 +78,61 @@ def _new_account(idx: int, mode: str = "spot") -> dict:
     }
 
 
+def get_contract_size(symbol: str) -> float:
+    sym = (symbol or "").upper()
+    if "XAU" in sym or "GOLD" in sym:
+        return 100.0  # 1 Lot Gold = 100 troy ounces
+    if "XAG" in sym or "SILVER" in sym:
+        return 5000.0  # 1 Lot Silver = 5,000 troy ounces
+    if "XTI" in sym or "USO" in sym or "WTI" in sym or "OIL" in sym:
+        return 1000.0  # 1 Lot Crude Oil = 1,000 barrels
+    return 100000.0  # 1 Lot Forex currencies = 100,000 units of base currency
+
+
+def calculate_forex_pnl(symbol: str, entry: float, mark: float, side: int, lot: float, prices: dict[str, float] | None = None) -> float:
+    """Kalkulasi PnL riil standar MetaTrader 5 untuk Forex, Logam & Komoditas ke dalam USD."""
+    sym = (symbol or "").upper()
+    c_size = get_contract_size(sym)
+    diff = (mark - entry) * side
+    base_pnl = diff * (lot * c_size)
+
+    # 1. Direct USD quote: XAUUSD, XAGUSD, XTIUSD, EURUSD, GBPUSD, AUDUSD, NZDUSD
+    if sym.endswith("USD"):
+        return round(base_pnl, 2)
+
+    # 2. JPY quote: USDJPY, EURJPY, GBPJPY, AUDJPY, CADJPY, CHFJPY, NZDJPY
+    if sym.endswith("JPY"):
+        usdjpy = (prices.get("USDJPY") if prices else None) or 158.0
+        return round(base_pnl / max(usdjpy, 1.0), 2)
+
+    # 3. CAD quote: USDCAD, AUDCAD, EURCAD, GBPCAD, NZDCAD
+    if sym.endswith("CAD"):
+        usdcad = (prices.get("USDCAD") if prices else None) or 1.40
+        return round(base_pnl / max(usdcad, 0.1), 2)
+
+    # 4. CHF quote: USDCHF, EURCHF, GBPCHF, CADCHF, AUDCHF
+    if sym.endswith("CHF"):
+        usdchf = (prices.get("USDCHF") if prices else None) or 0.83
+        return round(base_pnl / max(usdchf, 0.1), 2)
+
+    # 5. GBP quote: EURGBP
+    if sym.endswith("GBP"):
+        gbpusd = (prices.get("GBPUSD") if prices else None) or 1.33
+        return round(base_pnl * gbpusd, 2)
+
+    # 6. NZD quote: EURNZD, GBPNZD, AUDNZD
+    if sym.endswith("NZD"):
+        nzdusd = (prices.get("NZDUSD") if prices else None) or 0.56
+        return round(base_pnl * nzdusd, 2)
+
+    # 7. AUD quote: EURAUD, GBPAUD
+    if sym.endswith("AUD"):
+        audusd = (prices.get("AUDUSD") if prices else None) or 0.70
+        return round(base_pnl * audusd, 2)
+
+    return round(base_pnl, 2)
+
+
 class Engine:
     def __init__(self, rings: dict[str, BarRing], mode: str = "spot") -> None:
         self.mode = mode  # "spot", "futures", or "forex"
@@ -127,10 +182,18 @@ class Engine:
             sid = p.get("strategy")
             sym = p.get("symbol")
             if sid in self.accounts:
+                lot_val = p.get("lot")
+                if lot_val is None and self.mode == "forex":
+                    qty_f = float(p.get("qty", 0.10))
+                    lot_val = round(qty_f / 100000.0, 2) if qty_f >= 1000 else qty_f
+                elif lot_val is not None:
+                    lot_val = float(lot_val)
+
                 self.accounts[sid]["pos"][sym] = {
                     "symbol": sym,
                     "side": int(p["side"]),
                     "qty": float(p["qty"]),
+                    "lot": lot_val,
                     "entry": float(p["entry"]),
                     "stop": float(p["stop"]) if p.get("stop") is not None else None,
                     "target": float(p["target"]) if p.get("target") is not None else None,
@@ -154,6 +217,16 @@ class Engine:
         if r and r.last_close and r.last_close > 0:
             return float(r.last_close)
         return float(fallback)
+
+    def _forex_prices(self) -> dict[str, float]:
+        return {
+            "USDJPY": self._get_price("USDJPY", 158.0),
+            "USDCAD": self._get_price("USDCAD", 1.40),
+            "USDCHF": self._get_price("USDCHF", 0.83),
+            "GBPUSD": self._get_price("GBPUSD", 1.33),
+            "AUDUSD": self._get_price("AUDUSD", 0.70),
+            "NZDUSD": self._get_price("NZDUSD", 0.56),
+        }
 
     # ── feed ────────────────────────────────────────────────────────────
     def on_bar_closed(self, symbol: str, views: dict, closed_bar_close: float) -> None:
@@ -194,7 +267,11 @@ class Engine:
                 eq = acct["cash"]
                 for sym, p in acct["pos"].items():
                     px = self._get_price(sym, p["entry"])
-                    eq += (px - p["entry"]) * p["qty"] * p["side"]
+                    if self.mode == "forex":
+                        pnl = calculate_forex_pnl(sym, p["entry"], px, p["side"], p.get("lot", 0.10), self._forex_prices())
+                    else:
+                        pnl = (px - p["entry"]) * p["qty"] * p["side"]
+                    eq += pnl
                 if eq <= 0.0:
                     self._handle_mc(acct, ts)
                 else:
@@ -224,8 +301,12 @@ class Engine:
                 continue
             px = self._get_price(sym, p["entry"])
             fee_rate = acct.get("fee_rate", SPOT_FEE)
-            gross = (px - p["entry"]) * p["qty"] * p["side"]
-            fee = abs(px * p["qty"]) * fee_rate
+            if self.mode == "forex":
+                gross = calculate_forex_pnl(sym, p["entry"], px, p["side"], p.get("lot", 0.10), self._forex_prices())
+                fee = 0.0
+            else:
+                gross = (px - p["entry"]) * p["qty"] * p["side"]
+                fee = abs(px * p["qty"]) * fee_rate
             net = gross - fee
             acct["trades"] += 1
             if net > 0:
@@ -343,31 +424,77 @@ class Engine:
         rr_ratio = get_strategy_rr(acct["id"])
         tp_dist = stop_dist * rr_ratio
 
-        # Sizing berbasis risiko murni: loss saat SL terkena adalah persis ~RISK (2%) dari equity
-        # Margin yang dijaminkan dibatasi maks SINGLE_POS_CAP (20% equity = $2.000)
-        target_risk = acct["equity"] * RISK
-        risk_based_notional = target_risk / (stop_dist / price)
+        # Sizing berbasis risiko murni: loss saat SL terkena adalah persis ~RISK
+        # Margin yang dijaminkan dibatasi maks SINGLE_POS_CAP
         if self.mode == "futures":
+            target_risk = acct["equity"] * RISK
+            risk_based_notional = target_risk / (stop_dist / price)
             max_notional_cap = acct["equity"] * SINGLE_POS_CAP * leverage
             notional = min(risk_based_notional, max_notional_cap)
             margin_used = notional / leverage
+            if notional < 5:
+                return
+            qty = notional / price
+            lot = None
+            actual_risk = stop_dist * qty
+            fee = notional * fee_rate
+        elif self.mode == "forex":
+            # Real MT5 Contract Size & Institutional Sizing matching FXVerify Position Size Calculator
+            c_size = get_contract_size(symbol)
+            target_risk_usd = acct["cash"] * 0.015  # 1.5% target risk per trade (~$150 pada modal $10.000)
+            px_dict = self._forex_prices()
+            # Kalkulasi riil risiko per 1.0 Lot dalam USD jika SL terkena
+            risk_per_1_lot = abs(calculate_forex_pnl(symbol, 0.0, stop_dist, 1, 1.0, px_dict))
+            calc_lot = target_risk_usd / max(risk_per_1_lot, 1e-4)
+
+            if "XAU" in symbol or "GOLD" in symbol:
+                # Emas: 1 Lot = 100 oz. Lot standar prop firm: 0.05 - 0.50 Lot
+                lot = round(min(max(calc_lot, 0.05), 0.50), 2)
+            elif "XTI" in symbol or "USO" in symbol or "WTI" in symbol or "OIL" in symbol:
+                lot = round(min(max(calc_lot, 0.05), 0.50), 2)
+            else:
+                # Forex: 1 Lot = 100.000 unit. Lot standar MT5: 0.10 - 1.50 Lot
+                lot = round(min(max(calc_lot, 0.10), 1.50), 2)
+
+            qty = lot  # In Forex, qty stores lot directly
+            base_notional = lot * c_size * price
+            if symbol.endswith("USD"):
+                notional = base_notional
+            elif symbol.endswith("JPY"):
+                notional = base_notional / max(px_dict.get("USDJPY", 158.0), 1.0)
+            elif symbol.endswith("CAD"):
+                notional = base_notional / max(px_dict.get("USDCAD", 1.40), 0.1)
+            elif symbol.endswith("CHF"):
+                notional = base_notional / max(px_dict.get("USDCHF", 0.83), 0.1)
+            elif symbol.endswith("GBP"):
+                notional = base_notional * px_dict.get("GBPUSD", 1.33)
+            elif symbol.endswith("NZD"):
+                notional = base_notional * px_dict.get("NZDUSD", 0.56)
+            elif symbol.endswith("AUD"):
+                notional = base_notional * px_dict.get("AUDUSD", 0.70)
+            else:
+                notional = base_notional
+
+            margin_used = round(notional / 100.0, 2)  # Standar MT5 1:100 leverage margin
+            leverage = 1
+            fee = 0.0  # Zero fee, cost murni spread MT5 riil
+            actual_risk = round(target_risk_usd, 2)
         else:
+            # Spot mode: 1x leverage, long-only
+            target_risk = acct["equity"] * RISK
+            risk_based_notional = target_risk / (stop_dist / price)
             max_notional_cap = acct["equity"] * SINGLE_POS_CAP
             notional = min(risk_based_notional, max_notional_cap)
             margin_used = notional
+            if notional < 5:
+                return
+            qty = notional / price
+            lot = None
+            actual_risk = stop_dist * qty
+            fee = notional * fee_rate
 
-        if notional < 5:
-            return
-        qty = notional / price
-        fee = notional * fee_rate if self.mode != "forex" else 0.0
         stop = price - stop_dist if side == LONG else price + stop_dist
         target = price + tp_dist if side == LONG else price - tp_dist
-        actual_risk = stop_dist * qty
-
-        # Standar lot Forex: 1 Standard Lot = 100,000 unit
-        lot = round(notional / 100000, 2)
-        if self.mode == "forex" and lot < 0.01:
-            lot = 0.01
 
         acct["cash"] -= fee
         acct["pos"][symbol] = {
@@ -422,8 +549,12 @@ class Engine:
         if not p:
             return
         fee_rate = acct.get("fee_rate", SPOT_FEE)
-        gross = (price - p["entry"]) * p["qty"] * p["side"]
-        fee = abs(price * p["qty"]) * fee_rate if self.mode != "forex" else 0.0
+        if self.mode == "forex":
+            gross = calculate_forex_pnl(symbol, p["entry"], price, p["side"], p.get("lot", 0.10), self._forex_prices())
+            fee = 0.0
+        else:
+            gross = (price - p["entry"]) * p["qty"] * p["side"]
+            fee = abs(price * p["qty"]) * fee_rate
         net = gross - fee
         acct["cash"] += net
         acct["realized"] += net
@@ -453,6 +584,8 @@ class Engine:
             "leverage": 1 if self.mode != "futures" else lev,
             "lot": p.get("lot"),
             "equity_after": acct["cash"] + sum(
+                calculate_forex_pnl(s, q["entry"], self._get_price(s, q["entry"]), q["side"], q.get("lot", 0.10), self._forex_prices())
+                if self.mode == "forex" else
                 (self._get_price(s, q["entry"]) - q["entry"]) * q["qty"] * q["side"]
                 for s, q in acct["pos"].items()
             ),
@@ -547,7 +680,10 @@ class Engine:
                 eq = acct["cash"]
                 for sym, pos_item in acct["pos"].items():
                     px = self._get_price(sym, pos_item["entry"])
-                    eq += (px - pos_item["entry"]) * pos_item["qty"] * pos_item["side"]
+                    if self.mode == "forex":
+                        eq += calculate_forex_pnl(sym, pos_item["entry"], px, pos_item["side"], pos_item.get("lot", 0.10), self._forex_prices())
+                    else:
+                        eq += (px - pos_item["entry"]) * pos_item["qty"] * pos_item["side"]
                 if eq <= 0.0:
                     self._handle_mc(acct, now_ts)
             elif acct["cash"] <= 0.0 or acct["equity"] <= 0.0:
@@ -562,28 +698,35 @@ class Engine:
 
         accts = []
         positions = []
+        fx_px = self._forex_prices() if self.mode == "forex" else None
         for sid, a in self.accounts.items():
             # Mark-to-market live equity real-time tiap tick snapshot
             if a["pos"]:
                 live_eq = a["cash"]
                 for sym, p in a["pos"].items():
                     px = self._get_price(sym, p["entry"])
-                    live_eq += (px - p["entry"]) * p["qty"] * p["side"]
+                    if self.mode == "forex":
+                        pnl = calculate_forex_pnl(sym, p["entry"], px, p["side"], p.get("lot", 0.10), fx_px)
+                    else:
+                        pnl = (px - p["entry"]) * p["qty"] * p["side"]
+                    live_eq += pnl
                 eq = round(max(0.0, live_eq), 2)
             else:
                 eq = round(a["equity"], 2)
 
+            bal = round(a["cash"], 2)
             if record_spark:
                 hist = self.sparklines[sid]
-                if not hist or abs(hist[-1] - eq) > 0.01 or len(hist) < 2:
-                    hist.append(eq)
+                # Rekam perkembangan kurva saldo bersih terealisasi (Balance)
+                if not hist or abs(hist[-1] - bal) > 0.01 or len(hist) < 2:
+                    hist.append(bal)
                     if len(hist) > 60:
                         hist.pop(0)
 
             accts.append({
                 "id": sid, "name": a["name"], "family": a["family"], "color": a["color"],
                 "mode": self.mode, "leverage": 1 if self.mode != "futures" else a.get("leverage", 1),
-                "equity": eq, "cash": round(a["cash"], 2), "peak": a["peak"],
+                "equity": eq, "cash": bal, "balance": bal, "peak": a["peak"],
                 "max_dd": a["max_dd"], "trades": a["trades"], "wins": a["wins"],
                 "gross_win": a["gross_win"], "gross_loss": a["gross_loss"], "realized": a["realized"],
                 "funding_paid": round(a.get("funding_paid", 0), 4),
@@ -592,6 +735,10 @@ class Engine:
             })
             for sym, p in a["pos"].items():
                 px = self._get_price(sym, p["entry"])
+                if self.mode == "forex":
+                    upnl = calculate_forex_pnl(sym, p["entry"], px, p["side"], p.get("lot", 0.10), fx_px)
+                else:
+                    upnl = (px - p["entry"]) * p["qty"] * p["side"]
                 positions.append({
                     "strategy": sid, "symbol": sym, "side": p["side"], "qty": p["qty"],
                     "entry": p["entry"], "stop": p["stop"], "target": p["target"],
@@ -600,7 +747,7 @@ class Engine:
                     "leverage": 1 if self.mode != "futures" else p.get("leverage", 1),
                     "lot": p.get("lot"),
                     "risk_amount": p["risk_amount"], "reason": None,
-                    "mark": px, "upnl": (px - p["entry"]) * p["qty"] * p["side"],
+                    "mark": px, "upnl": round(upnl, 2),
                 })
         return {
             "accounts": accts,
@@ -622,7 +769,7 @@ class Engine:
         pts = []
         now = int(time.time() * 1000) // 10000 * 10000
         for sid, a in self.accounts.items():
-            pts.append((sid, now, round(a["equity"], 2)))
+            pts.append((sid, now, round(a["cash"], 2)))
         return {
             "new_trades": trades,
             "new_signals": signals,

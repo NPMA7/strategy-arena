@@ -3,7 +3,7 @@
   import { formatUSD, formatPercent } from '../lib/formatters.js';
   import { getStrategyCategory } from '../lib/constants.js';
 
-  let currentSort = $state('equity'); // 'equity' | 'winrate' | 'pf' | 'trades' | 'dd'
+  let currentSort = $state('balance'); // 'balance' | 'winrate' | 'pf' | 'trades' | 'dd'
   let currentFamily = $state('all'); // 'all' | string
 
   const FAMILIES = [
@@ -28,9 +28,9 @@
   let rawAccounts = $derived(arena.activeAccounts);
   let curves = $derived(arena.activeCurves);
 
-  // Overall rank mapping (1-indexed based strictly on equity)
+  // Overall rank mapping (1-indexed based strictly on balance)
   let rankMap = $derived.by(() => {
-    const sorted = [...rawAccounts].sort((a, b) => (b.equity ?? 0) - (a.equity ?? 0));
+    const sorted = [...rawAccounts].sort((a, b) => (b.balance ?? b.cash ?? b.equity ?? 0) - (a.balance ?? a.cash ?? a.equity ?? 0));
     const m = new Map();
     sorted.forEach((a, i) => m.set(a.id, i + 1));
     return m;
@@ -43,13 +43,14 @@
       const famLower = currentFamily.toLowerCase();
       list = list.filter((a) => {
         const cat = (a.family || getStrategyCategory(a.id)).toLowerCase();
+        if (famLower.startsWith('fibo') && cat.startsWith('fibo')) return true;
         return cat.includes(famLower);
       });
     }
 
     const copy = [...list];
     copy.sort((a, b) => {
-      if (currentSort === 'equity') return (b.equity ?? 0) - (a.equity ?? 0);
+      if (currentSort === 'balance' || currentSort === 'equity') return (b.balance ?? b.cash ?? b.equity ?? 0) - (a.balance ?? a.cash ?? a.equity ?? 0);
       if (currentSort === 'winrate') {
         const wrA = a.trades > 0 ? a.wins / a.trades : 0;
         const wrB = b.trades > 0 ? b.wins / b.trades : 0;
@@ -62,7 +63,7 @@
       }
       if (currentSort === 'trades') return (b.trades ?? 0) - (a.trades ?? 0);
       if (currentSort === 'dd') return (a.max_dd ?? 0) - (b.max_dd ?? 0);
-      return (b.equity ?? 0) - (a.equity ?? 0);
+      return (b.balance ?? b.cash ?? b.equity ?? 0) - (a.balance ?? a.cash ?? a.equity ?? 0);
     });
 
     return copy;
@@ -141,7 +142,7 @@
   <div class="phead">
     <div class="phead-left">
       <h2>
-        Papan peringkat — {rawAccounts.length} strategi {arena.mode === 'spot' ? 'spot' : (arena.mode === 'futures' ? 'futures' : 'forex & metals')}, modal $10.000 masing-masing
+        Papan peringkat — {rawAccounts.length} strategi {arena.mode === 'spot' ? 'spot' : (arena.mode === 'futures' ? 'futures' : 'forex & metals')}, modal $10.000 (Saldo Bersih / Balance)
       </h2>
     </div>
 
@@ -150,10 +151,10 @@
       <div class="seg" role="radiogroup" aria-label="Urutkan strategi">
         <button
           type="button"
-          class="seg-btn {currentSort === 'equity' ? 'active' : ''}"
-          onclick={() => (currentSort = 'equity')}
+          class="seg-btn {currentSort === 'balance' || currentSort === 'equity' ? 'active' : ''}"
+          onclick={() => (currentSort = 'balance')}
         >
-          Ekuitas
+          Balance
         </button>
         <button
           type="button"
@@ -205,8 +206,9 @@
     {#each displayedAccounts as a (a.id)}
       {@const rank = rankMap.get(a.id) || 1}
       {@const isSelected = arena.selectedStrategyId === a.id}
-      {@const isPositive = (a.returnPct ?? 0) >= 0}
-      {@const spark = calculateSpark(a.id, a.equity)}
+      {@const curBal = a.balance ?? a.cash ?? a.equity ?? 10000}
+      {@const isPositive = curBal >= 10000}
+      {@const spark = calculateSpark(a.id, curBal)}
       {@const strokeColor = isPositive ? '#10b981' : '#f43f5e'}
       {@const fillColor = isPositive ? 'rgba(16, 185, 129, 0.16)' : 'rgba(244, 63, 94, 0.16)'}
 
@@ -248,7 +250,7 @@
             </span>
           {:else}
             <span class="ret mono {isPositive ? 'up' : 'down'}">
-              {formatPercent(a.returnPct)}
+              {formatPercent(a.returnPct ?? ((curBal - 10000) / 10000) * 100)}
             </span>
           {/if}
         </div>
@@ -267,11 +269,11 @@
           </svg>
         </div>
 
-        <!-- Line 2: Category Family and Current Equity -->
+        <!-- Line 2: Category Family and Current Balance -->
         <div class="r2">
           <span class="fam">{a.family || getStrategyCategory(a.id)}</span>
           <span class="grow"></span>
-          <span class="eq mono">{formatUSD(a.equity, 0)}</span>
+          <span class="eq mono" title="Saldo Bersih Terealisasi: {formatUSD(curBal)}">{formatUSD(curBal, 0)}</span>
         </div>
       </div>
     {/each}

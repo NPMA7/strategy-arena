@@ -103,7 +103,7 @@
                   </td>
                   <td class="mono muted">
                     {#if arena.mode === 'forex'}
-                      {(p.lot ? p.lot : (p.qty ? (p.qty >= 1000 ? (p.qty / 100000).toFixed(2) : p.qty.toFixed(2)) : '0.10'))} Lot
+                      {((p.lot != null && Number(p.lot) > 0) ? Number(p.lot).toFixed(2) : (p.qty >= 1000 ? (p.qty / 100000).toFixed(2) : Number(p.qty || 0.10).toFixed(2)))} Lot
                     {:else}
                       {p.leverage}x
                     {/if}

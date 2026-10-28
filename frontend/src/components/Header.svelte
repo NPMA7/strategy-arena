@@ -81,7 +81,6 @@
       >
         <span class="indicator-dot dot-amber"></span>
         <span class="label">Crypto Spot</span>
-        <span class="count-badge num">35++ Strats</span>
       </button>
 
       <button
@@ -90,7 +89,6 @@
       >
         <span class="indicator-dot dot-cyan"></span>
         <span class="label">Crypto Futures</span>
-        <span class="count-badge num">50++ Strats</span>
       </button>
 
       <button
@@ -98,8 +96,7 @@
         onclick={() => handleModeChange("forex")}
       >
         <span class="indicator-dot dot-emerald"></span>
-        <span class="label">Forex</span>
-        <span class="count-badge num">30++ Strats</span>
+        <span class="label">Forex & Metals</span>
       </button>
 
       <div class="switcher-btn disabled" title="Direncanakan untuk Phase 2">
@@ -131,16 +128,6 @@
         <span class="val num">{formatUptime(arena.uptime)}</span>
       </div>
 
-      <span class="telemetry-divider"></span>
-
-      <!-- Trade Executions Count -->
-      <div
-        class="uptime-badge"
-        title="Total order trade dieksekusi di seluruh arena"
-      >
-        <span class="lbl">TRADES:</span>
-        <span class="val num">{arena.totalTrades.toLocaleString("en-US")}</span>
-      </div>
     </div>
 
     <!-- Copy-Trade API Trigger Button -->
@@ -293,14 +280,6 @@
     background-color: #10b981;
   }
 
-  .count-badge {
-    font-size: 10.5px;
-    font-weight: 500;
-    padding: 1px 6px;
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.06);
-    color: var(--fg-muted);
-  }
 
   .tag-soon {
     font-size: 9.5px;

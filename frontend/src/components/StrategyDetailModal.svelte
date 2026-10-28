@@ -78,19 +78,19 @@
     const strat = strategy;
     if (!strat) return [];
     const now = Date.now();
-    const liveEq = strat.equity ?? 10000;
+    const liveBal = strat.balance ?? strat.cash ?? strat.equity ?? 10000;
 
     let pts = [...curvePoints];
     if (pts.length === 0) {
       return [
         { ts: now - selectedHours * 3600 * 1000, equity: 10000 },
-        { ts: now, equity: liveEq },
+        { ts: now, equity: liveBal },
       ];
     }
 
     const lastPt = pts[pts.length - 1];
-    if (Math.abs(now - lastPt.ts) > 3000 || Math.abs(liveEq - lastPt.equity) > 0.01) {
-      pts.push({ ts: now, equity: liveEq });
+    if (Math.abs(now - lastPt.ts) > 3000 || Math.abs(liveBal - lastPt.equity) > 0.01) {
+      pts.push({ ts: now, equity: liveBal });
     }
     return pts;
   });
@@ -580,11 +580,11 @@
 
         <div class="m-right">
           <div class="eq-badge">
-            <span class="eq-val mono {strategy.equity >= 10000 ? 'up' : 'down'}">
-              {formatUSD(strategy.equity)}
+            <span class="eq-val mono {(strategy.balance ?? strategy.cash ?? strategy.equity) >= 10000 ? 'up' : 'down'}">
+              {formatUSD(strategy.balance ?? strategy.cash ?? strategy.equity)}
             </span>
             <span class="eq-sub mono">
-              {formatPercent(strategy.returnPct)} · {arena.mode === 'forex' ? 'FOREX MT5 DIRECT' : (arena.mode === 'futures' ? `FUTURES ${strategy.leverage || 1}X` : 'SPOT 1X')} · {openPositionsCount} POSISI TERBUKA
+              {formatPercent(strategy.returnPct)} · BALANCE BERSIH · {arena.mode === 'forex' ? 'FOREX MT5 DIRECT' : (arena.mode === 'futures' ? `FUTURES ${strategy.leverage || 1}X` : 'SPOT 1X')} · {openPositionsCount} POSISI TERBUKA
             </span>
           </div>
           <button class="m-close" onclick={() => (isOpen = false)} aria-label="Tutup Modal">×</button>
@@ -868,7 +868,7 @@
                       </td>
                       <td class="mono muted-cell">
                         {#if arena.mode === 'forex'}
-                          {tr.lot ? `${tr.lot} Lot` : (tr.qty ? `${(tr.qty >= 1000 ? (tr.qty / 100000).toFixed(2) : tr.qty.toFixed(2))} Lot` : '0.10 Lot')}
+                          {((tr.lot != null && Number(tr.lot) > 0) ? `${Number(tr.lot).toFixed(2)} Lot` : (tr.qty >= 1000 ? `${(tr.qty / 100000).toFixed(2)} Lot` : `${Number(tr.qty || 0.10).toFixed(2)} Lot`))}
                         {:else}
                           {tr.leverage || 1}x
                         {/if}

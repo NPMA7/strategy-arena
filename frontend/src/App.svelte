@@ -142,9 +142,12 @@
       grid-template-columns: minmax(0, 1fr);
       height: auto;
       min-height: auto;
+      max-height: none;
+      overflow: visible;
     }
     .cell {
-      height: 440px;
+      height: 480px;
+      min-height: 480px;
     }
   }
 
@@ -152,8 +155,14 @@
     .trading-floor {
       padding: 8px 10px 20px 10px;
     }
+    .desk-grid,
+    .market-logs-grid {
+      max-height: none;
+      overflow: visible;
+    }
     .cell {
-      height: 400px;
+      height: 460px;
+      min-height: 460px;
     }
   }
 </style>

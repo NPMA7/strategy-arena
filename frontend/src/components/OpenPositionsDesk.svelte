@@ -1,7 +1,8 @@
 <script>
   import { arena } from '../lib/store.svelte.js';
-  import { formatUSD, formatPrice } from '../lib/formatters.js';
+  import { formatUSD, formatPrice, calculateForexPips } from '../lib/formatters.js';
 
+  let isForex = $derived(arena.mode === 'forex');
   let searchQuery = $state('');
   let allPositions = $derived(arena.allActivePositions);
 
@@ -58,7 +59,7 @@
             <th>Strategi</th>
             <th>Pair</th>
             <th>Arah</th>
-            <th>Lev</th>
+            <th class="{isForex ? 'r' : ''}">{isForex ? 'Pips' : 'Lev'}</th>
             <th class="r">Entry</th>
             <th class="r">Mark</th>
             <th class="r">uPnL</th>
@@ -72,6 +73,8 @@
             {@const liveUpnl = p.qty > 0 && currentMark > 0 ? (currentMark - p.entry) * p.qty * sideSign : (p.upnl ?? 0)}
             {@const isUp = liveUpnl >= 0}
             {@const isSelected = arena.selectedStrategyId === p.strategy}
+            {@const isPosForex = isForex || (p.strategy && p.strategy.startsWith('fx_')) || p.category === 'forex'}
+            {@const pips = isPosForex ? calculateForexPips(p.symbol, p.entry, currentMark, p.side) : null}
             <tr
               class="pos-row {isSelected ? 'selected' : ''}"
               onclick={() => selectStrategy(p.strategy)}
@@ -86,7 +89,13 @@
                   {p.side}
                 </span>
               </td>
-              <td class="mono muted">{p.leverage}x</td>
+              {#if isPosForex && pips !== null}
+                <td class="r mono font-bold {pips >= 0 ? 'up' : 'down'}">
+                  {pips >= 0 ? '+' : ''}{pips.toFixed(1)} pip
+                </td>
+              {:else}
+                <td class="mono muted">{p.leverage}x</td>
+              {/if}
               <td class="r mono">{formatPrice(p.entry)}</td>
               <td class="r mono">{formatPrice(currentMark)}</td>
               <td class="r mono font-bold {isUp ? 'up' : 'down'}">

@@ -58,7 +58,11 @@
           {/if}
         </div>
         <div class="tile-vol mono muted">
-          vol {formatUSD(p.quote_volume ?? 50000000, 0)}
+          {#if isForex}
+            vol {p.volume ? Number(p.volume).toLocaleString('en-US', { maximumFractionDigits: 1 }) + ' lot' : '—'}
+          {:else}
+            vol {formatUSD(p.quote_volume ?? 50000000, 0)}
+          {/if}
         </div>
       </div>
     {/each}

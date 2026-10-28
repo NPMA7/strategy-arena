@@ -29,6 +29,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      mt5-bridge:
+        condition: service_started
     environment:
       DATABASE_URL: postgresql://arena:arena@db:5432/arena
       ARENA_PAIRS: "100"
@@ -36,11 +38,25 @@ services:
       ARENA_BINANCE_REST: https://data-api.binance.vision
       ARENA_BINANCE_WS: wss://data-stream.binance.vision
       ARENA_SNAPSHOT_SEC: "2"
+      MT5_BRIDGE_URL: http://mt5-bridge:5000
     volumes:
       - ./server:/app/server
       - ./frontend:/app/frontend
     ports:
       - "8080:8080"
+
+  mt5-bridge:
+    build:
+      context: .
+      dockerfile: docker/mt5-bridge.Dockerfile
+    container_name: mt5-bridge
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      PORT: "5000"
+    volumes:
+      - ./server/mt5_bridge_server.py:/app/server/mt5_bridge_server.py:ro
 
 volumes:
   arena-pgdata:

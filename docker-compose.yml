@@ -32,10 +32,10 @@ services:
     environment:
       NOVNC_HOST: ""
       LOGIN: "6310591"
-      PASSWORD: "@sTRAGEYaRENA200"
+      PASSWORD: "dL7ny!PE"
       SERVER: "Headway-Demo"
       MT5_LOGIN: "6310591"
-      MT5_PASSWORD: "@sTRAGEYaRENA200"
+      MT5_PASSWORD: "dL7ny!PE"
       MT5_SERVER: "Headway-Demo"
   app:
     build:

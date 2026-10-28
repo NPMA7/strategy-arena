@@ -78,7 +78,7 @@ def _sync_connect_rpyc():
     try:
         log.info("Mencoba menghubungkan ke RPyC MT5 di %s:%d...", MT5_RPYC_HOST, MT5_RPYC_PORT)
         conn = rpyc.classic.connect(MT5_RPYC_HOST, MT5_RPYC_PORT)
-        conn._config["sync_request_timeout"] = 10
+        conn._config["sync_request_timeout"] = 60
 
         # Initialize MT5 and remote batch routines
         conn.execute("""
@@ -94,7 +94,9 @@ def _arena_init():
     if ok:
         info = mt5.account_info()
         if not info or info.login != 6310591:
-            mt5.login(6310591, password="@sTRAGEYaRENA200", server="Headway-Demo")
+            log_res = mt5.login(6310591, password="dL7ny!PE", server="Headway-Demo")
+            if not log_res:
+                mt5.login(6310591, password="dL7ny!PE", server="mt5.demo.trade-hw.online:443")
     return ok
 
 def _arena_select_symbols(symbols):

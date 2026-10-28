@@ -1,9 +1,9 @@
-name: kripto-arena
+name: strategy-arena
 
 services:
   db:
     image: postgres:17-alpine
-    container_name: arena-db
+    container_name: strategy-arena-db
     restart: unless-stopped
     environment:
       POSTGRES_USER: arena
@@ -24,7 +24,8 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile
-    container_name: arena-app
+    image: strategy-arena-app:latest
+    container_name: strategy-arena-app
     restart: unless-stopped
     depends_on:
       db:
@@ -49,7 +50,8 @@ services:
     build:
       context: .
       dockerfile: docker/mt5-bridge.Dockerfile
-    container_name: mt5-bridge
+    image: strategy-arena-mt5-bridge:latest
+    container_name: strategy-arena-mt5-bridge
     restart: unless-stopped
     ports:
       - "5000:5000"
@@ -60,3 +62,4 @@ services:
 
 volumes:
   arena-pgdata:
+

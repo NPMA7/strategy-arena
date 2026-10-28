@@ -1,0 +1,46 @@
+name: kripto-arena
+
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: arena-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: arena
+      POSTGRES_PASSWORD: arena
+      POSTGRES_DB: arena
+    volumes:
+      - arena-pgdata:/var/lib/postgresql/data
+      - ./docker/init.sql:/docker-entrypoint-initdb.d/10-init.sql:ro
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U arena -d arena"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: arena-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://arena:arena@db:5432/arena
+      ARENA_PAIRS: "100"
+      ARENA_WARMUP_MIN: "0"
+      ARENA_BINANCE_REST: https://data-api.binance.vision
+      ARENA_BINANCE_WS: wss://data-stream.binance.vision
+      ARENA_SNAPSHOT_SEC: "2"
+    volumes:
+      - ./server:/app/server
+      - ./frontend:/app/frontend
+    ports:
+      - "8080:8080"
+
+volumes:
+  arena-pgdata:

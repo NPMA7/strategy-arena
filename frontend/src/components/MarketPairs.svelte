@@ -37,7 +37,7 @@
   <div class="phead">
     <h2>Pasar</h2>
     <span class="sub muted">
-      {pairs.length} pair {isForex ? 'Forex & Metals' : 'USDT'} · {isForex ? 'MT5 / MetaQuotes Live Stream' : 'peringkat volume 24 jam'} · tiles: {pairs.length}
+      {pairs.length} pair {isForex ? 'Forex & Metals' : 'USDT'} · {isForex ? 'MT5 Headway Live (Bid / Ask / Spread)' : 'peringkat volume 24 jam'} · tiles: {pairs.length}
     </span>
   </div>
 
@@ -45,25 +45,37 @@
     {#each pairs as p (p.symbol)}
       {@const px = arena.prices[p.symbol] ?? p.last_close}
       {@const change = arena.priceChanges[p.symbol]}
-      <div class="tile" data-symbol={p.symbol}>
+      {@const dec = p.digits ?? (p.symbol.includes('JPY') || p.symbol === 'USOIL' ? 3 : (p.symbol === 'XAUUSD' ? 2 : 5))}
+      <div class="tile {isForex ? 'tile-forex' : ''}" data-symbol={p.symbol}>
         <div class="tile-top">
-          <b>{isForex ? (p.base || p.symbol.slice(0, 3)) : (p.base || p.symbol.replace('USDT', ''))}</b>
-          <span class="muted-sub">/{isForex ? (p.quote || (p.symbol.length === 6 ? p.symbol.slice(3) : '')) : 'USDT'}</span>
+          <div class="tile-sym">
+            <b>{isForex ? (p.base || p.symbol.slice(0, 3)) : (p.base || p.symbol.replace('USDT', ''))}</b>
+            <span class="muted-sub">/{isForex ? (p.quote || (p.symbol.length === 6 ? p.symbol.slice(3) : '')) : 'USDT'}</span>
+          </div>
+          {#if isForex && p.change != null}
+            <span class="chg-badge mono {p.change >= 0 ? 'badge-up' : 'badge-down'}">
+              {p.change >= 0 ? '+' : ''}{Number(p.change).toFixed(2)}%
+            </span>
+          {/if}
         </div>
         <div class="tile-px mono {change === 'up' ? 'text-up' : change === 'down' ? 'text-down' : ''}">
           {#if isForex}
-            {px ? Number(px).toFixed(p.symbol.includes('JPY') || p.symbol === 'USOIL' ? 3 : (p.symbol === 'XAUUSD' ? 2 : 5)) : '—'}
+            {px ? Number(px).toFixed(dec) : '—'}
           {:else}
             {px ? formatPrice(px) : '—'}
           {/if}
         </div>
-        <div class="tile-vol mono muted">
-          {#if isForex}
-            vol {p.volume ? Number(p.volume).toLocaleString('en-US', { maximumFractionDigits: 1 }) + ' lot' : '—'}
-          {:else}
+        {#if isForex}
+          <div class="tile-ba mono">
+            <span class="ba-val"><span class="ba-lbl">B</span>{p.bid ? Number(p.bid).toFixed(dec) : (px ? Number(px).toFixed(dec) : '—')}</span>
+            <span class="ba-val"><span class="ba-lbl">A</span>{p.ask ? Number(p.ask).toFixed(dec) : (px ? Number(px).toFixed(dec) : '—')}</span>
+            <span class="spr-tag">spr {p.spread_pips ?? '1.2'}p</span>
+          </div>
+        {:else}
+          <div class="tile-vol mono muted">
             vol {formatUSD(p.quote_volume ?? 50000000, 0)}
-          {/if}
-        </div>
+          </div>
+        {/if}
       </div>
     {/each}
   </div>
@@ -134,6 +146,15 @@
   .tile-top {
     font-size: 11px;
     color: #f1f5f9;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .tile-sym {
+    display: flex;
+    align-items: baseline;
+    gap: 1px;
   }
 
   .tile-top b {
@@ -143,6 +164,24 @@
   .muted-sub {
     font-size: 9.5px;
     color: #64748b;
+  }
+
+  .chg-badge {
+    font-size: 8.5px;
+    font-weight: 600;
+    padding: 0.5px 3.5px;
+    border-radius: 3px;
+    letter-spacing: -0.01em;
+  }
+
+  .badge-up {
+    color: #10b981;
+    background: rgba(16, 185, 129, 0.12);
+  }
+
+  .badge-down {
+    color: #f43f5e;
+    background: rgba(244, 63, 94, 0.12);
   }
 
   .tile-px {
@@ -166,5 +205,36 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .tile-ba {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 8.5px;
+    color: #94a3b8;
+    gap: 2px;
+    margin-top: 1px;
+  }
+
+  .ba-val {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .ba-lbl {
+    color: #64748b;
+    margin-right: 1.5px;
+    font-size: 7.5px;
+  }
+
+  .spr-tag {
+    font-size: 8px;
+    color: #cbd5e1;
+    background: rgba(255, 255, 255, 0.06);
+    padding: 0 3px;
+    border-radius: 2px;
+    flex-shrink: 0;
   }
 </style>

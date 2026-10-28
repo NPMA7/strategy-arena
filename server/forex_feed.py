@@ -61,6 +61,7 @@ class ForexFeed:
         self.volumes_24h: dict[str, float] = {m["symbol"]: 50000.0 for m in FOREX_METAS}
         self.connected = True
         self.is_mt5_live = False
+        self.ticks_count = 0
         self._running = False
         self._task: asyncio.Task | None = None
         self.session: aiohttp.ClientSession | None = None
@@ -155,6 +156,7 @@ class ForexFeed:
                     self.current_prices[sym] = new_price
                     qty = round(random.uniform(0.1, 5.0), 2)
                     self.volumes_24h[sym] += qty
+                    self.ticks_count += 1
 
                     # Panggil callback on_trade
                     await self.on_trade(sym, new_price, qty, float(now_ms))

@@ -54,12 +54,12 @@
     const strat = strategy;
     if (!strat) return [];
     const now = Date.now();
-    const liveBal = strat.balance ?? strat.cash ?? strat.equity ?? 10000;
+    const liveBal = strat.balance ?? strat.cash ?? strat.equity ?? 1000;
 
     let pts = [...curveHistory];
     if (pts.length === 0) {
       return [
-        { ts: now - 3600 * 1000, equity: 10000 },
+        { ts: now - 3600 * 1000, equity: 1000 },
         { ts: now, equity: liveBal },
       ];
     }
@@ -138,14 +138,14 @@
     let pts = (rawPts || [])
       .map((p) => ({
         ts: typeof p.ts === 'number' ? p.ts : now,
-        equity: typeof p.equity === 'number' ? p.equity : (typeof p === 'number' ? p : 10000),
+        equity: typeof p.equity === 'number' ? p.equity : (typeof p === 'number' ? p : 1000),
       }))
       .sort((a, b) => a.ts - b.ts);
 
     if (pts.length === 0) {
-      const eq = strat?.equity ?? 10000;
+      const eq = strat?.equity ?? 1000;
       pts = [
-        { ts: now - 3600 * 1000, equity: 10000 },
+        { ts: now - 3600 * 1000, equity: 1000 },
         { ts: now, equity: eq },
       ];
     }
@@ -163,14 +163,14 @@
     pts = pts.filter((p) => p.ts >= startTs);
 
     if (pts.length === 0) {
-      const eq = strat?.equity ?? 10000;
+      const eq = strat?.equity ?? 1000;
       pts = [{ ts: startTs, equity: eq }, { ts: endTs, equity: eq }];
     }
 
-    // Determine Y range (include $10,000 baseline with padding)
+    // Determine Y range (include $1,000 baseline with padding)
     const equities = pts.map((p) => p.equity);
-    let minV = Math.min(...equities, 9950);
-    let maxV = Math.max(...equities, 10050);
+    let minV = Math.min(...equities, 995);
+    let maxV = Math.max(...equities, 1005);
 
     const vSpan = maxV - minV || 50;
     minV = minV - vSpan * 0.08;
@@ -200,8 +200,8 @@
       ctx.stroke();
     }
 
-    // Baseline at Modal Awal $10,000
-    const y10k = Y(10000);
+    // Baseline at Modal Awal $1,000
+    const y10k = Y(1000);
     if (y10k >= padT && y10k <= padT + ph) {
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.16)';
       ctx.lineWidth = 1;
@@ -216,7 +216,7 @@
       ctx.textAlign = 'left';
       ctx.textBaseline = 'bottom';
       ctx.font = '9.5px Inter, sans-serif';
-      ctx.fillText('modal awal $10.000', padL + 6, y10k - 5);
+      ctx.fillText('modal awal $1.000', padL + 6, y10k - 5);
     }
 
     // Top watermark / 24H timeframe badge
@@ -273,7 +273,7 @@
 
     // Curve Line
     const latestEq = pts[pts.length - 1].equity;
-    const isUp = latestEq >= 10000;
+    const isUp = latestEq >= 1000;
     const lineColor = isUp ? '#10b981' : '#f43f5e';
     const areaGrad = ctx.createLinearGradient(0, padT, 0, padT + ph);
     areaGrad.addColorStop(0, isUp ? 'rgba(16, 185, 129, 0.22)' : 'rgba(244, 63, 94, 0.22)');

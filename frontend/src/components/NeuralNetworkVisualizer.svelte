@@ -61,7 +61,7 @@
       x: 475,
       nodes: [
         { id: 'h3_0', label: 'NORM', sub: 'Z-Scr', desc: 'Statistical Z-Score Price Normalization' },
-        { id: 'h3_1', label: 'RISK', sub: '2% SL', desc: 'Strict 2% Equity Portfolio Risk Controller ($200 Max SL)' },
+        { id: 'h3_1', label: 'RISK', sub: '2% SL', desc: 'Strict 2% Equity Portfolio Risk Controller ($20 Max SL)' },
         { id: 'h3_2', label: 'BAL', sub: 'Balance', desc: 'Realized Clean Balance & Live MTM Tracking' },
         { id: 'h3_3', label: 'FUND', sub: '8h Fee', desc: 'Crypto Futures 8-Hour Funding Rate Simulator' },
         { id: 'h3_4', label: 'LEVR', sub: '20x Cap', desc: 'Crypto Futures Leverage Multiplier Control (1-20x)' },

@@ -625,7 +625,7 @@ async def reset_arena():
         a["warmed"] = True
     for a in forex_engine.accounts.values():
         a["warmed"] = True
-    return {"ok": True, "message": "Arena berhasil di-reset ke 0 (modal $10.000, 0 trade, 0 MC)"}
+    return {"ok": True, "message": "Arena berhasil di-reset ke 0 (modal $1.000, 0 trade, 0 MC)"}
 
 
 # ── Copy-Trading & Public API v1 ──────────────────────────────────────────

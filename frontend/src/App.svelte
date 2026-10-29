@@ -7,6 +7,7 @@
   import MarketPairs from './components/MarketPairs.svelte';
   import RealtimeLogs from './components/RealtimeLogs.svelte';
   import CopyTradeModal from './components/CopyTradeModal.svelte';
+  import TradingViewChartModal from './components/TradingViewChartModal.svelte';
   import LandingPage from './components/LandingPage.svelte';
   import NeuralExecutionPage from './components/NeuralExecutionPage.svelte';
   import { arena } from './lib/store.svelte.js';
@@ -71,6 +72,9 @@
     <CopyTradeModal />
   </div>
 {/if}
+
+<!-- Global TradingView Chart Modal (Tanpa Tools, Publik) -->
+<TradingViewChartModal />
 
 <style>
   .app-shell {

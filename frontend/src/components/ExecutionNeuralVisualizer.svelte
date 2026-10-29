@@ -1120,7 +1120,7 @@
             {#if hoveredNode.price}
               <span class="hud-price">${Number(hoveredNode.price).toFixed(2)}</span>
             {/if}
-            <span class="hud-action">Klik untuk aktifkan jalur seluruh pasar ➔</span>
+            <span class="hud-action">📈 Klik untuk buka Chart TradingView & sorot rute ➔</span>
           </div>
         {:else if hoveredNode.stratId}
           <!-- Quantitative Strategy Node Tooltip -->

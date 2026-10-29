@@ -894,7 +894,7 @@
           {#if hoveredInfo.price}
             <div class="hud-price">${Number(hoveredInfo.price).toFixed(2)}</div>
           {/if}
-          <div class="hud-hint">Klik untuk sorot sinapsis 3D</div>
+          <div class="hud-hint">📈 Klik untuk buka Chart TradingView & sorot rute 3D</div>
         {:else if hoveredInfo.type === 'strategy'}
           <div class="hud-tag quant">QUANT STRATEGY MODEL</div>
           <div class="hud-main">{hoveredInfo.name}</div>

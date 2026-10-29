@@ -125,13 +125,13 @@
       const name = sAcc?.name || fAcc?.name || xAcc?.name || sid;
       const category = getStrategyCategory(sid);
 
-      const sBal = sAcc?.balance ?? sAcc?.cash ?? 10000;
-      const fBal = fAcc?.balance ?? fAcc?.cash ?? 10000;
-      const xBal = xAcc?.balance ?? xAcc?.cash ?? 10000;
+      const sBal = sAcc?.balance ?? sAcc?.cash ?? 1000;
+      const fBal = fAcc?.balance ?? fAcc?.cash ?? 1000;
+      const xBal = xAcc?.balance ?? xAcc?.cash ?? 1000;
 
-      const sPnl = sBal - 10000;
-      const fPnl = fBal - 10000;
-      const xPnl = xBal - 10000;
+      const sPnl = sBal - 1000;
+      const fPnl = fBal - 1000;
+      const xPnl = xBal - 1000;
       const totalPnl = sPnl + fPnl + xPnl;
       const totalBal = sBal + fBal + xBal;
 
@@ -146,16 +146,16 @@
       const totalW = sW + fW + xW;
 
       const wr = totalTr > 0 ? (totalW / totalTr) * 100 : 0;
-      const retPct = (totalPnl / 30000) * 100;
+      const retPct = (totalPnl / 3000) * 100;
 
-      // Trajektori 30 Hari Kumulatif (Hari 1: $30.000 -> Hari 30: Saldo Realized Terkini)
+      // Trajektori 30 Hari Kumulatif (Hari 1: $3.000 -> Hari 30: Saldo Realized Terkini)
       const curve = generateTrajectoryCurve({
         id: sid,
         name,
         totalBal,
         wr,
         trades: totalTr
-      }, 30000, selectedTimeRangeDays);
+      }, 3000, selectedTimeRangeDays);
 
       // Dominant profit engine
       let dominantMarket = 'forex';
@@ -191,16 +191,16 @@
   // 2. Single Market Sorted Lists
   let sortedSpot = $derived.by(() => {
     const list = arena.spotAccounts.map(a => {
-      const bal = a.balance ?? a.cash ?? 10000;
+      const bal = a.balance ?? a.cash ?? 1000;
       const wr = a.trades > 0 ? (a.wins / a.trades) * 100 : 0;
       return {
         ...a,
         totalBal: bal,
-        totalPnl: bal - 10000,
-        retPct: a.returnPct || ((bal - 10000) / 100),
+        totalPnl: bal - 1000,
+        retPct: a.returnPct || (((bal - 1000) / 1000) * 100),
         wr,
         category: getStrategyCategory(a.id),
-        curve: generateTrajectoryCurve({ id: a.id, name: a.name, totalBal: bal, wr, trades: a.trades }, 10000, selectedTimeRangeDays),
+        curve: generateTrajectoryCurve({ id: a.id, name: a.name, totalBal: bal, wr, trades: a.trades }, 1000, selectedTimeRangeDays),
         mode: 'spot'
       };
     });
@@ -210,16 +210,16 @@
 
   let sortedFutures = $derived.by(() => {
     const list = arena.futuresAccounts.map(a => {
-      const bal = a.balance ?? a.cash ?? 10000;
+      const bal = a.balance ?? a.cash ?? 1000;
       const wr = a.trades > 0 ? (a.wins / a.trades) * 100 : 0;
       return {
         ...a,
         totalBal: bal,
-        totalPnl: bal - 10000,
-        retPct: a.returnPct || ((bal - 10000) / 100),
+        totalPnl: bal - 1000,
+        retPct: a.returnPct || (((bal - 1000) / 1000) * 100),
         wr,
         category: getStrategyCategory(a.id),
-        curve: generateTrajectoryCurve({ id: a.id, name: a.name, totalBal: bal, wr, trades: a.trades }, 10000, selectedTimeRangeDays),
+        curve: generateTrajectoryCurve({ id: a.id, name: a.name, totalBal: bal, wr, trades: a.trades }, 1000, selectedTimeRangeDays),
         mode: 'futures'
       };
     });
@@ -229,16 +229,16 @@
 
   let sortedForex = $derived.by(() => {
     const list = arena.forexAccounts.map(a => {
-      const bal = a.balance ?? a.cash ?? 10000;
+      const bal = a.balance ?? a.cash ?? 1000;
       const wr = a.trades > 0 ? (a.wins / a.trades) * 100 : 0;
       return {
         ...a,
         totalBal: bal,
-        totalPnl: bal - 10000,
-        retPct: a.returnPct || ((bal - 10000) / 100),
+        totalPnl: bal - 1000,
+        retPct: a.returnPct || (((bal - 1000) / 1000) * 100),
         wr,
         category: getStrategyCategory(a.id),
-        curve: generateTrajectoryCurve({ id: a.id, name: a.name, totalBal: bal, wr, trades: a.trades }, 10000, selectedTimeRangeDays),
+        curve: generateTrajectoryCurve({ id: a.id, name: a.name, totalBal: bal, wr, trades: a.trades }, 1000, selectedTimeRangeDays),
         mode: 'forex'
       };
     });
@@ -279,7 +279,7 @@
 
   let multiLineChart = $derived.by(() => {
     const list = top10;
-    const baseVal = activeMarketTab === 'universal' ? 30000 : 10000;
+    const baseVal = activeMarketTab === 'universal' ? 3000 : 1000;
     const days = selectedTimeRangeDays;
     const W = 760;
     const H = 250;
@@ -621,7 +621,7 @@
             <span class="m-lbl">Pairs</span>
           </div>
           <div class="metric-item">
-            <span class="m-val mono">$10.000</span>
+            <span class="m-val mono">$1.000</span>
             <span class="m-lbl">Modal Awal Seragam</span>
           </div>
           <div class="metric-item">
@@ -646,7 +646,7 @@
         <div class="head-info">
           <h2>PAPAN KLASEMEN UNIVERSAL MULTI-ASSET</h2>
           <p class="section-desc">
-            Audit kinerja terpadu 80+ strategi kuantitatif universal yang dieksekusi simultan di 3 kelas instrumen pasar (Crypto Spot, Binance Futures, Forex & Metals). Modal portofolio seragam $30.000 ($10.000 per pasar).
+            Audit kinerja terpadu 80+ strategi kuantitatif universal yang dieksekusi simultan di 3 kelas instrumen pasar (Crypto Spot, Binance Futures, Forex & Metals). Modal portofolio seragam $3.000 ($1.000 per pasar).
           </p>
         </div>
 
@@ -932,7 +932,7 @@
             </div>
 
             <div class="panel-controls">
-              <span class="panel-meta mono">Base: ${activeMarketTab === 'universal' ? '30.000' : '10.000'}</span>
+              <span class="panel-meta mono">Base: ${activeMarketTab === 'universal' ? '3.000' : '1.000'}</span>
             </div>
           </div>
 
@@ -1075,7 +1075,7 @@
 
             <!-- Base Line Label Badge -->
             <div class="chart-axis-baseline mono">
-              Modal Awal: ${activeMarketTab === 'universal' ? '30.000' : '10.000'}
+              Modal Awal: ${activeMarketTab === 'universal' ? '3.000' : '1.000'}
             </div>
 
             <!-- Floating Hover Tooltip (Khusus Model Terpilih dengan Tanggal Riil) -->

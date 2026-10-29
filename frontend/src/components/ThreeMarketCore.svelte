@@ -534,7 +534,7 @@
       <div class="step-num mono">01</div>
       <div class="card-info">
         <span class="card-title">MARKET INGESTION</span>
-        <span class="card-desc mono">128+ Crypto & MT5 Forex Pairs</span>
+        <span class="card-desc mono">128+ Pairs</span>
       </div>
     </div>
 

@@ -51,7 +51,15 @@
       {@const pipVal = p.pip || (dec === 3 ? 0.01 : (dec === 2 ? 0.1 : 0.0001))}
       {@const diff = (bidNum != null && askNum != null && askNum >= bidNum) ? (askNum - bidNum) : (p.spread != null ? Number(p.spread) : 0)}
       {@const sprPips = (diff > 0 && pipVal > 0) ? (diff / pipVal).toFixed(1) : (p.spread_pips != null ? Number(p.spread_pips).toFixed(1) : '0.0')}
-      <div class="tile {isForex ? 'tile-forex' : ''}" data-symbol={p.symbol}>
+      <div
+        class="tile {isForex ? 'tile-forex' : ''}"
+        data-symbol={p.symbol}
+        role="button"
+        tabindex="0"
+        title="Klik untuk melihat Live Chart TradingView {p.symbol}"
+        onclick={() => arena.openChart(p.symbol, isForex ? 'forex' : 'crypto')}
+        onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') arena.openChart(p.symbol, isForex ? 'forex' : 'crypto'); }}
+      >
         <div class="tile-top">
           <div class="tile-sym">
             <b>{isForex ? (p.base || p.symbol.slice(0, 3)) : (p.base || p.symbol.replace('USDT', ''))}</b>
@@ -146,7 +154,8 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
-    transition: background 0.12s, border-color 0.12s;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s, transform 0.12s, box-shadow 0.12s;
   }
 
   .tile-forex {
@@ -154,8 +163,10 @@
   }
 
   .tile:hover {
-    background: #111722;
-    border-color: rgba(255, 255, 255, 0.12);
+    background: #111728;
+    border-color: rgba(245, 158, 11, 0.45);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   }
 
   .tile-top {

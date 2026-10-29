@@ -378,6 +378,7 @@
             {activeTrade}
             onSelectPair={(sym) => {
               selectedTrade = null;
+              if (sym) arena.openChart(sym);
             }}
             onClearTrade={() => {
               selectedTrade = null;
@@ -389,6 +390,7 @@
             {activeTrade}
             onSelectPair={(sym) => {
               selectedTrade = null;
+              if (sym) arena.openChart(sym);
             }}
             onClearTrade={() => {
               selectedTrade = null;
@@ -532,7 +534,20 @@
                     <td class="font-bold text-white">
                       {pos.strategy_name || pos.strategy}
                     </td>
-                    <td class="font-bold text-cyan">{pos.symbol}</td>
+                    <td>
+                      <button
+                        type="button"
+                        class="table-pair-btn font-bold text-cyan mono"
+                        title="Klik untuk membuka Live Chart TradingView {pos.symbol}"
+                        onclick={(e) => {
+                          e.stopPropagation();
+                          arena.openChart(pos.symbol, pos.mode === 'forex' ? 'forex' : 'crypto');
+                        }}
+                      >
+                        {pos.symbol}
+                        <span class="chart-mini-icon">📈</span>
+                      </button>
+                    </td>
                     <td class="c">
                       <span class="side-badge {pos.side_label === 'LONG' || pos.side === 1 ? 'side-long' : 'side-short'}">
                         {pos.side_label || (pos.side === 1 ? 'LONG' : 'SHORT')}
@@ -1006,6 +1021,36 @@
     background: rgba(245, 158, 11, 0.15);
     color: #fbbf24;
     border: 1px solid rgba(245, 158, 11, 0.3);
+  }
+
+  .table-pair-btn {
+    background: transparent;
+    border: none;
+    font-size: 11.5px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: all 0.12s ease;
+  }
+
+  .table-pair-btn:hover {
+    background: rgba(56, 189, 248, 0.15);
+    color: #ffffff;
+    box-shadow: 0 0 8px rgba(56, 189, 248, 0.3);
+  }
+
+  .chart-mini-icon {
+    font-size: 10px;
+    opacity: 0.6;
+    transition: opacity 0.12s ease;
+  }
+
+  .table-pair-btn:hover .chart-mini-icon {
+    opacity: 1;
   }
 
   .tag-futures {

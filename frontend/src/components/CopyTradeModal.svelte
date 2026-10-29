@@ -168,8 +168,8 @@ curl -s "${protoHttp}//${host}/api/v1/signals/strategies?mode=${selectedMode}&ap
             <option value="all">Semua Strategi (Full Stream Feed)</option>
             {#each accounts as a}
               <option value={a.id}>
-                {a.name || a.id} ({a.equity >= 10000 ? "+" : ""}{(
-                  (a.equity / 10000 - 1) *
+                {a.name || a.id} ({a.equity >= 1000 ? "+" : ""}{(
+                  (a.equity / 1000 - 1) *
                   100
                 ).toFixed(1)}%)
               </option>

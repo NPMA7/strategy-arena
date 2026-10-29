@@ -78,12 +78,12 @@
     const strat = strategy;
     if (!strat) return [];
     const now = Date.now();
-    const liveBal = strat.balance ?? strat.cash ?? strat.equity ?? 10000;
+    const liveBal = strat.balance ?? strat.cash ?? strat.equity ?? 1000;
 
     let pts = [...curvePoints];
     if (pts.length === 0) {
       return [
-        { ts: now - selectedHours * 3600 * 1000, equity: 10000 },
+        { ts: now - selectedHours * 3600 * 1000, equity: 1000 },
         { ts: now, equity: liveBal },
       ];
     }
@@ -207,7 +207,7 @@
       : (strat.gross_loss ?? 0);
     const profitFactor = grossLoss > 0 ? (grossWin / grossLoss).toFixed(2) : (grossWin > 0 ? '∞' : '—');
 
-    const netProfit = (strat.equity ?? 10000) - 10000;
+    const netProfit = (strat.equity ?? 1000) - 1000;
     const avgTrade = totalTrades > 0 ? netProfit / totalTrades : 0;
     const avgWin = wins > 0 ? grossWin / wins : 0;
     const avgLoss = losses > 0 ? grossLoss / losses : 0;
@@ -219,8 +219,8 @@
     if (curvePoints.length > 10) {
       const returns = [];
       for (let i = 1; i < curvePoints.length; i++) {
-        const prev = curvePoints[i - 1].equity || 10000;
-        const curr = curvePoints[i].equity || 10000;
+        const prev = curvePoints[i - 1].equity || 1000;
+        const curr = curvePoints[i].equity || 1000;
         returns.push((curr - prev) / prev);
       }
       const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
@@ -255,7 +255,7 @@
       avgLoss,
       payoffRatio,
       maxDD: (strat.max_dd || 0) * 100,
-      maxDDAmount: ((strat.max_dd || 0) * 10000),
+      maxDDAmount: ((strat.max_dd || 0) * 1000),
       sharpe,
       sortino,
       refillCount: strat.refillCount || 0,
@@ -298,13 +298,13 @@
     let pts = (rawPts || [])
       .map((p) => ({
         ts: typeof p.ts === 'number' ? p.ts : now,
-        equity: typeof p.equity === 'number' ? p.equity : 10000,
+        equity: typeof p.equity === 'number' ? p.equity : 1000,
       }))
       .sort((a, b) => a.ts - b.ts);
 
     if (pts.length === 0) {
-      const eq = strat?.equity ?? 10000;
-      pts = [{ ts: now - windowMs, equity: 10000 }, { ts: now, equity: eq }];
+      const eq = strat?.equity ?? 1000;
+      pts = [{ ts: now - windowMs, equity: 1000 }, { ts: now, equity: eq }];
     }
 
     const latestTs = pts[pts.length - 1].ts;
@@ -315,14 +315,14 @@
 
     pts = pts.filter((p) => p.ts >= startTs);
     if (pts.length === 0) {
-      const eq = strat?.equity ?? 10000;
+      const eq = strat?.equity ?? 1000;
       pts = [{ ts: startTs, equity: eq }, { ts: endTs, equity: eq }];
     }
 
-    // Determine Y range (include $10,000 baseline)
+    // Determine Y range (include $1,000 baseline)
     const equities = pts.map((p) => p.equity);
-    let minV = Math.min(...equities, 9950);
-    let maxV = Math.max(...equities, 10050);
+    let minV = Math.min(...equities, 995);
+    let maxV = Math.max(...equities, 1005);
 
     const vSpan = maxV - minV || 50;
     minV = minV - vSpan * 0.08;
@@ -352,8 +352,8 @@
       ctx.stroke();
     }
 
-    // Baseline at Modal Awal $10,000
-    const y10k = Y(10000);
+    // Baseline at Modal Awal $1,000
+    const y10k = Y(1000);
     if (y10k >= padT && y10k <= padT + ph) {
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
       ctx.lineWidth = 1;
@@ -368,7 +368,7 @@
       ctx.textAlign = 'left';
       ctx.textBaseline = 'bottom';
       ctx.font = '10px Inter, sans-serif';
-      ctx.fillText('MODAL AWAL $10.000', padL + 8, y10k - 5);
+      ctx.fillText('MODAL AWAL $1.000', padL + 8, y10k - 5);
     }
 
     // X-Axis Vertical Lines & Date/Time Ticks
@@ -406,7 +406,7 @@
 
     // Equity Curve Line
     const latestEq = pts[pts.length - 1].equity;
-    const isUp = latestEq >= 10000;
+    const isUp = latestEq >= 1000;
     const lineColor = isUp ? '#10b981' : '#f43f5e';
     const areaGrad = ctx.createLinearGradient(0, padT, 0, padT + ph);
     areaGrad.addColorStop(0, isUp ? 'rgba(16, 185, 129, 0.28)' : 'rgba(244, 63, 94, 0.28)');
@@ -477,8 +477,8 @@
       const dt = new Date(ch.dataPoint.ts);
       const dtStr = dt.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'medium' });
       const eqVal = ch.dataPoint.equity;
-      const diff = eqVal - 10000;
-      const pct = (diff / 10000) * 100;
+      const diff = eqVal - 1000;
+      const pct = (diff / 1000) * 100;
 
       const ttipW = 180;
       const ttipH = 64;
@@ -580,7 +580,7 @@
 
         <div class="m-right">
           <div class="eq-badge">
-            <span class="eq-val mono {(strategy.balance ?? strategy.cash ?? strategy.equity) >= 10000 ? 'up' : 'down'}">
+            <span class="eq-val mono {(strategy.balance ?? strategy.cash ?? strategy.equity) >= 1000 ? 'up' : 'down'}">
               {formatUSD(strategy.balance ?? strategy.cash ?? strategy.equity)}
             </span>
             <span class="eq-sub mono">
@@ -671,7 +671,7 @@
           <div class="chart-legend-row mono">
             <div class="c-leg">
               <span class="leg-dash">---</span>
-              <span>Garis Putus-Putus: Modal Awal $10.000</span>
+              <span>Garis Putus-Putus: Modal Awal $1.000</span>
             </div>
             <div class="c-leg">
               <span class="leg-dot dot-live"></span>
@@ -699,7 +699,7 @@
               <b class="s-val mono {deepStats.netProfit >= 0 ? 'up' : 'down'}">
                 {deepStats.netProfit >= 0 ? '+' : ''}{formatUSD(deepStats.netProfit)}
               </b>
-              <span class="s-sub mono">{formatPercent(strategy.returnPct)} dari modal $10.000</span>
+              <span class="s-sub mono">{formatPercent(strategy.returnPct)} dari modal $1.000</span>
             </div>
 
             <!-- Box 2: Win Rate -->
@@ -780,7 +780,7 @@
               <b class="s-val mono {deepStats.refillCount > 0 ? 'down' : 'up'}">
                 {deepStats.refillCount === 0 ? 'SEHAT (0 MC)' : `${deepStats.refillCount}x TERKENA MC`}
               </b>
-              <span class="s-sub mono">{deepStats.refillCount > 0 ? 'Modal di-refill otomatis ke $10.000' : 'Belum pernah mengalami likuidasi total'}</span>
+              <span class="s-sub mono">{deepStats.refillCount > 0 ? 'Modal di-refill otomatis ke $1.000' : 'Belum pernah mengalami likuidasi total'}</span>
             </div>
           </div>
         </div>

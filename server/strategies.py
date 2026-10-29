@@ -16,7 +16,7 @@ from __future__ import annotations
 from typing import Callable
 
 MAX_POS = 5            # batas concurrent positions per strategi (bisa pegang hingga 5 pair berbeda)
-SINGLE_POS_CAP = 0.20  # alokasi maks 20% equity ($2.000 dari $10.000) per posisi
+SINGLE_POS_CAP = 0.20  # alokasi maks 20% equity ($200 dari $1.000) per posisi
 TOTAL_NOTIONAL_CAP = 1.0   # max 100% equity total notional (spot) / margin (futures)
 TOTAL_RISK_CAP = 0.20      # max 20% equity total risk exposure
 LONG, SHORT = 1, -1

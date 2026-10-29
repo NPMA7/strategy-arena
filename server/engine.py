@@ -26,7 +26,7 @@ from .strategies import (
     SPOT_STRATEGIES, FUTURES_STRATEGIES, FOREX_STRATEGIES, get_strategy_rr,
 )
 
-START_EQUITY = 10_000.0
+START_EQUITY = 1_000.0
 RISK = 0.02
 SL_MULT = 2.0
 MIN_BARS = 210  # butuh EMA200 dulu
@@ -288,7 +288,7 @@ class Engine:
                 acct["warmed"] = True
 
     def _handle_mc(self, acct: dict, ts: int) -> None:
-        """Margin Call / saldo $0: likuidasi semua posisi terbuka, refill ke START_EQUITY ($10.000), catat mc_count."""
+        """Margin Call / saldo $0: likuidasi semua posisi terbuka, refill ke START_EQUITY ($1.000), catat mc_count."""
         sid = acct["id"]
         acct["mc_count"] = acct.get("mc_count", 0) + 1
         mc_num = acct["mc_count"]
@@ -302,7 +302,7 @@ class Engine:
             px = self._get_price(sym, p["entry"])
             fee_rate = acct.get("fee_rate", SPOT_FEE)
             if self.mode == "forex":
-                gross = calculate_forex_pnl(sym, p["entry"], px, p["side"], p.get("lot", 0.10), self._forex_prices())
+                gross = calculate_forex_pnl(sym, p["entry"], px, p["side"], p.get("lot", 0.02), self._forex_prices())
                 fee = 0.0
             else:
                 gross = (px - p["entry"]) * p["qty"] * p["side"]
@@ -324,13 +324,13 @@ class Engine:
                 "equity_after": 0.0,
             })
 
-        # 2. Refill saldo kembali ke modal awal ($10.000)
+        # 2. Refill saldo kembali ke modal awal ($1.000)
         acct["cash"] = START_EQUITY
         acct["equity"] = START_EQUITY
         acct["peak"] = START_EQUITY
         acct["max_dd"] = 1.0  # Tercatat pernah drawdown 100%
 
-        # Update sparkline agar visualisasi menunjukkan penurunan ke 0 dan refill ke $10.000
+        # Update sparkline agar visualisasi menunjukkan penurunan ke 0 dan refill ke $1.000
         if sid in self.sparklines:
             self.sparklines[sid].append(0.0)
             self.sparklines[sid].append(START_EQUITY)
@@ -372,7 +372,7 @@ class Engine:
         stop_dist = SL_MULT * atr if (atr and atr > 0) else price * 0.02
         stop_dist = max(stop_dist, price * 0.0035)
 
-        # Sizing berbasis risiko murni: loss saat SL terkena adalah ~2% equity ($200 dari modal $10.000)
+        # Sizing berbasis risiko murni: loss saat SL terkena adalah ~2% equity ($20 dari modal $1.000)
         target_risk = acct["equity"] * RISK
         risk_based_notional = target_risk / (stop_dist / price)
         if self.mode == "futures":
@@ -441,20 +441,20 @@ class Engine:
         elif self.mode == "forex":
             # Real MT5 Contract Size & Institutional Sizing matching FXVerify Position Size Calculator
             c_size = get_contract_size(symbol)
-            target_risk_usd = acct["cash"] * 0.015  # 1.5% target risk per trade (~$150 pada modal $10.000)
+            target_risk_usd = acct["cash"] * 0.015  # 1.5% target risk per trade (~$15 pada modal $1.000)
             px_dict = self._forex_prices()
             # Kalkulasi riil risiko per 1.0 Lot dalam USD jika SL terkena
             risk_per_1_lot = abs(calculate_forex_pnl(symbol, 0.0, stop_dist, 1, 1.0, px_dict))
             calc_lot = target_risk_usd / max(risk_per_1_lot, 1e-4)
 
             if "XAU" in symbol or "GOLD" in symbol:
-                # Emas: 1 Lot = 100 oz. Lot standar prop firm: 0.05 - 0.50 Lot
-                lot = round(min(max(calc_lot, 0.05), 0.50), 2)
+                # Emas: 1 Lot = 100 oz. Lot standar modal $1.000: 0.01 - 0.10 Lot
+                lot = round(min(max(calc_lot, 0.01), 0.10), 2)
             elif "XTI" in symbol or "USO" in symbol or "WTI" in symbol or "OIL" in symbol:
-                lot = round(min(max(calc_lot, 0.05), 0.50), 2)
+                lot = round(min(max(calc_lot, 0.01), 0.10), 2)
             else:
-                # Forex: 1 Lot = 100.000 unit. Lot standar MT5: 0.10 - 1.50 Lot
-                lot = round(min(max(calc_lot, 0.10), 1.50), 2)
+                # Forex: 1 Lot = 100.000 unit. Lot standar modal $1.000: 0.01 - 0.20 Lot
+                lot = round(min(max(calc_lot, 0.01), 0.20), 2)
 
             qty = lot  # In Forex, qty stores lot directly
             base_notional = lot * c_size * price

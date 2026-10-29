@@ -104,21 +104,17 @@
   /* Desk Grid: Dossier + Pair Yang Sedang Diperdagangkan */
   .desk-grid {
     grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
-    height: 480px;
-    max-height: 480px;
-    min-height: 480px;
+    height: 540px;
+    min-height: 540px;
     margin-bottom: 12px;
-    overflow: hidden;
   }
 
   /* Market & Logs Grid: Pasar + Log Realtime */
   .market-logs-grid {
     grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
     height: 380px;
-    max-height: 380px;
     min-height: 380px;
     margin-bottom: 12px;
-    overflow: hidden;
   }
 
   .cell {
@@ -127,7 +123,6 @@
     height: 100%;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
   }
 
   .floor-foot {
@@ -147,7 +142,7 @@
     color: #94a3b8;
   }
 
-  @media (max-width: 1280px) {
+  @media (max-width: 1100px) {
     .desk-grid,
     .market-logs-grid {
       grid-template-columns: minmax(0, 1fr);
@@ -158,25 +153,24 @@
     }
     .cell {
       height: auto;
-      min-height: 460px;
+      min-height: 0;
+      overflow: visible;
     }
   }
 
   @media (max-width: 768px) {
     .trading-floor {
-      padding: 6px 8px 16px 8px;
-      overflow-x: hidden;
+      padding: 8px 10px 20px 10px;
     }
     .desk-grid,
     .market-logs-grid {
-      gap: 10px;
-      margin-bottom: 10px;
       max-height: none;
       overflow: visible;
     }
     .cell {
       height: auto;
-      min-height: 400px;
+      min-height: 0;
+      overflow: visible;
     }
   }
 </style>

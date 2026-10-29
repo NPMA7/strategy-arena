@@ -339,7 +339,11 @@
       </div>
 
       <div class="dos-actions">
-        <button class="btn-open-detail mono" onclick={() => (detailModalOpen = true)} title="Buka Analisis & Histori Trade Lengkap">
+        <div class="dos-eq">
+          <b class="mono {isPositive ? 'up' : 'down'}">{formatUSD(strategy.balance ?? strategy.cash ?? strategy.equity)}</b>
+          <span>BALANCE BERSIH · {positions.length > 0 ? `${positions.length} POSISI TERBUKA` : '0 POSISI TERBUKA'}</span>
+        </div>
+        <button class="btn-open-detail mono" onclick={() => (detailModalOpen = true)}>
           <svg class="btn-icon-svg" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <line x1="18" y1="20" x2="18" y2="10"></line>
             <line x1="12" y1="20" x2="12" y2="4"></line>
@@ -347,10 +351,6 @@
           </svg>
           <span>Analisis & Histori</span>
         </button>
-        <div class="dos-eq">
-          <b class="mono {isPositive ? 'up' : 'down'}">{formatUSD(strategy.balance ?? strategy.cash ?? strategy.equity)}</b>
-          <span>BALANCE BERSIH · {positions.length > 0 ? `${positions.length} POSISI TERBUKA` : '0 POSISI TERBUKA'}</span>
-        </div>
       </div>
     </div>
 
@@ -394,8 +394,16 @@
     <div class="pos-list">
       <div class="pos-list-bar">
         <div class="pos-list-title">
+          {#if positions.length > 0}
+            <span class="live-dot-pulse"></span>
+          {/if}
           <span>POSISI AKTIF STRATEGI</span>
-          <span class="count-pill">{positions.length} pair</span>
+          <span class="count-pill {positions.length > 0 ? 'has-pos' : ''}">
+            {positions.length > 0 ? `${positions.length} posisi terbuka` : '0 posisi (flat)'}
+          </span>
+        </div>
+        <div class="pos-list-right">
+          <span class="mono hint-text">Mark-to-Market Realtime</span>
         </div>
       </div>
 
@@ -405,7 +413,7 @@
             <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
             <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
           </svg>
-          <span>Strategi ini sedang menunggu sinyal entry berikutnya (flat).</span>
+          <span>Strategi ini sedang menunggu sinyal entry berikutnya (flat / 0 posisi terbuka).</span>
         </div>
       {:else}
         <div class="tablewrap">
@@ -655,9 +663,10 @@
   .pos-list {
     display: flex;
     flex-direction: column;
-    flex: 1 1 0;
-    min-height: 0;
-    overflow: hidden;
+    flex: 1 1 auto;
+    min-height: 220px;
+    background: #070b12;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
   }
 
   .pos-list-bar {
@@ -671,6 +680,9 @@
   }
 
   .pos-list-title {
+    display: flex;
+    align-items: center;
+    gap: 7px;
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.06em;
@@ -678,26 +690,50 @@
     text-transform: uppercase;
   }
 
+  .live-dot-pulse {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 8px #10b981;
+    display: inline-block;
+  }
+
   .count-pill {
     font-size: 10px;
     color: #64748b;
     background: #111722;
-    padding: 1px 6px;
-    border-radius: 3px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .count-pill.has-pos {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+    border-color: rgba(16, 185, 129, 0.3);
+    font-weight: 700;
+  }
+
+  .hint-text {
+    font-size: 10px;
+    color: #475569;
+    letter-spacing: 0.04em;
   }
 
   .tablewrap {
-    flex: 1 1 0;
-    min-height: 120px;
+    flex: 1 1 auto;
+    min-height: 160px;
+    max-height: 420px;
     overflow-y: auto;
     overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
     scrollbar-gutter: stable;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
   }
 
   table {
     width: 100%;
-    min-width: 560px;
     border-collapse: collapse;
     font-size: 11.5px;
   }
@@ -764,16 +800,19 @@
   }
 
   @media (max-width: 900px) {
+    .detail {
+      height: auto;
+      min-height: auto;
+    }
     .dos-head {
-      flex-direction: column;
-      align-items: stretch;
-      gap: 10px;
       padding: 10px 12px;
+      gap: 10px;
     }
     .dos-actions {
       margin-left: 0;
       width: 100%;
       justify-content: space-between;
+      margin-top: 6px;
     }
     .dos-body {
       grid-template-columns: minmax(0, 1fr);
@@ -781,39 +820,21 @@
     .chartwrap {
       border-right: 0;
       border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      padding: 8px 6px;
+      padding: 6px 4px;
     }
     #eqChart {
-      height: 160px;
+      height: 140px;
     }
     .kpis {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      padding: 10px 12px;
+      padding: 8px 10px;
       gap: 8px;
     }
-    .kpi-box span {
-      font-size: 8.5px;
+    .pos-list {
+      min-height: 220px;
     }
-    .kpi-box b {
-      font-size: 13px;
-    }
-  }
-
-  @media (max-width: 480px) {
-    .dos-title h2 {
-      font-size: 15px;
-    }
-    .dos-eq b {
-      font-size: 17px;
-    }
-    .kpis {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      padding: 8px 10px;
-      gap: 6px;
-    }
-    .btn-open-detail {
-      padding: 5px 8px;
-      font-size: 10px;
+    .tablewrap {
+      min-height: 180px;
+      max-height: 360px;
     }
   }
 </style>

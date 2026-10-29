@@ -171,17 +171,18 @@
   }
 
   .tablewrap {
-    flex: 1 1 0;
-    min-height: 180px;
+    flex: 1 1 auto;
+    min-height: 200px;
+    max-height: 440px;
     overflow-y: auto;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-gutter: stable;
+    width: 100%;
   }
 
   table {
     width: 100%;
-    min-width: 580px;
     border-collapse: collapse;
     font-size: 11.5px;
   }
@@ -274,20 +275,5 @@
     padding: 40px;
     color: #64748b;
     font-size: 12px;
-  }
-
-  @media (max-width: 640px) {
-    .phead {
-      flex-direction: column;
-      align-items: stretch;
-      gap: 8px;
-      padding: 8px 10px;
-    }
-    .phead-left {
-      justify-content: space-between;
-    }
-    .search-wrap input {
-      width: 100%;
-    }
   }
 </style>

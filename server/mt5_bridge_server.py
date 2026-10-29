@@ -67,7 +67,7 @@ _last_conn_attempt = 0.0
 
 
 def _sync_connect_rpyc():
-    """Mengelola koneksi persisten ke server RPyC MT5 di mt5-vnc (dieksekusi di worker thread)."""
+    """Mengelola koneksi persisten ke server RPyC MT5 (dieksekusi di worker thread)."""
     global _rpyc_conn, _last_conn_attempt, cached_account_info
     now = time.time()
     if _rpyc_conn is not None:
@@ -81,28 +81,31 @@ def _sync_connect_rpyc():
         return None
     _last_conn_attempt = now
 
-    try:
-        log.info("Mencoba menghubungkan ke RPyC MT5 di %s:%d...", MT5_RPYC_HOST, MT5_RPYC_PORT)
-        conn = rpyc.classic.connect(MT5_RPYC_HOST, MT5_RPYC_PORT)
-        conn._config["sync_request_timeout"] = 60
+    # Daftar kandidat host MT5 terminal
+    candidate_hosts = []
+    seen = set()
+    for h, p in [(MT5_RPYC_HOST, MT5_RPYC_PORT), ("sa-copytrade-mt5", 18812), ("mt5-vnc", 18812)]:
+        if (h, p) not in seen and h:
+            seen.add((h, p))
+            candidate_hosts.append((h, p))
 
-        # Initialize MT5 and remote batch routines
-        conn.execute("""
+    for h, p in candidate_hosts:
+        try:
+            log.info("Mencoba menghubungkan ke RPyC MT5 di %s:%d...", h, p)
+            conn = rpyc.classic.connect(h, p)
+            conn._config["sync_request_timeout"] = 15
+
+            # Initialize MT5 and remote batch routines
+            conn.execute("""
 import sys
 if 'C:\\\\mt5libs' not in sys.path:
     sys.path.append('C:\\\\mt5libs')
 import MetaTrader5 as mt5
 
 def _arena_init():
-    ok = mt5.initialize(path="C:\\\\MT5\\\\terminal64.exe", portable=True)
+    ok = mt5.initialize()
     if not ok:
-        ok = mt5.initialize()
-    if ok:
-        info = mt5.account_info()
-        if not info or info.login != 6310591:
-            log_res = mt5.login(6310591, password="dL7ny!PE", server="Headway-Demo")
-            if not log_res:
-                mt5.login(6310591, password="dL7ny!PE", server="mt5.demo.trade-hw.online:443")
+        ok = mt5.initialize(path="C:\\\\MT5\\\\terminal64.exe", portable=True)
     return ok
 
 _daily_base_prices = {}
@@ -169,31 +172,31 @@ def _arena_get_bars(broker_sym, num_bars):
     return out
 """)
 
-        init_ok = conn.eval("_arena_init()")
-        if init_ok:
-            conn.eval(f"_arena_select_symbols({list(BROKER_MAP.values())})")
-            log.info("✓ Sukses terhubung dan menginisialisasi MT5 di %s:%d", MT5_RPYC_HOST, MT5_RPYC_PORT)
-            _rpyc_conn = conn
-            cached_account_info["connected"] = True
-            try:
-                acc = conn.eval("mt5.account_info()")
-                if acc:
-                    cached_account_info["login"] = int(acc.login)
-                    cached_account_info["server"] = str(acc.server)
-                    cached_account_info["balance"] = float(acc.balance)
-            except Exception:
-                pass
-            return _rpyc_conn
-        else:
-            err = conn.eval("mt5.last_error()")
-            log.warning("MT5 initialize() di remote RPyC mengembalikan False: %s", err)
-            cached_account_info["connected"] = False
-            return None
-    except Exception as exc:
-        log.warning("Gagal connect ke RPyC MT5 (%s:%d): %s", MT5_RPYC_HOST, MT5_RPYC_PORT, exc)
-        _rpyc_conn = None
-        cached_account_info["connected"] = False
-        return None
+            init_ok = conn.eval("_arena_init()")
+            if init_ok:
+                conn.eval(f"_arena_select_symbols({list(BROKER_MAP.values())})")
+                log.info("✓ Sukses terhubung dan menginisialisasi MT5 di %s:%d", h, p)
+                _rpyc_conn = conn
+                cached_account_info["connected"] = True
+                try:
+                    acc = conn.eval("mt5.account_info()")
+                    if acc:
+                        cached_account_info["login"] = int(acc.login)
+                        cached_account_info["server"] = str(acc.server)
+                        cached_account_info["balance"] = float(acc.balance)
+                except Exception:
+                    pass
+                return _rpyc_conn
+            else:
+                err = conn.eval("mt5.last_error()")
+                log.warning("MT5 initialize() di remote RPyC (%s:%d) mengembalikan False: %s", h, p, err)
+        except Exception as exc:
+            log.warning("Gagal connect ke kandidat RPyC MT5 (%s:%d): %s", h, p, exc)
+            continue
+
+    _rpyc_conn = None
+    cached_account_info["connected"] = False
+    return None
 
 
 def _sync_fetch_ticks(conn):

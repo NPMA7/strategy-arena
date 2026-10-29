@@ -126,20 +126,22 @@ class ForexFeed:
             timeout = aiohttp.ClientTimeout(total=1.5)
             async with self.session.get(f"{MT5_BRIDGE_URL}/health", timeout=timeout) as resp:
                 if resp.status == 200:
-                    return True
+                    data = await resp.json()
+                    return bool(data.get("connected") and data.get("symbols_count", 0) > 0)
         except Exception:
             pass
         return False
 
     async def _feed_loop(self) -> None:
         """Tick generation & bridge poll loop. Mengirimkan live tick tiap 500ms."""
+        last_pause_log = 0.0
         while self._running:
             try:
                 now_sec = time.time()
                 now_ms = int(now_sec * 1000)
 
-                # Cek koneksi ke MT5 Bridge secara periodik (setiap 10 detik)
-                if now_sec - self._last_mt5_check >= 10.0:
+                # Cek koneksi ke MT5 Bridge secara periodik (setiap 3 detik)
+                if now_sec - self._last_mt5_check >= 3.0:
                     self._last_mt5_check = now_sec
                     mt5_ok = await self._check_mt5_bridge()
                     if mt5_ok != self.is_mt5_live:
@@ -147,10 +149,10 @@ class ForexFeed:
                         if mt5_ok:
                             log.info("✓ Terhubung ke MT5 Bridge di %s (Live Realtime Feed)", MT5_BRIDGE_URL)
                         else:
-                            log.info("MT5 Bridge offline, menjalankan autonomous Forex Feed simulation.")
+                            log.warning("⏸️ MT5 Bridge offline/kosong. Pembaruan harga Forex DIHENTIKAN SEMENTARA (PAUSED) agar tidak terjadi distorsi harga.")
 
                 bridge_ticks = None
-                if self.is_mt5_live and self.session:
+                if self.session:
                     try:
                         timeout = aiohttp.ClientTimeout(total=1.5)
                         async with self.session.get(f"{MT5_BRIDGE_URL}/ticks", timeout=timeout) as resp:
@@ -159,35 +161,40 @@ class ForexFeed:
                     except Exception:
                         pass
 
+                # Jika MT5 bridge tidak mengembalikan ticks riil, JANGAN gunakan simulasi random! STOP / PAUSE FOREX!
+                if not bridge_ticks or not isinstance(bridge_ticks, dict) or len(bridge_ticks) == 0:
+                    if now_sec - last_pause_log >= 15.0:
+                        last_pause_log = now_sec
+                        log.warning("⏸️ MT5 Bridge tidak mengembalikan data tick riil. Forex feed dihentikan (PAUSED) untuk menjaga integritas harga.")
+                    self.is_mt5_live = False
+                    await asyncio.sleep(1.0)
+                    continue
+
+                self.is_mt5_live = True
+
                 for meta in FOREX_METAS:
                     sym = meta["symbol"]
+                    if sym not in bridge_ticks:
+                        continue
+                    t_data = bridge_ticks[sym]
                     cur = self.current_prices[sym]
                     digits = meta["digits"]
 
-                    if bridge_ticks and sym in bridge_ticks:
-                        t_data = bridge_ticks[sym]
-                        self.latest_ticks[sym] = t_data
-                        new_price = round(float(t_data.get("price") or t_data.get("last") or cur), digits)
-                        if t_data.get("day_open") and float(t_data["day_open"]) > 0:
-                            self.open_prices_24h[sym] = float(t_data["day_open"])
-                    else:
-                        # Model Ornstein-Uhlenbeck: variasi mikro dengan tendensi stabil
-                        vol = meta["vol"]
-                        anchor = meta["base_price"]
-                        reversion = 0.02 * (anchor - cur)
-                        shock = random.gauss(0, vol)
-                        new_price = round(cur + reversion + shock, digits)
+                    self.latest_ticks[sym] = t_data
+                    new_price = round(float(t_data.get("price") or t_data.get("last") or cur), digits)
+                    if t_data.get("day_open") and float(t_data["day_open"]) > 0:
+                        self.open_prices_24h[sym] = float(t_data["day_open"])
 
                     # Pastikan harga tetap rasional positif
                     if new_price <= 0:
-                        new_price = cur
+                        continue
 
                     self.current_prices[sym] = new_price
                     qty = round(random.uniform(0.1, 5.0), 2)
                     self.volumes_24h[sym] += qty
                     self.ticks_count += 1
 
-                    # Panggil callback on_trade
+                    # Panggil callback on_trade HANYA jika berasal dari tick riil MT5
                     await self.on_trade(sym, new_price, qty, float(now_ms))
 
                 await asyncio.sleep(0.5)
@@ -210,16 +217,15 @@ class ForexFeed:
             bid = t.get("bid")
             ask = t.get("ask")
             if bid is None or ask is None:
-                spr_pts = round(pip * random.uniform(0.8, 1.8), digits)
-                bid = round(cur - spr_pts / 2.0, digits)
-                ask = round(cur + spr_pts / 2.0, digits)
+                bid = cur
+                ask = cur
+                diff = 0.0
+                spr_pips = 0.0
             else:
                 bid = round(float(bid), digits)
                 ask = round(float(ask), digits)
-
-            # Selisih persis mengikuti selisih harga Bid dan Ask
-            diff = round(ask - bid, digits)
-            spr_pips = round(diff / pip, 1) if pip > 0 else 0.0
+                diff = round(ask - bid, digits)
+                spr_pips = round(diff / pip, 1) if pip > 0 else 0.0
 
             change = t.get("change")
             if change is None:

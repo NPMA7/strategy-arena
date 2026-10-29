@@ -343,14 +343,7 @@
           <b class="mono {isPositive ? 'up' : 'down'}">{formatUSD(strategy.balance ?? strategy.cash ?? strategy.equity)}</b>
           <span>BALANCE BERSIH · {positions.length > 0 ? `${positions.length} POSISI TERBUKA` : '0 POSISI TERBUKA'}</span>
         </div>
-        <button class="btn-open-detail mono" onclick={() => (detailModalOpen = true)}>
-          <svg class="btn-icon-svg" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="20" x2="18" y2="10"></line>
-            <line x1="12" y1="20" x2="12" y2="4"></line>
-            <line x1="6" y1="20" x2="6" y2="14"></line>
-          </svg>
-          <span>Analisis & Histori</span>
-        </button>
+      
       </div>
     </div>
 
@@ -389,6 +382,14 @@
         </div>
       </div>
     </div>
+        <button class="btn-open-detail mono" onclick={() => (detailModalOpen = true)}>
+          <svg class="btn-icon-svg" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10"></line>
+            <line x1="12" y1="20" x2="12" y2="4"></line>
+            <line x1="6" y1="20" x2="6" y2="14"></line>
+          </svg>
+          <span>Analisis & Histori</span>
+        </button>
 
     <!-- Active Positions Table for this Selected Strategy -->
     <div class="pos-list">
@@ -398,9 +399,6 @@
             <span class="live-dot-pulse"></span>
           {/if}
           <span>POSISI AKTIF STRATEGI</span>
-          <span class="count-pill {positions.length > 0 ? 'has-pos' : ''}">
-            {positions.length > 0 ? `${positions.length} posisi terbuka` : '0 posisi (flat)'}
-          </span>
         </div>
         <div class="pos-list-right">
           <span class="mono hint-text">Mark-to-Market Realtime</span>
@@ -698,23 +696,6 @@
     box-shadow: 0 0 8px #10b981;
     display: inline-block;
   }
-
-  .count-pill {
-    font-size: 10px;
-    color: #64748b;
-    background: #111722;
-    padding: 2px 7px;
-    border-radius: 4px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-  }
-
-  .count-pill.has-pos {
-    background: rgba(16, 185, 129, 0.15);
-    color: #10b981;
-    border-color: rgba(16, 185, 129, 0.3);
-    font-weight: 700;
-  }
-
   .hint-text {
     font-size: 10px;
     color: #475569;

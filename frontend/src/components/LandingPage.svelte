@@ -7,6 +7,7 @@
 
   // Tab & Filter State for Executive Leaderboard
   let activeMarketTab = $state('universal'); // 'universal', 'forex', 'futures', 'spot'
+  let mobileMenuOpen = $state(false);
   let boardLimit = $state(10); // 5, 10, 25, 88
   let chartViewMode = $state('lines'); // 'lines' or 'donut'
   let selectedTimeRangeDays = $state(30); // 30 (1 Bulan Kumulatif), 14, 7
@@ -552,7 +553,8 @@
         </div>
       </div>
 
-      <div class="header-actions">
+      <!-- Desktop Actions -->
+      <div class="header-actions desktop-nav">
         <!-- Terminal Enter CTA -->
         <button class="nav-btn btn-spot" onclick={() => enterTerminal("spot")}>
           <span>Terminal Spot</span>
@@ -573,7 +575,105 @@
           <span>Neural Execution</span>
         </button>
       </div>
+
+      <!-- Hamburger Button (Mobile) -->
+      <button
+        type="button"
+        class="hamburger-btn"
+        class:active={mobileMenuOpen}
+        onclick={() => (mobileMenuOpen = !mobileMenuOpen)}
+        aria-label={mobileMenuOpen ? 'Tutup navigasi' : 'Buka menu terminal'}
+      >
+        {#if mobileMenuOpen}
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        {:else}
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="4" y1="7" x2="20" y2="7"></line>
+            <line x1="4" y1="12" x2="20" y2="12"></line>
+            <line x1="4" y1="17" x2="20" y2="17"></line>
+          </svg>
+        {/if}
+      </button>
     </div>
+
+    <!-- Mobile Drawer Menu Dropdown -->
+    {#if mobileMenuOpen}
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="mobile-drawer-backdrop" onclick={() => (mobileMenuOpen = false)}>
+        <div class="mobile-drawer-content" onclick={(e) => e.stopPropagation()}>
+          <div class="drawer-header">
+            <span class="drawer-title mono">PILIH TERMINAL ARENA</span>
+            <span class="drawer-sub">Multi-Asset Quantitative Benchmark</span>
+          </div>
+
+          <div class="drawer-nav-list">
+            <button
+              type="button"
+              class="drawer-nav-item item-spot"
+              onclick={() => { mobileMenuOpen = false; enterTerminal('spot'); }}
+            >
+              <div class="drawer-icon icon-spot">
+                <span class="dot-spot"></span>
+              </div>
+              <div class="drawer-item-info">
+                <span class="item-name">Terminal Spot</span>
+                <span class="item-desc">Binance Crypto Spot (No-Leverage)</span>
+              </div>
+              <svg class="chevron-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>
+
+            <button
+              type="button"
+              class="drawer-nav-item item-futures"
+              onclick={() => { mobileMenuOpen = false; enterTerminal('futures'); }}
+            >
+              <div class="drawer-icon icon-futures">
+                <span class="dot-futures"></span>
+              </div>
+              <div class="drawer-item-info">
+                <span class="item-name">Terminal Futures</span>
+                <span class="item-desc">Binance Perpetual (Leverage 1–20x)</span>
+              </div>
+              <svg class="chevron-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>
+
+            <button
+              type="button"
+              class="drawer-nav-item item-forex"
+              onclick={() => { mobileMenuOpen = false; enterTerminal('forex'); }}
+            >
+              <div class="drawer-icon icon-forex">
+                <span class="dot-forex"></span>
+              </div>
+              <div class="drawer-item-info">
+                <span class="item-name">Terminal Forex & Metals</span>
+                <span class="item-desc">MT5 Direct Feed & Eksekusi Headway</span>
+              </div>
+              <svg class="chevron-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>
+
+            <button
+              type="button"
+              class="drawer-nav-item item-neural"
+              onclick={() => { mobileMenuOpen = false; arena.navigate('/neural-execution'); }}
+            >
+              <div class="drawer-icon icon-neural">
+                <span class="dot-neural"></span>
+              </div>
+              <div class="drawer-item-info">
+                <span class="item-name">Neural Execution</span>
+                <span class="item-desc">Visual 3D Matrix & Realtime Trade Feed</span>
+              </div>
+              <svg class="chevron-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    {/if}
   </header>
 
   <!-- Hero Section with 3D Core Viewport -->
@@ -1576,6 +1676,195 @@
   .btn-forex:hover {
     color: #ffffff;
     border-color: rgba(255, 255, 255, 0.25);
+  }
+
+  /* Hamburger Menu (Mobile Only) */
+  .hamburger-btn {
+    display: none;
+    background: #0d121c;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    color: #e2e8f0;
+    padding: 6px 8px;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+  }
+
+  .hamburger-btn:hover {
+    background: #151d2c;
+    border-color: rgba(245, 158, 11, 0.4);
+    color: #f59e0b;
+  }
+
+  .hamburger-btn.active {
+    background: rgba(245, 158, 11, 0.15);
+    border-color: #f59e0b;
+    color: #f59e0b;
+  }
+
+  /* Mobile Drawer Dropdown */
+  .mobile-drawer-backdrop {
+    position: fixed;
+    top: 57px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(3, 7, 18, 0.85);
+    backdrop-filter: blur(10px);
+    z-index: 100;
+    animation: fadeIn 0.18s ease;
+  }
+
+  .mobile-drawer-content {
+    background: #090e17;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    padding: 16px 16px 20px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
+    animation: slideDown 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .drawer-header {
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .drawer-title {
+    display: block;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    color: #f59e0b;
+  }
+
+  .drawer-sub {
+    display: block;
+    font-size: 12px;
+    color: #94a3b8;
+    margin-top: 2px;
+  }
+
+  .drawer-nav-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .drawer-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #0c121d;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 12px 14px;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    width: 100%;
+    color: inherit;
+    box-sizing: border-box;
+  }
+
+  .drawer-nav-item:hover,
+  .drawer-nav-item:active {
+    background: #151d2c;
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: translateX(2px);
+  }
+
+  .drawer-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .icon-spot {
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+  }
+  .dot-spot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #f59e0b;
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+  }
+
+  .icon-futures {
+    background: rgba(56, 189, 248, 0.12);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+  }
+  .dot-futures {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #38bdf8;
+    box-shadow: 0 0 8px rgba(56, 189, 248, 0.6);
+  }
+
+  .icon-forex {
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+  }
+  .dot-forex {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+  }
+
+  .icon-neural {
+    background: rgba(168, 85, 247, 0.15);
+    border: 1px solid rgba(168, 85, 247, 0.35);
+  }
+  .dot-neural {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #a855f7;
+    box-shadow: 0 0 8px rgba(168, 85, 247, 0.6);
+  }
+
+  .drawer-item-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .item-name {
+    display: block;
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #f1f5f9;
+  }
+
+  .item-desc {
+    display: block;
+    font-size: 11px;
+    color: #64748b;
+    margin-top: 2px;
+  }
+
+  .chevron-svg {
+    color: #475569;
+    flex-shrink: 0;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideDown {
+    from { transform: translateY(-12px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
   }
 
   /* Hero Section */
@@ -3176,26 +3465,16 @@
 
   @media (max-width: 768px) {
     .landing-nav-container {
-      flex-direction: column;
-      align-items: stretch;
-      gap: 12px;
-      padding: 10px 14px;
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
     }
-    .brand {
-      justify-content: flex-start;
+    .desktop-nav {
+      display: none !important;
     }
-    .header-actions {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 8px;
-      width: 100%;
-    }
-    .nav-btn {
-      text-align: center;
-      padding: 8px 10px;
-      font-size: 11px;
-      width: 100%;
-      box-sizing: border-box;
+    .hamburger-btn {
+      display: flex;
     }
     .hero-section {
       padding: 32px 14px 44px;

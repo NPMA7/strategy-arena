@@ -141,11 +141,6 @@
 
         <!-- Right: Public Clean Mode & Close Button -->
         <div class="header-right">
-          <div class="public-lock-tag mono" title="Drawing tools dinonaktifkan untuk menjaga kenyamanan seluruh pengguna publik">
-            <span class="lock-icon">🔒</span>
-            <span class="lock-txt">Mode Publik (Tanpa Tools)</span>
-          </div>
-
           <button
             type="button"
             class="close-btn"
@@ -349,21 +344,6 @@
     gap: 12px;
   }
 
-  .public-lock-tag {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    background: rgba(148, 163, 184, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    padding: 4px 9px;
-    border-radius: 6px;
-    font-size: 10px;
-    color: #94a3b8;
-  }
-
-  .lock-icon {
-    font-size: 11px;
-  }
 
   .close-btn {
     background: rgba(255, 255, 255, 0.06);
@@ -409,9 +389,6 @@
       flex-direction: column;
       align-items: stretch;
       gap: 10px;
-    }
-    .public-lock-tag {
-      display: none;
     }
   }
 </style>

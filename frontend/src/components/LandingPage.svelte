@@ -3,7 +3,7 @@
   import { arena } from "../lib/store.svelte.js";
   import { formatUSD, formatPercent, formatUptime } from "../lib/formatters.js";
   import { getStrategyCategory } from "../lib/constants.js";
-  import NeuralNetworkVisualizer from "./NeuralNetworkVisualizer.svelte";
+  import NeuralNetworkVisualizer3D from "./NeuralNetworkVisualizer3D.svelte";
 
   // Tab & Filter State for Executive Leaderboard
   let activeMarketTab = $state('universal'); // 'universal', 'forex', 'futures', 'spot'
@@ -125,13 +125,13 @@
       const name = sAcc?.name || fAcc?.name || xAcc?.name || sid;
       const category = getStrategyCategory(sid);
 
-      const sBal = sAcc?.balance ?? sAcc?.cash ?? 1000;
-      const fBal = fAcc?.balance ?? fAcc?.cash ?? 1000;
-      const xBal = xAcc?.balance ?? xAcc?.cash ?? 1000;
+      const sBal = sAcc?.balance ?? sAcc?.cash ?? arena.startEquity;
+      const fBal = fAcc?.balance ?? fAcc?.cash ?? arena.startEquity;
+      const xBal = xAcc?.balance ?? xAcc?.cash ?? arena.startEquity;
 
-      const sPnl = sBal - 1000;
-      const fPnl = fBal - 1000;
-      const xPnl = xBal - 1000;
+      const sPnl = sBal - arena.startEquity;
+      const fPnl = fBal - arena.startEquity;
+      const xPnl = xBal - arena.startEquity;
       const totalPnl = sPnl + fPnl + xPnl;
       const totalBal = sBal + fBal + xBal;
 
@@ -146,16 +146,16 @@
       const totalW = sW + fW + xW;
 
       const wr = totalTr > 0 ? (totalW / totalTr) * 100 : 0;
-      const retPct = (totalPnl / 3000) * 100;
+      const retPct = (totalPnl / arena.universalStartEquity) * 100;
 
-      // Trajektori 30 Hari Kumulatif (Hari 1: $3.000 -> Hari 30: Saldo Realized Terkini)
+      // Trajektori Kumulatif
       const curve = generateTrajectoryCurve({
         id: sid,
         name,
         totalBal,
         wr,
         trades: totalTr
-      }, 3000, selectedTimeRangeDays);
+      }, arena.universalStartEquity, selectedTimeRangeDays);
 
       // Dominant profit engine
       let dominantMarket = 'forex';
@@ -190,17 +190,18 @@
 
   // 2. Single Market Sorted Lists
   let sortedSpot = $derived.by(() => {
+    const startEq = arena.startEquity;
     const list = arena.spotAccounts.map(a => {
-      const bal = a.balance ?? a.cash ?? 1000;
+      const bal = a.balance ?? a.cash ?? startEq;
       const wr = a.trades > 0 ? (a.wins / a.trades) * 100 : 0;
       return {
         ...a,
         totalBal: bal,
-        totalPnl: bal - 1000,
-        retPct: a.returnPct || (((bal - 1000) / 1000) * 100),
+        totalPnl: bal - startEq,
+        retPct: a.returnPct || (((bal - startEq) / startEq) * 100),
         wr,
         category: getStrategyCategory(a.id),
-        curve: generateTrajectoryCurve({ id: a.id, name: a.name, totalBal: bal, wr, trades: a.trades }, 1000, selectedTimeRangeDays),
+        curve: generateTrajectoryCurve({ id: a.id, name: a.name, totalBal: bal, wr, trades: a.trades }, startEq, selectedTimeRangeDays),
         mode: 'spot'
       };
     });
@@ -209,17 +210,18 @@
   });
 
   let sortedFutures = $derived.by(() => {
+    const startEq = arena.startEquity;
     const list = arena.futuresAccounts.map(a => {
-      const bal = a.balance ?? a.cash ?? 1000;
+      const bal = a.balance ?? a.cash ?? startEq;
       const wr = a.trades > 0 ? (a.wins / a.trades) * 100 : 0;
       return {
         ...a,
         totalBal: bal,
-        totalPnl: bal - 1000,
-        retPct: a.returnPct || (((bal - 1000) / 1000) * 100),
+        totalPnl: bal - startEq,
+        retPct: a.returnPct || (((bal - startEq) / startEq) * 100),
         wr,
         category: getStrategyCategory(a.id),
-        curve: generateTrajectoryCurve({ id: a.id, name: a.name, totalBal: bal, wr, trades: a.trades }, 1000, selectedTimeRangeDays),
+        curve: generateTrajectoryCurve({ id: a.id, name: a.name, totalBal: bal, wr, trades: a.trades }, startEq, selectedTimeRangeDays),
         mode: 'futures'
       };
     });
@@ -228,17 +230,18 @@
   });
 
   let sortedForex = $derived.by(() => {
+    const startEq = arena.startEquity;
     const list = arena.forexAccounts.map(a => {
-      const bal = a.balance ?? a.cash ?? 1000;
+      const bal = a.balance ?? a.cash ?? startEq;
       const wr = a.trades > 0 ? (a.wins / a.trades) * 100 : 0;
       return {
         ...a,
         totalBal: bal,
-        totalPnl: bal - 1000,
-        retPct: a.returnPct || (((bal - 1000) / 1000) * 100),
+        totalPnl: bal - startEq,
+        retPct: a.returnPct || (((bal - startEq) / startEq) * 100),
         wr,
         category: getStrategyCategory(a.id),
-        curve: generateTrajectoryCurve({ id: a.id, name: a.name, totalBal: bal, wr, trades: a.trades }, 1000, selectedTimeRangeDays),
+        curve: generateTrajectoryCurve({ id: a.id, name: a.name, totalBal: bal, wr, trades: a.trades }, startEq, selectedTimeRangeDays),
         mode: 'forex'
       };
     });
@@ -279,7 +282,7 @@
 
   let multiLineChart = $derived.by(() => {
     const list = top10;
-    const baseVal = activeMarketTab === 'universal' ? 3000 : 1000;
+    const baseVal = activeMarketTab === 'universal' ? arena.universalStartEquity : arena.startEquity;
     const days = selectedTimeRangeDays;
     const W = 760;
     const H = 250;
@@ -575,14 +578,19 @@
 
   <!-- Hero Section with 3D Core Viewport -->
   <section class="hero-section">
-    <div class="hero-container">
-      <!-- Left Column: Copy & Direct CTAs -->
-      <div class="hero-content">
+    <!-- Interactive 3D Cyber Neural Background Mesh -->
+    <div class="hero-bg-3d">
+      <NeuralNetworkVisualizer3D isBackground={true} />
+      <div class="hero-vignette-overlay"></div>
+    </div>
 
-        <h1 style="color: chocolate;">
+    <div class="hero-container">
+      <!-- Foreground Content -->
+      <div class="hero-content">
+        <h1 class="hero-eyebrow-brand">
           ARENA KUANTITATIF
         </h1> 
-        <h1 class="hero-title" sty>
+        <h1 class="hero-title">
           MULTI-PASAR TERBESAR.
         </h1>
 
@@ -617,11 +625,11 @@
             <span class="m-lbl">Model Algoritma</span>
           </div>
           <div class="metric-item">
-            <span class="m-val mono">100++</span>
-            <span class="m-lbl">Pairs</span>
+            <span class="m-val mono">128</span>
+            <span class="m-lbl">Active Pairs (Tri-Market)</span>
           </div>
           <div class="metric-item">
-            <span class="m-val mono">$1.000</span>
+            <span class="m-val mono">{formatUSD(arena.startEquity, 0)}</span>
             <span class="m-lbl">Modal Awal Seragam</span>
           </div>
           <div class="metric-item">
@@ -629,11 +637,6 @@
             <span class="m-lbl">Latensi Sinyal Internal</span>
           </div>
         </div>
-      </div>
-
-      <!-- Right Column: Deep Neural Network Architecture -->
-      <div class="hero-pipeline">
-        <NeuralNetworkVisualizer />
       </div>
     </div>
   </section>
@@ -646,7 +649,7 @@
         <div class="head-info">
           <h2>PAPAN KLASEMEN UNIVERSAL MULTI-ASSET</h2>
           <p class="section-desc">
-            Audit kinerja terpadu 80+ strategi kuantitatif universal yang dieksekusi simultan di 3 kelas instrumen pasar (Crypto Spot, Binance Futures, Forex & Metals). Modal portofolio seragam $3.000 ($1.000 per pasar).
+            Audit kinerja terpadu 80+ strategi kuantitatif universal yang dieksekusi simultan di 3 kelas instrumen pasar (Crypto Spot, Binance Futures, Forex & Metals). Modal portofolio seragam {formatUSD(arena.universalStartEquity, 0)} ({formatUSD(arena.startEquity, 0)} per pasar).
           </p>
         </div>
 
@@ -932,7 +935,7 @@
             </div>
 
             <div class="panel-controls">
-              <span class="panel-meta mono">Base: ${activeMarketTab === 'universal' ? '3.000' : '1.000'}</span>
+              <span class="panel-meta mono">Base: {activeMarketTab === 'universal' ? formatUSD(arena.universalStartEquity, 0) : formatUSD(arena.startEquity, 0)}</span>
             </div>
           </div>
 
@@ -1075,7 +1078,7 @@
 
             <!-- Base Line Label Badge -->
             <div class="chart-axis-baseline mono">
-              Modal Awal: ${activeMarketTab === 'universal' ? '3.000' : '1.000'}
+              Modal Awal: {activeMarketTab === 'universal' ? formatUSD(arena.universalStartEquity, 0) : formatUSD(arena.startEquity, 0)}
             </div>
 
             <!-- Floating Hover Tooltip (Khusus Model Terpilih dengan Tanggal Riil) -->
@@ -1439,9 +1442,6 @@
       </div>
 
       <div class="foot-links">
-        <button class="foot-btn foot-neural" onclick={() => arena.navigate("/neural-execution")}
-          >⚡ Neural Execution</button
-        >
         <button class="foot-btn" onclick={() => enterTerminal("spot")}
           >Terminal Spot</button
         >
@@ -1450,6 +1450,9 @@
         >
         <button class="foot-btn" onclick={() => enterTerminal("forex")}
           >Terminal Forex</button
+        >
+        <button class="foot-btn foot-neural" onclick={() => arena.navigate("/neural-execution")}
+          >Neural Execution</button
         >
         <a href="/api/bootstrap" target="_blank" class="foot-btn"
           >API Bootstrap</a
@@ -1573,43 +1576,92 @@
 
   /* Hero Section */
   .hero-section {
-    padding: 56px 24px 72px;
+    position: relative;
+    padding: 64px 24px 84px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    background: radial-gradient(
-      ellipse at 80% 20%,
-      rgba(245, 158, 11, 0.05) 0%,
-      transparent 60%
+    background: #030712;
+    overflow: hidden;
+    min-height: 680px;
+    display: flex;
+    align-items: center;
+  }
+
+  .hero-bg-3d {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    overflow: hidden;
+  }
+
+  .hero-vignette-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2;
+    background: linear-gradient(
+      90deg,
+      rgba(3, 7, 18, 0.96) 0%,
+      rgba(3, 7, 18, 0.88) 38%,
+      rgba(3, 7, 18, 0.45) 68%,
+      rgba(3, 7, 18, 0.15) 100%
     );
   }
 
   .hero-container {
+    position: relative;
+    z-index: 3;
     max-width: 1440px;
+    width: 100%;
     margin: 0 auto;
-    display: grid;
-    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-    gap: 48px;
-    align-items: center;
+    pointer-events: none;
   }
 
-  .eyebrow {
-    display: flex;
+  .hero-content {
+    max-width: 680px;
+    pointer-events: auto;
+  }
+
+  .hero-institutional-badge {
+    display: inline-flex;
     align-items: center;
     gap: 8px;
     font-size: 11px;
     font-weight: 700;
-    letter-spacing: 0.1em;
-    color: #f59e0b;
-    margin-bottom: 16px;
+    letter-spacing: 0.08em;
+    color: #38bdf8;
+    background: rgba(56, 189, 248, 0.1);
+    border: 1px solid rgba(56, 189, 248, 0.25);
+    padding: 5px 12px;
+    border-radius: 20px;
+    margin-bottom: 20px;
+    backdrop-filter: blur(8px);
   }
 
-  .bullet {
-    color: #64748b;
+  .pulse-cyan-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #38bdf8;
+    box-shadow: 0 0 8px #38bdf8;
+    animation: pulse 1.8s infinite;
+  }
+
+  .hero-eyebrow-brand {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: #f59e0b;
+    margin: 0 0 4px 0;
+    text-transform: uppercase;
   }
 
   .hero-title {
-    font-size: 42px;
+    font-size: 44px;
     font-weight: 800;
-    line-height: 1.1;
+    line-height: 1.08;
     letter-spacing: -0.03em;
     color: #ffffff;
     margin: 0 0 20px 0;
@@ -1693,11 +1745,6 @@
     font-size: 11px;
     color: #64748b;
     margin-top: 4px;
-  }
-
-  .hero-pipeline {
-    width: 100%;
-    min-height: 480px;
   }
 
   /* Podium Section */

@@ -545,7 +545,6 @@
                         }}
                       >
                         {pos.symbol}
-                        <span class="chart-mini-icon">📈</span>
                       </button>
                     </td>
                     <td class="c">
@@ -1043,15 +1042,6 @@
     box-shadow: 0 0 8px rgba(56, 189, 248, 0.3);
   }
 
-  .chart-mini-icon {
-    font-size: 10px;
-    opacity: 0.6;
-    transition: opacity 0.12s ease;
-  }
-
-  .table-pair-btn:hover .chart-mini-icon {
-    opacity: 1;
-  }
 
   .tag-futures {
     background: rgba(6, 182, 212, 0.15);

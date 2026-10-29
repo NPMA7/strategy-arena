@@ -19,6 +19,7 @@ from typing import Iterable
 
 from .bars import BarRing
 from .indicators import compute
+from .config import START_EQUITY, RISK_PER_TRADE as RISK, SL_MULT, FOREX_TARGET_RISK
 from .strategies import (
     LONG, MAX_POS, SHORT, SIGNAL_FN, STRATEGY_IDS, STRATEGY_META, THRESHOLD,
     SINGLE_POS_CAP, TOTAL_NOTIONAL_CAP, TOTAL_RISK_CAP, DEFAULT_LEVERAGE,
@@ -26,9 +27,6 @@ from .strategies import (
     SPOT_STRATEGIES, FUTURES_STRATEGIES, FOREX_STRATEGIES, get_strategy_rr,
 )
 
-START_EQUITY = 1_000.0
-RISK = 0.02
-SL_MULT = 2.0
 MIN_BARS = 210  # butuh EMA200 dulu
 
 STRAT_COLORS = [

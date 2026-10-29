@@ -165,7 +165,7 @@
               </div>
               <div class="t-row">
                 <span class="t-key">Modal:</span>
-                <span class="t-val mono">$1.000 Modal Awal</span>
+                <span class="t-val mono">{formatUSD(arena.startEquity, 0)} Modal Awal</span>
               </div>
               <div class="t-row">
                 <span class="t-key">Fee:</span>

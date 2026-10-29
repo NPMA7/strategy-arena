@@ -32,7 +32,7 @@ log = logging.getLogger("arena")
 ROOT_DIR = os.path.dirname(os.path.dirname(__file__))
 FRONTEND_DIR = os.path.join(ROOT_DIR, "frontend")
 DIST_DIR = os.path.join(FRONTEND_DIR, "dist")
-SNAPSHOT_SEC = float(os.getenv("ARENA_SNAPSHOT_SEC", "2"))
+from .config import START_EQUITY, SNAPSHOT_SEC, get_client_config
 PRICE_TICK_SEC = 0.5
 
 db = DB()
@@ -194,6 +194,7 @@ def build_live_state_payload() -> dict:
         "type": "state",
         "t": int(now * 1000),
         "uptime": int(now - state["started"]),
+        "config": get_client_config(),
         "db_size": _cached_db_size,
         "feed": {
             "connected": (feed.connected if feed else False) or (forex_feed.connected if forex_feed else False),
@@ -625,7 +626,17 @@ async def reset_arena():
         a["warmed"] = True
     for a in forex_engine.accounts.values():
         a["warmed"] = True
-    return {"ok": True, "message": "Arena berhasil di-reset ke 0 (modal $1.000, 0 trade, 0 MC)"}
+    return {
+        "ok": True,
+        "message": f"Arena berhasil di-reset ke 0 (modal ${START_EQUITY:,.0f}, 0 trade, 0 MC)",
+        "config": get_client_config(),
+    }
+
+
+@app.get("/api/config")
+async def get_config():
+    """Return runtime configuration derived from .env / system settings."""
+    return JSONResponse(get_client_config())
 
 
 # ── Copy-Trading & Public API v1 ──────────────────────────────────────────

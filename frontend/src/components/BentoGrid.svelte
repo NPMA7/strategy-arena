@@ -11,7 +11,7 @@
   let topStrategy = $derived(sorted[0] || null);
 
   // Totals
-  let totalEquity = $derived(accounts.reduce((acc, a) => acc + (a.equity || 1000), 0));
+  let totalEquity = $derived(accounts.reduce((acc, a) => acc + (a.equity || arena.startEquity), 0));
   let totalMargin = $derived(positions.reduce((acc, p) => acc + (p.margin || 0), 0));
   let openPositionsCount = $derived(positions.length);
 
@@ -178,7 +178,7 @@
       </div>
       <div class="defense-item">
         <span class="d-label">Likuidasi & Proteksi</span>
-        <span class="d-val">Auto Refill $1.000 + Flag</span>
+        <span class="d-val">Auto Refill {formatUSD(arena.startEquity, 0)} + Flag</span>
       </div>
     </div>
   </div>

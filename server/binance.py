@@ -24,9 +24,7 @@ import certifi
 
 log = logging.getLogger("arena.binance")
 
-REST = os.getenv("ARENA_BINANCE_REST", "https://data-api.binance.vision")
-WS_BASE = os.getenv("ARENA_BINANCE_WS", "wss://data-stream.binance.vision")
-PAIR_LIMIT = int(os.getenv("ARENA_PAIRS", "100"))
+from .config import ARENA_BINANCE_REST as REST, ARENA_BINANCE_WS as WS_BASE, ARENA_PAIRS as PAIR_LIMIT
 REFRESH_SEC = 900
 MAX_STREAMS_PER_CONN = 220
 

@@ -22,7 +22,7 @@ import aiohttp
 
 log = logging.getLogger("arena.forex")
 
-MT5_BRIDGE_URL = os.getenv("MT5_BRIDGE_URL", "http://mt5-bridge:5000")
+from .config import MT5_BRIDGE_URL
 
 FOREX_METAS: list[dict] = [
     {"symbol": "XAUUSD", "base": "XAU", "quote": "USD", "name": "Spot Gold / US Dollar", "digits": 2, "base_price": 4048.45, "pip": 0.1, "vol": 0.50},

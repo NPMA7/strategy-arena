@@ -114,7 +114,7 @@
     }
 
     // Extract raw numbers
-    const vals = pts.map((p) => (Array.isArray(p) ? p[1] : (typeof p === 'number' ? p : p.equity || 1000)));
+    const vals = pts.map((p) => (Array.isArray(p) ? p[1] : (typeof p === 'number' ? p : p.equity || arena.startEquity)));
     const min = Math.min(...vals);
     const max = Math.max(...vals);
     const range = max - min || 1;
@@ -142,7 +142,7 @@
   <div class="phead">
     <div class="phead-left">
       <h2>
-        Papan peringkat — {rawAccounts.length} strategi {arena.mode === 'spot' ? 'spot' : (arena.mode === 'futures' ? 'futures' : 'forex & metals')}, modal $1.000 (Saldo Bersih / Balance)
+        Papan peringkat — {rawAccounts.length} strategi {arena.mode === 'spot' ? 'spot' : (arena.mode === 'futures' ? 'futures' : 'forex & metals')}, modal {formatUSD(arena.startEquity, 0)} (Saldo Bersih / Balance)
       </h2>
     </div>
 
@@ -206,8 +206,8 @@
     {#each displayedAccounts as a (a.id)}
       {@const rank = rankMap.get(a.id) || 1}
       {@const isSelected = arena.selectedStrategyId === a.id}
-      {@const curBal = a.balance ?? a.cash ?? a.equity ?? 1000}
-      {@const isPositive = curBal >= 1000}
+      {@const curBal = a.balance ?? a.cash ?? a.equity ?? arena.startEquity}
+      {@const isPositive = curBal >= arena.startEquity}
       {@const spark = calculateSpark(a.id, curBal)}
       {@const strokeColor = isPositive ? '#10b981' : '#f43f5e'}
       {@const fillColor = isPositive ? 'rgba(16, 185, 129, 0.16)' : 'rgba(244, 63, 94, 0.16)'}
@@ -250,7 +250,7 @@
             </span>
           {:else}
             <span class="ret mono {isPositive ? 'up' : 'down'}">
-              {formatPercent(a.returnPct ?? ((curBal - 1000) / 1000) * 100)}
+              {formatPercent(a.returnPct ?? ((curBal - arena.startEquity) / arena.startEquity) * 100)}
             </span>
           {/if}
         </div>

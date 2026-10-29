@@ -6,16 +6,16 @@ services:
     container_name: strategy-arena-db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: arena
-      POSTGRES_PASSWORD: arena
-      POSTGRES_DB: arena
+      POSTGRES_USER: ${POSTGRES_USER:-arena}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-arena}
+      POSTGRES_DB: ${POSTGRES_DB:-arena}
     volumes:
       - arena-pgdata:/var/lib/postgresql/data
       - ./docker/init.sql:/docker-entrypoint-initdb.d/10-init.sql:ro
     ports:
-      - "5433:5432"
+      - "${POSTGRES_PORT:-5433}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U arena -d arena"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-arena} -d ${POSTGRES_DB:-arena}"]
       interval: 3s
       timeout: 3s
       retries: 30
@@ -26,17 +26,18 @@ services:
     restart: unless-stopped
     entrypoint: ["/bin/sh", "-c", "rm -f /opt/wineprefix/drive_c/server; exec /app/src/main.sh"]
     ports:
-      - "3000:8080"
-      - "5901:5901"
-      - "18812:18812"
+      - "${MT5_VNC_HTTP_PORT:-3000}:8080"
+      - "${MT5_VNC_PORT:-5901}:5901"
+      - "${MT5_RPYC_PORT:-18812}:18812"
     environment:
       NOVNC_HOST: ""
-      LOGIN: "6310591"
-      PASSWORD: "dL7ny!PE"
-      SERVER: "Headway-Demo"
-      MT5_LOGIN: "6310591"
-      MT5_PASSWORD: "dL7ny!PE"
-      MT5_SERVER: "Headway-Demo"
+      LOGIN: "${MT5_LOGIN:-6310591}"
+      PASSWORD: "${MT5_PASSWORD:-dL7ny!PE}"
+      SERVER: "${MT5_SERVER:-Headway-Demo}"
+      MT5_LOGIN: "${MT5_LOGIN:-6310591}"
+      MT5_PASSWORD: "${MT5_PASSWORD:-dL7ny!PE}"
+      MT5_SERVER: "${MT5_SERVER:-Headway-Demo}"
+
   app:
     build:
       context: .
@@ -49,19 +50,27 @@ services:
         condition: service_healthy
       mt5-bridge:
         condition: service_started
+    env_file:
+      - .env
     environment:
-      DATABASE_URL: postgresql://arena:arena@db:5432/arena
-      ARENA_PAIRS: "100"
-      ARENA_WARMUP_MIN: "0"
-      ARENA_BINANCE_REST: https://data-api.binance.vision
-      ARENA_BINANCE_WS: wss://data-stream.binance.vision
-      ARENA_SNAPSHOT_SEC: "2"
-      MT5_BRIDGE_URL: http://mt5-bridge:5000
+      DATABASE_URL: ${DATABASE_URL:-postgresql://arena:arena@db:5432/arena}
+      START_EQUITY: ${START_EQUITY:-1000.0}
+      RISK_PER_TRADE: ${RISK_PER_TRADE:-0.02}
+      SINGLE_POS_CAP: ${SINGLE_POS_CAP:-0.20}
+      SL_MULT: ${SL_MULT:-2.0}
+      FOREX_TARGET_RISK: ${FOREX_TARGET_RISK:-15.0}
+      ARENA_PAIRS: ${ARENA_PAIRS:-100}
+      ARENA_WARMUP_MIN: ${ARENA_WARMUP_MIN:-0}
+      ARENA_BINANCE_REST: ${ARENA_BINANCE_REST:-https://data-api.binance.vision}
+      ARENA_BINANCE_WS: ${ARENA_BINANCE_WS:-wss://data-stream.binance.vision}
+      ARENA_SNAPSHOT_SEC: ${ARENA_SNAPSHOT_SEC:-2}
+      MT5_BRIDGE_URL: ${MT5_BRIDGE_URL:-http://mt5-bridge:5000}
     volumes:
       - ./server:/app/server
       - ./frontend:/app/frontend
+      - ./.env:/app/.env:ro
     ports:
-      - "8080:8080"
+      - "${APP_PORT:-8080}:8080"
 
   mt5-bridge:
     build:
@@ -73,11 +82,11 @@ services:
     depends_on:
       - mt5-vnc
     ports:
-      - "5000:5000"
+      - "${MT5_BRIDGE_PORT:-5000}:5000"
     environment:
-      PORT: "5000"
-      MT5_RPYC_HOST: "mt5-vnc"
-      MT5_RPYC_PORT: "18812"
+      PORT: "${MT5_BRIDGE_PORT:-5000}"
+      MT5_RPYC_HOST: "${MT5_RPYC_HOST:-mt5-vnc}"
+      MT5_RPYC_PORT: "${MT5_RPYC_PORT:-18812}"
     volumes:
       - ./server/mt5_bridge_server.py:/app/server/mt5_bridge_server.py:ro
 

@@ -14,7 +14,7 @@ import asyncpg
 
 log = logging.getLogger("arena.db")
 
-DSN = os.getenv("DATABASE_URL", "postgresql://arena:arena@db:5432/arena")
+from .config import DATABASE_URL as DSN
 DEFAULT_PUBLIC_KEY = "pk_live_strategyarena_public_feed"
 
 

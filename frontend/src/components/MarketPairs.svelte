@@ -294,4 +294,24 @@
     white-space: nowrap;
     flex-shrink: 0;
   }
+
+  @media (max-width: 480px) {
+    .phead {
+      padding: 8px 10px;
+    }
+    .mkt-grid {
+      grid-template-columns: repeat(auto-fill, minmax(115px, 1fr));
+      gap: 4px;
+      padding: 6px;
+    }
+    .tile {
+      padding: 5px 6px;
+    }
+    .tile-sym b {
+      font-size: 10.5px;
+    }
+    .fx-val {
+      font-size: 11px;
+    }
+  }
 </style>

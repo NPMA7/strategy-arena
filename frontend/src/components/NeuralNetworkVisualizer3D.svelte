@@ -1178,4 +1178,25 @@
     backdrop-filter: blur(8px);
     pointer-events: auto;
   }
+
+  @media (max-width: 768px) {
+    .nav-guide-pill {
+      display: none !important;
+    }
+    .matrix-top-bar {
+      flex-direction: column;
+      align-items: stretch;
+      padding: 8px 12px;
+      gap: 8px;
+    }
+    .top-right {
+      width: 100%;
+      justify-content: space-between;
+    }
+    .category-pills {
+      overflow-x: auto;
+      max-width: 100%;
+      white-space: nowrap;
+    }
+  }
 </style>

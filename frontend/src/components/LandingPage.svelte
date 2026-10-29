@@ -1470,6 +1470,9 @@
     display: flex;
     flex-direction: column;
     font-family: "Inter", sans-serif;
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100vw;
   }
 
   /* Header */
@@ -3167,6 +3170,205 @@
     }
     .bento-wide {
       grid-column: span 1;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .landing-nav-container {
+      flex-direction: column;
+      align-items: stretch;
+      padding: 10px 14px;
+      gap: 10px;
+    }
+
+    .header-actions {
+      display: flex;
+      overflow-x: auto;
+      gap: 8px;
+      width: 100%;
+      padding-bottom: 2px;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .nav-btn {
+      white-space: nowrap;
+      flex-shrink: 0;
+      padding: 6px 12px;
+      font-size: 11px;
+    }
+
+    .hero-section {
+      padding: 40px 14px 48px;
+      min-height: auto;
+    }
+
+    .hero-eyebrow-brand {
+      font-size: 18px;
+    }
+
+    .hero-title {
+      font-size: 28px;
+      line-height: 1.15;
+      margin-bottom: 14px;
+    }
+
+    .hero-desc {
+      font-size: 13px;
+      line-height: 1.5;
+      margin-bottom: 24px;
+    }
+
+    .hero-ctas {
+      flex-direction: column;
+      width: 100%;
+      gap: 10px;
+      margin-bottom: 28px;
+    }
+
+    .cta-secondary {
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .metrics-quad {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      padding-top: 18px;
+    }
+
+    .metric-item .m-val {
+      font-size: 17px;
+    }
+
+    .metric-item .m-lbl {
+      font-size: 10px;
+    }
+
+    .leaderboard-section,
+    .podium-section,
+    .bento-section {
+      padding: 36px 14px;
+    }
+
+    .executive-head {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 18px;
+      padding-bottom: 14px;
+    }
+
+    .executive-head h2 {
+      font-size: 20px;
+      line-height: 1.25;
+    }
+
+    .section-desc {
+      font-size: 12.5px;
+    }
+
+    .head-controls {
+      width: 100%;
+    }
+
+    .btn-group-toggle {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 3px;
+    }
+
+    .toggle-btn {
+      white-space: nowrap;
+      flex-shrink: 0;
+      padding: 6px 10px;
+      font-size: 10.5px;
+    }
+
+    .podium-hero-stage {
+      width: 100%;
+      gap: 16px;
+      margin-top: 8px;
+      margin-bottom: 24px;
+      padding-top: 0;
+    }
+
+    .podium-pillar-card {
+      width: 100% !important;
+      max-width: 100% !important;
+      min-height: auto;
+      box-sizing: border-box;
+    }
+
+    .pillar-body {
+      padding: 12px 14px;
+    }
+
+    .strat-headline {
+      font-size: 15px;
+    }
+
+    .pnl-val {
+      font-size: 18px;
+    }
+
+    .champion-halo {
+      display: none;
+    }
+
+    .analytic-panel-box {
+      padding: 14px 12px;
+    }
+
+    .panel-head {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .master-table-wrap {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .master-strategy-table {
+      min-width: 640px;
+    }
+
+    .landing-footer {
+      padding: 24px 14px;
+    }
+
+    .footer-container {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 16px;
+    }
+
+    .foot-links {
+      flex-wrap: wrap;
+      width: 100%;
+    }
+
+    .foot-btn {
+      flex: 1;
+      text-align: center;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .hero-eyebrow-brand {
+      font-size: 16px;
+    }
+    .hero-title {
+      font-size: 24px;
+    }
+    .executive-head h2 {
+      font-size: 18px;
+    }
+    .brand-title {
+      font-size: 14px;
     }
   }
 </style>

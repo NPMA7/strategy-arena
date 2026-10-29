@@ -941,22 +941,52 @@
 
   @media (max-width: 768px) {
     .rows {
-      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     }
     .phead {
       flex-direction: column;
-      align-items: flex-start;
+      align-items: stretch;
+      gap: 10px;
     }
     .phead-right {
       width: 100%;
-      justify-content: space-between;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
     }
     .search-box {
       width: 100%;
-      min-width: 160px;
+      min-width: 0;
+    }
+    .seg {
+      width: 100%;
+      overflow-x: auto;
+      white-space: nowrap;
+      -webkit-overflow-scrolling: touch;
+      padding: 3px;
+    }
+    .seg-btn {
+      padding: 4px 8px;
+      font-size: 10.5px;
+      flex-shrink: 0;
     }
     .cs-info-grid {
       grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .rows {
+      grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+    }
+    .row {
+      padding: 6px 8px;
+    }
+    .pos {
+      font-size: 9.5px;
+    }
+    .nm {
+      font-size: 11px;
     }
   }
 </style>

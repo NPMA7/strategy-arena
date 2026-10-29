@@ -147,7 +147,7 @@
     color: #94a3b8;
   }
 
-  @media (max-width: 1100px) {
+  @media (max-width: 1280px) {
     .desk-grid,
     .market-logs-grid {
       grid-template-columns: minmax(0, 1fr);
@@ -157,23 +157,26 @@
       overflow: visible;
     }
     .cell {
-      height: 480px;
-      min-height: 480px;
+      height: auto;
+      min-height: 460px;
     }
   }
 
   @media (max-width: 768px) {
     .trading-floor {
-      padding: 8px 10px 20px 10px;
+      padding: 6px 8px 16px 8px;
+      overflow-x: hidden;
     }
     .desk-grid,
     .market-logs-grid {
+      gap: 10px;
+      margin-bottom: 10px;
       max-height: none;
       overflow: visible;
     }
     .cell {
-      height: 460px;
-      min-height: 460px;
+      height: auto;
+      min-height: 400px;
     }
   }
 </style>

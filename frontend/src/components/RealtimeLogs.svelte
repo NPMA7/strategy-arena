@@ -163,4 +163,20 @@
     color: #64748b;
     font-size: 12px;
   }
+
+  @media (max-width: 480px) {
+    .ev-row {
+      flex-wrap: wrap;
+      gap: 4px;
+      padding: 6px 8px;
+    }
+    .ev-strat {
+      min-width: 0;
+      max-width: 120px;
+    }
+    .ev-msg {
+      width: 100%;
+      flex-basis: 100%;
+    }
+  }
 </style>

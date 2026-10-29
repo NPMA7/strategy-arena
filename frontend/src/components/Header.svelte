@@ -431,16 +431,47 @@
     .header-root {
       flex-direction: column;
       align-items: stretch;
-      padding: 10px 12px;
+      padding: 8px 12px;
+      gap: 10px;
     }
-    .header-left,
-    .header-right {
-      justify-content: space-between;
+    .header-left {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 10px;
       width: 100%;
+    }
+    .brand-link {
+      width: 100%;
+      justify-content: flex-start;
     }
     .market-switcher {
       overflow-x: auto;
       max-width: 100%;
+      white-space: nowrap;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 2px;
+    }
+    .switcher-btn {
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .header-right {
+      justify-content: space-between;
+      width: 100%;
+      overflow-x: auto;
+      padding-top: 4px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+    }
+  }
+
+  @media (max-width: 480px) {
+    .telemetry-pill {
+      padding: 4px 8px;
+      font-size: 10px;
+    }
+    .btn-copy-trade {
+      padding: 4px 8px;
+      font-size: 11px;
     }
   }
 </style>

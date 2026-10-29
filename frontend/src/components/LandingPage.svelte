@@ -566,6 +566,9 @@
         >
           <span>Terminal Forex</span>
         </button>
+        <button class="nav-btn btn-neural" onclick={() => arena.navigate("/neural-execution")}>
+          <span>Neural Execution</span>
+        </button>
       </div>
     </div>
   </header>
@@ -1436,6 +1439,9 @@
       </div>
 
       <div class="foot-links">
+        <button class="foot-btn foot-neural" onclick={() => arena.navigate("/neural-execution")}
+          >⚡ Neural Execution</button
+        >
         <button class="foot-btn" onclick={() => enterTerminal("spot")}
           >Terminal Spot</button
         >
@@ -1519,6 +1525,17 @@
     font-weight: 600;
     cursor: pointer;
     transition: all 0.15s ease;
+  }
+
+  .btn-neural {
+        background: #151c29;
+    color: #94a3b8;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .btn-neural:hover {
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.25);
   }
 
   .btn-spot {
@@ -1629,6 +1646,18 @@
     background: #161e2c;
     transform: translateY(-1px);
   }
+
+  .cta-neural {
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.15) 0%, rgba(126, 34, 206, 0.08) 100%);
+    border: 1px solid rgba(168, 85, 247, 0.45);
+    box-shadow: 0 4px 16px rgba(168, 85, 247, 0.15);
+  }
+
+  .cta-neural:hover {
+    border-color: rgba(168, 85, 247, 0.7);
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.25) 0%, rgba(126, 34, 206, 0.15) 100%);
+  }
+
 
   .cta-secondary .cta-title {
     font-size: 15px;

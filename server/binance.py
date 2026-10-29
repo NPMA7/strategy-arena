@@ -204,7 +204,7 @@ class BinanceFeed:
                         ring = rings.get(sym)
                         if ring is None:
                             from .bars import BarRing
-                            ring = rings[sym] = BarRing()
+                            ring = rings[sym] = BarRing(offset_ms=(abs(hash(sym)) % 60) * 1000)
                         for k in data:
                             # k: [open_time, open, high, low, close, volume, ...]
                             open_t = int(k[0])

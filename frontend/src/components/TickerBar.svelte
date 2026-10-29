@@ -34,13 +34,14 @@
 
   let isFutures = $derived(arena.mode === 'futures');
   let isForex = $derived(arena.mode === 'forex');
+  let isExecutions = $derived(arena.currentRoute === 'executions');
 </script>
 
 <div class="ticker-bar-root">
   <!-- Market Mode Identifier Pill -->
   <div class="ticker-label">
-    <span class="dot {isForex ? 'dot-forex' : (isFutures ? 'dot-futures' : 'dot-spot')}">●</span>
-    <span class="label-text">{isForex ? 'FOREX & METALS PAIRS' : (isFutures ? 'FUTURES PAIRS' : 'SPOT PAIRS')}</span>
+    <span class="dot {isExecutions ? 'dot-neural' : (isForex ? 'dot-forex' : (isFutures ? 'dot-futures' : 'dot-spot'))}">●</span>
+    <span class="label-text">{isExecutions ? 'MULTI-ASSET PAIRS' : (isForex ? 'FOREX & METALS PAIRS' : (isFutures ? 'FUTURES PAIRS' : 'SPOT PAIRS'))}</span>
   </div>
 
   <!-- Infinite Smooth Animated Marquee Ticker -->
@@ -150,6 +151,11 @@
   .dot-forex {
     color: #10b981;
     text-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+  }
+
+  .dot-neural {
+    color: #c084fc;
+    text-shadow: 0 0 6px rgba(192, 132, 252, 0.6);
   }
 
   .label-text {

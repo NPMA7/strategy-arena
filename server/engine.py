@@ -237,7 +237,7 @@ class Engine:
         if snap.n < MIN_BARS:
             return
         self.bars_processed += 1
-        ts = int(snap.ts[snap.i])
+        ts = int(time.time() * 1000)
 
         signals: list[tuple[float, str, str]] = []  # (score, sid, symbol)
         for sid in self.strategy_ids:
@@ -496,10 +496,14 @@ class Engine:
         stop = price - stop_dist if side == LONG else price + stop_dist
         target = price + tp_dist if side == LONG else price - tp_dist
 
+        # Gunakan wall-clock real-time timestamp agar detik riil tercatat presisi per detik (bukan selalu :00)
+        now_ms = int(time.time() * 1000)
+        open_ts = now_ms if abs(now_ms - ts) < 86400000 else ts
+
         acct["cash"] -= fee
         acct["pos"][symbol] = {
             "symbol": symbol, "side": side, "qty": qty, "entry": price,
-            "stop": stop, "target": target, "opened_at": ts,
+            "stop": stop, "target": target, "opened_at": open_ts,
             "notional": notional, "margin_used": margin_used,
             "risk_amount": actual_risk, "score": score,
             "leverage": 1 if self.mode != "futures" else leverage,
@@ -519,8 +523,8 @@ class Engine:
 
         # Structured signal untuk Copy-Trading API / WebSocket / Webhooks
         sig = {
-            "id": f"sig_{ts}_{acct['id']}_{symbol}_open",
-            "ts": ts,
+            "id": f"sig_{open_ts}_{acct['id']}_{symbol}_open",
+            "ts": open_ts,
             "mode": self.mode,
             "strategy": acct["id"],
             "strategy_name": acct["name"],

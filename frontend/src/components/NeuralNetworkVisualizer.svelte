@@ -22,7 +22,7 @@
     {
       id: 'input',
       name: 'Multi-Asset Feed Layer',
-      x: 70,
+      x: 80,
       nodes: [
         { id: 'in_0', label: 'BTC', sub: 'CRYPTO', val: () => `$${formatUSD(btcPrice).replace('$', '')}`, desc: 'Bitcoin Live WebSocket Tick (Binance Futures/Spot)', type: 'input' },
         { id: 'in_1', label: 'ETH', sub: 'CRYPTO', val: () => `$${formatUSD(ethPrice).replace('$', '')}`, desc: 'Ethereum Live WebSocket Tick (Binance)', type: 'input' },
@@ -40,7 +40,7 @@
     {
       id: 'h1',
       name: 'Hidden Layer 1 · Signal & Feature Extractors',
-      x: 220,
+      x: 275,
       nodes: [
         { id: 'h1_0', label: 'SMC', sub: 'OB', desc: 'SMC Institutional Order Block Mitigation Algorithm' },
         { id: 'h1_1', label: 'ICT', sub: 'FVG', desc: 'ICT Fair Value Gap Imbalance Retest Model' },
@@ -56,27 +56,9 @@
       glow: '#06b6d4',
     },
     {
-      id: 'h2',
-      name: 'Hidden Layer 2 · 80++ Universal Model Weights',
-      x: 370,
-      nodes: [
-        { id: 'h2_0', label: 'W₁', sub: '0.84', desc: 'EMA Stack 9/21/50 Model Weight' },
-        { id: 'h2_1', label: 'W₁₄', sub: '0.91', desc: 'Donchian Turtle Breakout Weight' },
-        { id: 'h2_2', label: 'W₂₈', sub: '0.82', desc: 'SMC Institutional Order Block Weight' },
-        { id: 'h2_3', label: 'W₄₂', sub: '0.88', desc: 'ICT Fair Value Gap Imbalance Weight' },
-        { id: 'h2_4', label: 'W₅₆', sub: '0.79', desc: 'Petro-CAD Divergence Model Weight' },
-        { id: 'h2_5', label: 'W₇₀', sub: '0.93', desc: 'Safe-Haven Gold Relay Model Weight' },
-        { id: 'h2_6', label: 'W₈₈', sub: '0.89', desc: 'Fibonacci Golden Pocket 61.8 & Expansion Weight' },
-      ],
-      yCoords: [84, 140, 196, 252, 308, 364, 420],
-      stroke: '#0ea5e9',
-      fill: 'rgba(14, 165, 233, 0.08)',
-      glow: '#0ea5e9',
-    },
-    {
       id: 'h3',
-      name: 'Hidden Layer 3 · Risk & Capital Allocation',
-      x: 520,
+      name: 'Hidden Layer 2 · Risk & Capital Allocation',
+      x: 475,
       nodes: [
         { id: 'h3_0', label: 'NORM', sub: 'Z-Scr', desc: 'Statistical Z-Score Price Normalization' },
         { id: 'h3_1', label: 'RISK', sub: '2% SL', desc: 'Strict 2% Equity Portfolio Risk Controller ($200 Max SL)' },
@@ -94,7 +76,7 @@
     {
       id: 'output',
       name: 'Execution Engines · Tri-Market Output',
-      x: 680,
+      x: 670,
       nodes: [
         { id: 'out_0', label: 'FUT·L', sub: 'FUTURES', tag: '20x LEV', desc: 'Binance Futures Long Position (Leverage 1-20x)', type: 'output-long' },
         { id: 'out_1', label: 'SPOT', sub: 'CRYPTO', tag: '1x SPOT', desc: 'Binance Spot Execution (Long-Only, Tanpa Leverage)', type: 'output-spot' },
@@ -181,13 +163,11 @@
       const n1 = Math.floor(Math.random() * layers[1].nodes.length);
       const n2 = Math.floor(Math.random() * layers[2].nodes.length);
       const n3 = Math.floor(Math.random() * layers[3].nodes.length);
-      const n4 = Math.floor(Math.random() * layers[4].nodes.length);
 
       const chain = [
         `in_${n0}->h1_${n1}`,
-        `h1_${n1}->h2_${n2}`,
-        `h2_${n2}->h3_${n3}`,
-        `h3_${n3}->out_${n4}`,
+        `h1_${n1}->h3_${n2}`,
+        `h3_${n2}->out_${n3}`,
       ];
 
       // Multi-asset pulse colors: cyan (crypto), emerald (forex), amber (futures), purple (arbitrage)
@@ -271,27 +251,27 @@
       <!-- 1. DIAGRAM TITLES & BRACKETS -->
 
       <!-- Column Title: Input layer -->
-      <text x="70" y="48" text-anchor="middle" class="svg-col-title">Multi-Asset Input</text>
+      <text x="80" y="48" text-anchor="middle" class="svg-col-title">Multi-Asset Input</text>
 
-      <!-- Bracket above Multiple hidden layers (x = 220 to x = 520) -->
+      <!-- Bracket above Multiple hidden layers (x = 275 to x = 475) -->
       <path 
-        d="M 220,54 L 220,40 L 362,40 L 370,32 L 378,40 L 520,40 L 520,54" 
+        d="M 275,54 L 275,40 L 367,40 L 375,32 L 383,40 L 475,40 L 475,54" 
         fill="none" 
         stroke="#64748b" 
         stroke-width="1.6"
         stroke-linecap="round"
         stroke-linejoin="round"
       />
-      <text x="370" y="28" text-anchor="middle" class="svg-col-title">Deep Quantitative Neural Layers (80++ Models · SMC / ICT / Trend)</text>
+      <text x="375" y="28" text-anchor="middle" class="svg-col-title">Deep Quantitative Neural Layers (88 Models · SMC / ICT / Trend)</text>
 
       <!-- Column Title: Output layer -->
-      <text x="680" y="48" text-anchor="middle" class="svg-col-title">Execution Engines</text>
+      <text x="670" y="48" text-anchor="middle" class="svg-col-title">Execution Engines</text>
 
       <!-- 2. SYNAPSE CONNECTIONS (Directed arrows between all layers) -->
       <g class="synapse-group">
         {#each synapses as syn (syn.id)}
           {@const isConnected = hoveredNodeId && (syn.fromId === hoveredNodeId || syn.toId === hoveredNodeId)}
-          {@const markerName = syn.layerIdx === 0 ? 'arrow-blue' : syn.layerIdx === 1 ? 'arrow-cyan' : syn.layerIdx === 2 ? 'arrow-teal' : 'arrow-green'}
+          {@const markerName = syn.layerIdx === 0 ? 'arrow-blue' : syn.layerIdx === 1 ? 'arrow-cyan' : 'arrow-green'}
           <line
             x1={syn.sx}
             y1={syn.sy}
@@ -299,7 +279,7 @@
             y2={syn.ey}
             class="synapse-line"
             class:synapse-active={isConnected}
-            stroke={isConnected ? '#f59e0b' : syn.layerIdx === 0 ? '#38bdf8' : syn.layerIdx === 1 ? '#06b6d4' : syn.layerIdx === 2 ? '#0ea5e9' : '#10b981'}
+            stroke={isConnected ? '#f59e0b' : syn.layerIdx === 0 ? '#38bdf8' : syn.layerIdx === 1 ? '#06b6d4' : '#10b981'}
             stroke-width={isConnected ? 2.2 : 0.95}
             stroke-opacity={isConnected ? 0.95 : 0.22}
             marker-end="url(#{markerName})"

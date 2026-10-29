@@ -76,7 +76,7 @@
     <!-- Multi-Asset Market Switcher Navigation -->
     <nav class="market-switcher" aria-label="Market Mode Selection">
       <button
-        class="switcher-btn {arena.mode === 'spot' ? 'active-spot' : ''}"
+        class="switcher-btn {arena.currentRoute === 'spot' ? 'active-spot' : ''}"
         onclick={() => handleModeChange("spot")}
       >
         <span class="indicator-dot dot-amber"></span>
@@ -84,7 +84,7 @@
       </button>
 
       <button
-        class="switcher-btn {arena.mode === 'futures' ? 'active-futures' : ''}"
+        class="switcher-btn {arena.currentRoute === 'futures' ? 'active-futures' : ''}"
         onclick={() => handleModeChange("futures")}
       >
         <span class="indicator-dot dot-cyan"></span>
@@ -92,11 +92,20 @@
       </button>
 
       <button
-        class="switcher-btn {arena.mode === 'forex' ? 'active-forex' : ''}"
+        class="switcher-btn {arena.currentRoute === 'forex' ? 'active-forex' : ''}"
         onclick={() => handleModeChange("forex")}
       >
         <span class="indicator-dot dot-emerald"></span>
         <span class="label">Forex & Metals</span>
+      </button>
+
+      <button
+        class="switcher-btn {arena.currentRoute === 'executions' ? 'active-neural' : ''}"
+        onclick={() => arena.navigate("/neural-execution")}
+        title="Lihat Visual Neural Network & Seluruh Eksekusi Trade Multi-Pasar"
+      >
+        <span class="indicator-dot dot-purple"></span>
+        <span class="label">Neural Execution</span>
       </button>
 
       <div class="switcher-btn disabled" title="Direncanakan untuk Phase 2">
@@ -116,6 +125,17 @@
           >{arena.connected ? "LIVE FEED" : "RECONNECTING"}</span
         >
       </span>
+
+      <span class="telemetry-divider"></span>
+
+      <!-- Database Size Badge -->
+      <div
+        class="db-size-badge"
+        title="Ukuran total penyimpanan database PostgreSQL ($PGDATA: data tabel, indeks & WAL)"
+      >
+        <span class="lbl">DB:</span>
+        <span class="val num">{arena.dbSize}</span>
+      </div>
 
       <span class="telemetry-divider"></span>
 
@@ -257,6 +277,14 @@
     border: 1px solid rgba(16, 185, 129, 0.4);
   }
 
+  .switcher-btn.active-neural {
+    background-color: var(--bg-surface-elevated);
+    color: #ffffff85;
+    box-shadow: 1px solid var(--shadow-sm);
+    border: 1px solid rgba(255, 255, 255, 0.548);
+  }
+
+
   .switcher-btn.disabled {
     opacity: 0.45;
     cursor: not-allowed;
@@ -278,6 +306,10 @@
 
   .dot-emerald {
     background-color: #10b981;
+  }
+
+  .dot-purple {
+    background-color: #ffffffa6;
   }
 
 
@@ -354,6 +386,24 @@
   .uptime-badge .val {
     color: var(--fg-primary);
     font-weight: 600;
+  }
+
+  .db-size-badge {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .db-size-badge .lbl {
+    color: var(--fg-muted);
+    font-size: 10px;
+    font-weight: 600;
+  }
+
+  .db-size-badge .val {
+    color: #38bdf8;
+    font-weight: 700;
+    font-family: var(--font-mono, monospace);
   }
 
   /* Copy-Trade Button */

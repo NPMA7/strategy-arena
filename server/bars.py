@@ -10,9 +10,9 @@ CAP = 720  # 12 jam candle 1 menit
 class BarRing:
     """Fixed capacity circular buffer. Arrays are contiguous float64."""
 
-    __slots__ = ("ts", "o", "h", "l", "c", "v", "n", "head", "last_tick", "price")
+    __slots__ = ("ts", "o", "h", "l", "c", "v", "n", "head", "last_tick", "price", "offset_ms")
 
-    def __init__(self, cap: int = CAP) -> None:
+    def __init__(self, cap: int = CAP, offset_ms: int = 0) -> None:
         self.ts = np.zeros(cap, dtype=np.float64)
         self.o = np.zeros(cap)
         self.h = np.zeros(cap)
@@ -23,12 +23,13 @@ class BarRing:
         self.head = 0
         self.last_tick = 0.0
         self.price = 0.0
+        self.offset_ms = int(offset_ms)
 
     def on_trade(self, ts: float, price: float, qty: float) -> bool:
         """Roll the forming bar with a trade tick. Returns True if a bar just closed."""
         self.last_tick = ts
         self.price = price
-        bucket = ts // 60000 * 60000
+        bucket = int((ts - self.offset_ms) // 60000 * 60000 + self.offset_ms)
         closed = False
         if self.n == 0:
             self._push(bucket, price, price, price, price, qty)

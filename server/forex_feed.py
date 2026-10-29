@@ -84,7 +84,7 @@ class ForexFeed:
             sym = meta["symbol"]
             ring = rings.get(sym)
             if ring is None:
-                ring = rings[sym] = BarRing()
+                ring = rings[sym] = BarRing(offset_ms=(abs(hash(sym)) % 60) * 1000)
 
             base = meta["base_price"]
             vol = meta["vol"]

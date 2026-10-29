@@ -8,6 +8,7 @@
   import RealtimeLogs from './components/RealtimeLogs.svelte';
   import CopyTradeModal from './components/CopyTradeModal.svelte';
   import LandingPage from './components/LandingPage.svelte';
+  import NeuralExecutionPage from './components/NeuralExecutionPage.svelte';
   import { arena } from './lib/store.svelte.js';
 
   let totalTrades = $derived(arena.totalTrades);
@@ -16,6 +17,12 @@
 
 {#if arena.currentRoute === 'landing'}
   <LandingPage />
+{:else if arena.currentRoute === 'executions'}
+  <div class="app-shell">
+    <Header />
+    <TickerBar />
+    <NeuralExecutionPage />
+  </div>
 {:else}
   <div class="app-shell">
     <!-- Top Navigation & Market Switcher (Modern Header) -->

@@ -777,6 +777,9 @@
         <filter id="glow-white" x="-30%" y="-30%" width="160%" height="160%">
           <feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="#ffffff" flood-opacity="0.9"/>
         </filter>
+        <filter id="glow-rose" x="-30%" y="-30%" width="160%" height="160%">
+          <feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="#f43f5e" flood-opacity="0.85"/>
+        </filter>
       </defs>
 
       <!-- 1. Column Titles & Structure Brackets -->
@@ -1064,9 +1067,9 @@
                 cy={o.y}
                 r={o.R + 10}
                 fill="none"
-                stroke={isAuditActive ? '#fbbf24' : (isForex ? '#10b981' : '#f59e0b')}
+                stroke={isAuditActive ? '#fbbf24' : (isForex ? '#10b981' : (o.id === 'out_spot' ? '#f43f5e' : '#f59e0b'))}
                 stroke-width="3.8"
-                filter={isAuditActive ? 'url(#glow-gold)' : (isForex ? 'url(#glow-emerald)' : 'url(#glow-gold)')}
+                filter={isAuditActive ? 'url(#glow-gold)' : (isForex ? 'url(#glow-emerald)' : (o.id === 'out_spot' ? 'url(#glow-rose)' : 'url(#glow-gold)'))}
               />
             {/if}
 
@@ -1074,12 +1077,12 @@
               cx={o.x}
               cy={o.y}
               r={o.R}
-              fill={isNodeActive ? (isAuditActive ? 'rgba(251, 191, 36, 0.28)' : (isForex ? 'rgba(16, 185, 129, 0.25)' : 'rgba(245, 158, 11, 0.22)')) : (isForex ? 'rgba(16, 185, 129, 0.12)' : 'rgba(245, 158, 11, 0.10)')}
-              stroke={isNodeActive ? (isAuditActive ? '#fbbf24' : (isForex ? '#10b981' : '#f59e0b')) : isNodeHovered ? '#ffffff' : (isForex ? '#10b981' : '#f59e0b')}
+              fill={isNodeActive ? (isAuditActive ? 'rgba(251, 191, 36, 0.28)' : (isForex ? 'rgba(16, 185, 129, 0.25)' : (o.id === 'out_spot' ? 'rgba(244, 63, 94, 0.25)' : 'rgba(245, 158, 11, 0.22)'))) : (isForex ? 'rgba(16, 185, 129, 0.12)' : (o.id === 'out_spot' ? 'rgba(244, 63, 94, 0.12)' : 'rgba(245, 158, 11, 0.10)'))}
+              stroke={isNodeActive ? (isAuditActive ? '#fbbf24' : (isForex ? '#10b981' : (o.id === 'out_spot' ? '#f43f5e' : '#f59e0b'))) : isNodeHovered ? '#ffffff' : (isForex ? '#10b981' : (o.id === 'out_spot' ? '#f43f5e' : '#f59e0b'))}
               stroke-width={isNodeActive ? 3.8 : 2.6}
             />
 
-            <text x={o.x} y={o.y + 5.5} text-anchor="middle" class="node-label mono font-bold" font-size="14.5" fill={isNodeActive ? '#ffffff' : (isForex ? '#34d399' : '#fbbf24')} font-weight="800">
+            <text x={o.x} y={o.y + 5.5} text-anchor="middle" class="node-label mono font-bold" font-size="14.5" fill={isNodeActive ? '#ffffff' : (isForex ? '#34d399' : (o.id === 'out_spot' ? '#f43f5e' : '#fbbf24'))} font-weight="800">
               {o.label}
             </text>
             <text x={o.x} y={o.y + o.R + 18} text-anchor="middle" class="node-sub mono" fill="#94a3b8" font-size="11.5" font-weight="700">

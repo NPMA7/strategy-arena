@@ -4,6 +4,10 @@
   import { formatUSD, formatPercent, formatUptime, calculateForexPnl } from '../lib/formatters.js';
   import { STRATEGIES_88 } from '../lib/strategies_data.js';
   import ExecutionNeuralVisualizer from './ExecutionNeuralVisualizer.svelte';
+  import ExecutionNeuralVisualizer3D from './ExecutionNeuralVisualizer3D.svelte';
+
+  // Dimension Mode: '2d' (Blueprint) or '3d' (Matrix Hologram)
+  let viewDimension = $state('2d');
 
   // Filters State
   let marketFilter = $state('all'); // 'all', 'spot', 'futures', 'forex'
@@ -324,6 +328,35 @@
           <span class="bar-tag mono">PIPELINE ARSITEKTUR</span>
           <h3>Deep Quantitative Neural Network</h3>
         </div>
+
+        <!-- 2D / 3D Dimension Toggle -->
+        <div class="view-dimension-toggle mono">
+          <button
+            type="button"
+            class="dim-btn {viewDimension === '2d' ? 'active' : ''}"
+            onclick={() => viewDimension = '2d'}
+            title="Tampilan 2D Blueprint Interaktif"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+            </svg>
+            2D Blueprint
+          </button>
+          <button
+            type="button"
+            class="dim-btn {viewDimension === '3d' ? 'active active-3d' : ''}"
+            onclick={() => viewDimension = '3d'}
+            title="Tampilan 3D Hologram WebGL Interaktif"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+              <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+              <line x1="12" y1="22.08" x2="12" y2="12"/>
+            </svg>
+            3D Hologram
+          </button>
+        </div>
+
         {#if activeTrade}
           <div class="active-trade-pill mono">
             <span class="glow-dot"></span>
@@ -340,17 +373,29 @@
       </div>
 
       <div class="nn-stage-wrap">
-        <ExecutionNeuralVisualizer
-          {activeTrade}
-          onSelectPair={(sym) => {
-            selectedTrade = null;
-            applyPairFilter(sym);
-          }}
-          onClearTrade={() => {
-            selectedTrade = null;
-          }}
-          onNewTrade={(t) => handleRealtimeNewTrade(t)}
-        />
+        {#if viewDimension === '2d'}
+          <ExecutionNeuralVisualizer
+            {activeTrade}
+            onSelectPair={(sym) => {
+              selectedTrade = null;
+            }}
+            onClearTrade={() => {
+              selectedTrade = null;
+            }}
+            onNewTrade={(t) => handleRealtimeNewTrade(t)}
+          />
+        {:else}
+          <ExecutionNeuralVisualizer3D
+            {activeTrade}
+            onSelectPair={(sym) => {
+              selectedTrade = null;
+            }}
+            onClearTrade={() => {
+              selectedTrade = null;
+            }}
+            onNewTrade={(t) => handleRealtimeNewTrade(t)}
+          />
+        {/if}
       </div>
     </div>
 
@@ -614,6 +659,52 @@
     font-size: 16px;
     font-weight: 700;
     color: #ffffff;
+  }
+
+  /* 2D / 3D Dimension Switcher Pill */
+  .view-dimension-toggle {
+    display: inline-flex;
+    align-items: center;
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    padding: 3px;
+    gap: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  }
+
+  .dim-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: transparent;
+    border: 1px solid transparent;
+    color: #94a3b8;
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .dim-btn:hover {
+    color: #f1f5f9;
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .dim-btn.active {
+    background: #1e293b;
+    border-color: rgba(255, 255, 255, 0.15);
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  }
+
+  .dim-btn.active-3d {
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.25) 0%, rgba(99, 102, 241, 0.25) 100%);
+    border-color: rgba(56, 189, 248, 0.5);
+    color: #38bdf8;
+    box-shadow: 0 0 16px rgba(56, 189, 248, 0.3);
   }
 
   .active-trade-pill {

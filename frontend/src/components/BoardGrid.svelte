@@ -5,6 +5,7 @@
 
   let currentSort = $state('balance'); // 'balance' | 'winrate' | 'pf' | 'trades' | 'dd'
   let currentFamily = $state('all'); // 'all' | string
+  let searchQuery = $state('');
 
   const FAMILIES = [
     'all',
@@ -45,6 +46,16 @@
         const cat = (a.family || getStrategyCategory(a.id)).toLowerCase();
         if (famLower.startsWith('fibo') && cat.startsWith('fibo')) return true;
         return cat.includes(famLower);
+      });
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      list = list.filter((a) => {
+        const name = (a.name || '').toLowerCase();
+        const id = (a.id || '').toLowerCase();
+        const cat = (a.family || getStrategyCategory(a.id)).toLowerCase();
+        return name.includes(q) || id.includes(q) || cat.includes(q);
       });
     }
 
@@ -91,9 +102,20 @@
   ];
 
   let displayedComingSoon = $derived.by(() => {
-    if (currentFamily === 'all') return COMING_SOON_STRATEGIES;
-    const famLower = currentFamily.toLowerCase();
-    return COMING_SOON_STRATEGIES.filter((s) => s.family.toLowerCase().includes(famLower));
+    let list = COMING_SOON_STRATEGIES;
+    if (currentFamily !== 'all') {
+      const famLower = currentFamily.toLowerCase();
+      list = list.filter((s) => s.family.toLowerCase().includes(famLower));
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      list = list.filter((s) =>
+        (s.name || '').toLowerCase().includes(q) ||
+        (s.id || '').toLowerCase().includes(q) ||
+        (s.family || '').toLowerCase().includes(q)
+      );
+    }
+    return list;
   });
 
   // Calculate SVG sparkline path from curve numbers
@@ -142,11 +164,33 @@
   <div class="phead">
     <div class="phead-left">
       <h2>
-        Papan peringkat — {rawAccounts.length} strategi {arena.mode === 'spot' ? 'spot' : (arena.mode === 'futures' ? 'futures' : 'forex & metals')}, modal {formatUSD(arena.startEquity, 0)} (Saldo Bersih / Balance)
+        Papan peringkat — {#if searchQuery.trim() || currentFamily !== 'all'}{displayedAccounts.length} dari {/if}{rawAccounts.length} strategi {arena.mode === 'spot' ? 'spot' : (arena.mode === 'futures' ? 'futures' : 'forex & metals')}, modal {formatUSD(arena.startEquity, 0)} (Saldo Bersih / Balance)
       </h2>
     </div>
 
     <div class="phead-right">
+      <!-- Search Input Filter -->
+      <div class="search-box">
+        <svg class="search-icon-svg" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input
+          type="text"
+          placeholder="Cari strategi (nama / id)..."
+          bind:value={searchQuery}
+          onkeydown={(e) => { if (e.key === 'Escape') searchQuery = ''; }}
+        />
+        {#if searchQuery}
+          <button
+            type="button"
+            class="clear-btn"
+            onclick={() => (searchQuery = '')}
+            aria-label="Hapus pencarian"
+          >×</button>
+        {/if}
+      </div>
+
       <!-- Sorting buttons -->
       <div class="seg" role="radiogroup" aria-label="Urutkan strategi">
         <button
@@ -316,6 +360,19 @@
         </div>
       </div>
     {/each}
+
+    {#if displayedAccounts.length === 0 && displayedComingSoon.length === 0}
+      <div class="no-results">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <p>Tidak ada strategi yang cocok dengan pencarian "<strong>{searchQuery}</strong>"{currentFamily !== 'all' ? ` di kategori ${currentFamily}` : ''}</p>
+        <button type="button" class="btn-clear-filter" onclick={() => { searchQuery = ''; currentFamily = 'all'; }}>
+          Reset Filter & Pencarian
+        </button>
+      </div>
+    {/if}
   </div>
 </section>
 
@@ -380,6 +437,68 @@
     font-weight: 600;
     color: #e2e8f0;
     letter-spacing: -0.01em;
+  }
+
+  .phead-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  /* Search input filter */
+  .search-box {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #06090e;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 4px;
+    padding: 3px 8px;
+    width: 210px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+
+  .search-box:focus-within {
+    border-color: rgba(245, 158, 11, 0.5);
+    box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.2);
+  }
+
+  .search-icon-svg {
+    color: #64748b;
+    flex-shrink: 0;
+  }
+
+  .search-box input {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #e2e8f0;
+    font-size: 11px;
+    width: 100%;
+    font-family: inherit;
+  }
+
+  .search-box input::placeholder {
+    color: #64748b;
+  }
+
+  .clear-btn {
+    background: transparent;
+    border: none;
+    color: #64748b;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s;
+  }
+
+  .clear-btn:hover {
+    color: #f1f5f9;
   }
 
   /* Segmented sort buttons */
@@ -780,6 +899,46 @@
     color: #cbd5e1;
   }
 
+  .no-results {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 16px;
+    background: #090d14;
+    color: #94a3b8;
+    text-align: center;
+    gap: 8px;
+  }
+
+  .no-results p {
+    margin: 0;
+    font-size: 13px;
+    color: #cbd5e1;
+  }
+
+  .no-results strong {
+    color: #f59e0b;
+  }
+
+  .btn-clear-filter {
+    margin-top: 6px;
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    color: #f59e0b;
+    padding: 5px 12px;
+    border-radius: 4px;
+    font-size: 11.5px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .btn-clear-filter:hover {
+    background: rgba(245, 158, 11, 0.22);
+  }
+
   @media (max-width: 768px) {
     .rows {
       grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
@@ -787,6 +946,14 @@
     .phead {
       flex-direction: column;
       align-items: flex-start;
+    }
+    .phead-right {
+      width: 100%;
+      justify-content: space-between;
+    }
+    .search-box {
+      width: 100%;
+      min-width: 160px;
     }
     .cs-info-grid {
       grid-template-columns: 1fr;

@@ -17,6 +17,10 @@ log = logging.getLogger("mt5-bridge")
 PORT = int(os.getenv("PORT", "5000"))
 MT5_RPYC_HOST = os.getenv("MT5_RPYC_HOST", "mt5-vnc")
 MT5_RPYC_PORT = int(os.getenv("MT5_RPYC_PORT", "18812"))
+MT5_LOGIN = int(os.getenv("MT5_LOGIN", "6310591"))
+MT5_PASSWORD = os.getenv("MT5_PASSWORD", "dL7ny!PE")
+MT5_SERVER = os.getenv("MT5_SERVER", "Headway-Demo")
+MT5_IP_SERVER = os.getenv("MT5_IP_SERVER", "mt5.demo.trade-hw.online:443")
 
 # 28 Pair Forex & Komoditas Strategy Arena (Watchlist Image 1 + Majors & Crosses)
 PAIRS: dict[str, dict] = {
@@ -81,10 +85,10 @@ def _sync_connect_rpyc():
         return None
     _last_conn_attempt = now
 
-    # Daftar kandidat host MT5 terminal
+    # Daftar kandidat host MT5 terminal untuk Strategy Arena Feed (Headway Demo)
     candidate_hosts = []
     seen = set()
-    for h, p in [(MT5_RPYC_HOST, MT5_RPYC_PORT), ("sa-copytrade-mt5", 18812), ("mt5-vnc", 18812)]:
+    for h, p in [(MT5_RPYC_HOST, MT5_RPYC_PORT), ("mt5-vnc", 18812)]:
         if (h, p) not in seen and h:
             seen.add((h, p))
             candidate_hosts.append((h, p))
@@ -102,10 +106,17 @@ if 'C:\\\\mt5libs' not in sys.path:
     sys.path.append('C:\\\\mt5libs')
 import MetaTrader5 as mt5
 
-def _arena_init():
+def _arena_init(login, password, server, ip_server):
     ok = mt5.initialize()
     if not ok:
         ok = mt5.initialize(path="C:\\\\MT5\\\\terminal64.exe", portable=True)
+    if ok and login and password:
+        info = mt5.account_info()
+        if not info or info.login != login:
+            logged_in = mt5.login(login, password=password, server=server)
+            if not logged_in and ip_server:
+                srv = ip_server if ":" in ip_server else ip_server + ":443"
+                mt5.login(login, password=password, server=srv)
     return ok
 
 _daily_base_prices = {}
@@ -172,7 +183,7 @@ def _arena_get_bars(broker_sym, num_bars):
     return out
 """)
 
-            init_ok = conn.eval("_arena_init()")
+            init_ok = conn.eval(f"_arena_init({MT5_LOGIN}, {repr(MT5_PASSWORD)}, {repr(MT5_SERVER)}, {repr(MT5_IP_SERVER)})")
             if init_ok:
                 conn.eval(f"_arena_select_symbols({list(BROKER_MAP.values())})")
                 log.info("✓ Sukses terhubung dan menginisialisasi MT5 di %s:%d", h, p)

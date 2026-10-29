@@ -24,7 +24,7 @@ MT5_IP_SERVER = os.getenv("MT5_IP_SERVER", "mt5.demo.trade-hw.online:443")
 
 # 28 Pair Forex & Komoditas Strategy Arena (Watchlist Image 1 + Majors & Crosses)
 PAIRS: dict[str, dict] = {
-    "XAUUSD": {"name": "Gold Spot vs USD", "digits": 2, "pip": 0.1, "base": "XAU", "quote": "USD", "broker_symbol": "XAUUSD"},
+    "XAUUSD": {"name": "Gold Spot vs USD", "digits": 3, "pip": 0.1, "base": "XAU", "quote": "USD", "broker_symbol": "XAUUSD"},
     "EURUSD": {"name": "Euro vs US Dollar", "digits": 5, "pip": 0.0001, "base": "EUR", "quote": "USD", "broker_symbol": "EURUSD"},
     "GBPUSD": {"name": "British Pound vs USD", "digits": 5, "pip": 0.0001, "base": "GBP", "quote": "USD", "broker_symbol": "GBPUSD"},
     "USDJPY": {"name": "US Dollar vs Japanese Yen", "digits": 3, "pip": 0.01, "base": "USD", "quote": "JPY", "broker_symbol": "USDJPY"},

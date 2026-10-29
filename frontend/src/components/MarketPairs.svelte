@@ -45,10 +45,11 @@
     {#each pairs as p (p.symbol)}
       {@const px = arena.prices[p.symbol] ?? p.last_close}
       {@const change = arena.priceChanges[p.symbol]}
-      {@const dec = p.digits ?? (p.symbol.includes('JPY') || p.symbol === 'XTIUSD' || p.symbol === 'USOIL' ? 3 : (p.symbol === 'XAUUSD' ? 2 : 5))}
+      {@const is3Dec = p.symbol.includes('JPY') || p.symbol.includes('XAU') || p.symbol.includes('GOLD') || p.symbol.includes('XAG') || p.symbol.includes('SILVER') || p.symbol.includes('XTI') || p.symbol.includes('OIL') || p.symbol === 'USOIL'}
+      {@const dec = is3Dec ? 3 : (p.digits ?? 5)}
       {@const bidNum = p.bid != null ? Number(p.bid) : (px != null ? Number(px) : null)}
       {@const askNum = p.ask != null ? Number(p.ask) : (px != null ? Number(px) : null)}
-      {@const pipVal = p.pip || (dec === 3 ? 0.01 : (dec === 2 ? 0.1 : 0.0001))}
+      {@const pipVal = p.pip || (p.symbol.includes('XAU') || p.symbol.includes('GOLD') ? 0.1 : (dec === 3 ? 0.01 : 0.0001))}
       {@const diff = (bidNum != null && askNum != null && askNum >= bidNum) ? (askNum - bidNum) : (p.spread != null ? Number(p.spread) : 0)}
       {@const sprPips = (diff > 0 && pipVal > 0) ? (diff / pipVal).toFixed(1) : (p.spread_pips != null ? Number(p.spread_pips).toFixed(1) : '0.0')}
       <div

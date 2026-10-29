@@ -1,7 +1,7 @@
 <script>
   import { onDestroy } from 'svelte';
   import { arena } from '../lib/store.svelte.js';
-  import { formatPrice, formatUSD } from '../lib/formatters.js';
+  import { formatPrice, formatForexPrice, formatUSD } from '../lib/formatters.js';
 
   let selectedInterval = $state('15'); // '1', '5', '15', '60', '240', 'D'
 
@@ -120,7 +120,7 @@
             <div class="live-price-pill mono">
               <span class="dot-live"></span>
               <span class="px-val">
-                {symbolInfo.category === 'forex' ? (livePrice.toFixed(symbolInfo.symbol.includes('JPY') ? 3 : 5)) : formatPrice(livePrice)}
+                {symbolInfo.category === 'forex' ? formatForexPrice(livePrice, symbolInfo.symbol) : formatPrice(livePrice)}
               </span>
             </div>
           {/if}

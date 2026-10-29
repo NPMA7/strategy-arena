@@ -60,6 +60,9 @@ MT5_LOGIN = os.getenv("MT5_LOGIN", "6310591")
 MT5_PASSWORD = os.getenv("MT5_PASSWORD", "dL7ny!PE")
 MT5_SERVER = os.getenv("MT5_SERVER", "Headway-Demo")
 
+# Admin & API Security
+ADMIN_RESET_KEY = os.getenv("ADMIN_RESET_KEY", "")
+
 
 def get_client_config() -> dict:
     """Return public config dictionary passed to frontend web clients."""

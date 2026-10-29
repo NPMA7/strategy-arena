@@ -15,7 +15,7 @@ import os
 import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, HTTPException, Depends
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, HTTPException, Depends, Header
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -32,7 +32,7 @@ log = logging.getLogger("arena")
 ROOT_DIR = os.path.dirname(os.path.dirname(__file__))
 FRONTEND_DIR = os.path.join(ROOT_DIR, "frontend")
 DIST_DIR = os.path.join(FRONTEND_DIR, "dist")
-from .config import START_EQUITY, SNAPSHOT_SEC, get_client_config
+from .config import START_EQUITY, SNAPSHOT_SEC, ADMIN_RESET_KEY, get_client_config
 PRICE_TICK_SEC = 0.5
 
 db = DB()
@@ -609,10 +609,19 @@ async def get_all_executions_endpoint(
 
 
 @app.post("/api/reset")
-async def reset_arena():
+async def reset_arena(
+    admin_key: str | None = Query(None, description="Secret admin reset key"),
+    x_admin_key: str | None = Header(None, alias="X-Admin-Key"),
+):
     """Hapus seluruh data simulasi di database dan reset semua engine (spot, futures, forex) ke state awal dari 0."""
+    provided = (x_admin_key or admin_key or "").strip()
+    if not ADMIN_RESET_KEY or provided != ADMIN_RESET_KEY:
+        raise HTTPException(
+            status_code=403,
+            detail="Akses ditolak: Endpoint reset diproteksi. Masukkan admin key via header 'X-Admin-Key' atau query parameter '?admin_key=...'."
+        )
     global spot_engine, futures_engine, forex_engine
-    log.info("Resetting entire arena to 0...")
+    log.info("Resetting entire arena to 0 via authenticated admin key...")
     await db.clear_all_data()
     now = time.time()
     state["started"] = now
@@ -670,8 +679,21 @@ async def get_public_key():
 @app.post("/api/v1/auth/generate-key")
 async def generate_custom_key(name: str = Query("My Bot Client")):
     """Membuat custom API key untuk bot pribadi."""
-    key = await db.create_api_key(name=name)
-    return {"ok": True, "api_key": key, "name": name}
+    clean_name = name.strip()[:60] if name else "My Bot Client"
+    try:
+        async with db.pool.acquire() as con:
+            count = await con.fetchval("SELECT count(*) FROM api_keys")
+            if count and count >= 200:
+                raise HTTPException(
+                    status_code=429,
+                    detail="Batas kuota API key custom tercapai (maks 200). Silakan gunakan public API key default."
+                )
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.warning(f"Error checking api_keys count: {e}")
+    key = await db.create_api_key(name=clean_name)
+    return {"ok": True, "api_key": key, "name": clean_name}
 
 
 @app.get("/api/v1/signals/strategies")

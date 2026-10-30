@@ -4,6 +4,10 @@ Platform terminal kuantitatif dan mesin simulasi *paper-trading* multi-strategi 
 
 Dirancang dengan standar visual **Institutional Craft** (Anti-AI-Slop, *functional depth*, dark theme konsisten, border presisi 1px, penempatan kolom waktu WIB di sisi kiri pair, tabel metrik densitas tinggi, serta bebas emoji generik).
 
+> 🤖 **Mencari Mesin Copy-Trading Otomatis ke MetaTrader 5?**  
+> Jika Anda ingin menyalin sinyal dari Strategy Arena langsung ke akun riil MetaTrader 5 (Headway, dsb.) secara otomatis dengan dukungan container MT5, rekonsiliasi watchdog, multi-strategy hedging, dan kontrol via bot Telegram (`/my-posisi`, `/posisi`, `/status`), gunakan repositori resmi:  
+> 👉 [**https://github.com/NPMA7/sa-copytrade**](https://github.com/NPMA7/sa-copytrade)
+
 ---
 
 ## 🏛️ Arsitektur Sistem
@@ -70,7 +74,9 @@ Dirancang dengan standar visual **Institutional Craft** (Anti-AI-Slop, *function
 - **Neural Network Visualizer**: Visualisasi feed-forward interaktif lapisan neural network inferensi sinyal (Input Layer Indikator $\rightarrow$ Hidden Layers Ekstraksi Fitur $\rightarrow$ Output Probabilitas Action Long/Short/Flat).
 - **Three Market Core (3D WebGL)**: Representasi grafis sirkulasi likuiditas dan volatilitas pasar berbasis Three.js.
 
-### 4. Hub Sinyal Publik & Copy-Trading API (v1)
+### 4. Hub Sinyal Publik & Integrasi Copy-Trading (v1)
+- **Mesin Eksekusi Copy-Trade Resmi**: Untuk menyalin sinyal trading secara langsung ke akun riil broker (Headway MT5, akun Cent maupun Standard), silakan gunakan repositori pendamping resmi [**`sa-copytrade`**](https://github.com/NPMA7/sa-copytrade).
+  - Repositori `sa-copytrade` menyediakan arsitektur bot daemon mandiri, hedging multi-strategi (`ALLOW_HEDGING`), remote command bot Telegram (`/my-posisi`, `/posisi`, `/status`, `/help`), smart fresh-trade reconciliation, dan tampilan GUI MT5 via browser (noVNC).
 - **Dukungan Multi-Strategi Komprehensif**: Endpoint WebSocket `/ws/signals` dan REST `/api/v1/signals/positions` mendukung penyalinan beberapa strategi sekaligus via query koma (contoh: `?strategy=roc_momentum,gap_fill&mode=forex`).
 - **Otentikasi Kunci Publik**: Menggunakan Public Key default `pk_live_strategyarena_public_feed`.
 - **Generator Kode Terintegrasi**: Panduan dan template bot siap pakai untuk Python (`aiohttp` / `websockets`), cURL, dan integrasi MetaTrader 5.

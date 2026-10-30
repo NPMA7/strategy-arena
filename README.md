@@ -142,7 +142,8 @@ npm run build
 | Endpoint | Metode | Parameter Query | Deskripsi |
 | :--- | :---: | :--- | :--- |
 | `/api/bootstrap` | `GET` | — | Memuat data awal: pasangan pair, daftar strategi, statistik server, dan status feed. |
-| `/api/strategy/{sid}` | `GET` | `mode` (spot/futures/forex), `hours` (1-2160) | Riwayat trade lengkap, ringkasan akun, aggregate count (win/loss), dan titik kurva ekuitas. |
+| `/api/strategy/{sid}` | `GET` | `mode` (spot/futures/forex), `hours` (1-2160) | Ringkasan akun, aggregate count (win/loss), dan titik kurva ekuitas. |
+| `/api/strategy/{sid}/trades` | `GET` | `mode`, `page`, `limit` (default 50), `filter` (all/win/loss), `search` | Riwayat transaksi terpaginasi dari server PostgreSQL dengan filter dan pencarian instan. |
 | `/api/symbol/{symbol}` | `GET` | `limit` (1-500) | Data candlestick OHLCV historis 1m dari ring buffer. |
 | `/api/v1/signals/strategies` | `GET` | `mode`, `api_key` | Peringkat dan performa semua strategi aktif. |
 | `/api/v1/signals/positions` | `GET` | `strategy` (ID / koma / 'all'), `mode`, `api_key` | Daftar posisi terbuka aktif saat ini untuk sinkronisasi portofolio copy-trade. |

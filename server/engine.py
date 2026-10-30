@@ -286,7 +286,7 @@ class Engine:
                     else:
                         pnl = (px - p["entry"]) * p["qty"] * p["side"]
                     eq += pnl
-                if eq <= 0.0:
+                if self.is_mc_breached(acct, eq):
                     self._handle_mc(acct, ts)
                 else:
                     acct["equity"] = eq
@@ -296,13 +296,28 @@ class Engine:
                     if dd > acct["max_dd"]:
                         acct["max_dd"] = dd
             else:
-                if acct["cash"] <= 0.0 or acct["equity"] <= 0.0:
+                if self.is_mc_breached(acct):
                     self._handle_mc(acct, ts)
             if not acct["warmed"]:
                 acct["warmed"] = True
 
+    @property
+    def mc_threshold(self) -> float:
+        """Batas saldo untuk Margin Call & Refill: Di Futures < $10.0, pasar lain <= $0.0."""
+        return 10.0 if self.mode == "futures" else 0.0
+
+    def is_mc_breached(self, acct: dict, current_equity: Optional[float] = None) -> bool:
+        thresh = self.mc_threshold
+        eq = current_equity if current_equity is not None else acct.get("equity", acct.get("cash", 0.0))
+        cash = acct.get("cash", 0.0)
+        if thresh > 0.0:
+            return eq < thresh or cash < thresh
+        return eq <= 0.0 or cash <= 0.0
+
     def _handle_mc(self, acct: dict, ts: int) -> None:
-        """Margin Call / saldo $0: likuidasi semua posisi terbuka, refill ke START_EQUITY ($1.000), catat mc_count."""
+        """Margin Call / saldo habis (< $10 di Futures, <= $0 di pasar lain):
+        Likuidasi semua posisi terbuka, refill ke START_EQUITY ($1.000), catat mc_count.
+        Statistik historis (trades, wins, pnl, curves) tetap dipertahankan."""
         sid = acct["id"]
         acct["mc_count"] = acct.get("mc_count", 0) + 1
         mc_num = acct["mc_count"]
@@ -338,10 +353,10 @@ class Engine:
                 "equity_after": 0.0,
             })
 
-        # 2. Refill saldo kembali ke modal awal ($1.000)
+        # 2. Refill saldo kembali ke modal awal ($1.000) tanpa mereset riwayat/statistik
         acct["cash"] = START_EQUITY
         acct["equity"] = START_EQUITY
-        acct["peak"] = START_EQUITY
+        acct["peak"] = max(acct.get("peak", START_EQUITY), START_EQUITY)
         acct["max_dd"] = 1.0  # Tercatat pernah drawdown 100%
 
         # Update sparkline agar visualisasi menunjukkan penurunan ke 0 dan refill ke $1.000
@@ -352,7 +367,8 @@ class Engine:
 
         # 3. Kirim notifikasi event ke feed realtime
         mode_str = self.mode.upper()
-        msg = f"💥 MARGIN CALL (MC {mc_num}x) [{mode_str}]: Saldo {acct['name']} habis & posisi dilikuidasi! Refill otomatis ke ${START_EQUITY:,.0f}."
+        thresh_str = "< $10" if self.mode == "futures" else "<= $0"
+        msg = f"💥 MARGIN CALL (MC {mc_num}x) [{mode_str}]: Saldo {acct['name']} {thresh_str} & posisi dilikuidasi! Refill otomatis ke ${START_EQUITY:,.0f}."
         self._push_event([sid], None, "mc", msg)
 
     # ── eksekusi ────────────────────────────────────────────────────────
@@ -635,7 +651,7 @@ class Engine:
         if len(self.signals) > 500:
             self.signals = self.signals[-500:]
 
-        if not acct["pos"] and (acct["cash"] <= 0.0 or acct["equity"] <= 0.0):
+        if not acct["pos"] and self.is_mc_breached(acct):
             self._handle_mc(acct, ts)
 
     # ── funding rate (futures only) ─────────────────────────────────────
@@ -662,7 +678,7 @@ class Engine:
                 for sym, p in acct["pos"].items():
                     px = self._get_price(sym, p["entry"])
                     eq += (px - p["entry"]) * p["qty"] * p["side"]
-                if eq <= 0.0:
+                if self.is_mc_breached(acct, eq):
                     self._handle_mc(acct, ts)
 
     # ── stops & take profit (dipanggil saat tick harga, eksekusi instan) ─
@@ -701,9 +717,9 @@ class Engine:
                         eq += calculate_forex_pnl(sym, pos_item["entry"], px, pos_item["side"], pos_item.get("lot", 0.10), self._forex_prices())
                     else:
                         eq += (px - pos_item["entry"]) * pos_item["qty"] * pos_item["side"]
-                if eq <= 0.0:
+                if self.is_mc_breached(acct, eq):
                     self._handle_mc(acct, now_ts)
-            elif acct["cash"] <= 0.0 or acct["equity"] <= 0.0:
+            elif self.is_mc_breached(acct):
                 self._handle_mc(acct, now_ts)
 
     # ── snapshot untuk UI/DB ────────────────────────────────────────────
@@ -731,7 +747,13 @@ class Engine:
             else:
                 eq = round(a["equity"], 2)
 
-            bal = round(a["cash"], 2)
+            # Cek apakah akun terkena MC (misal di Futures saldo/equity < $10)
+            if self.is_mc_breached(a, eq):
+                self._handle_mc(a, int(now * 1000))
+                bal = round(a["cash"], 2)
+                eq = round(a["equity"], 2)
+            else:
+                bal = round(a["cash"], 2)
             if record_spark:
                 hist = self.sparklines[sid]
                 now_ms = int(now * 1000)

@@ -519,8 +519,20 @@ async def get_live_state():
 
 
 @app.get("/api/strategy/{sid}")
-async def strategy_detail(sid: str, mode: str = Query("spot"), hours: int = Query(24, ge=1, le=2160), limit: int = Query(5000, ge=1, le=10000)):
+async def strategy_detail(sid: str, mode: str = Query("spot"), hours: int = Query(24, ge=1, le=2160), limit: int = Query(50, ge=1, le=10000)):
     return JSONResponse(await db.read_strategy_detail(sid, mode=mode, hours=hours, limit=limit))
+
+
+@app.get("/api/strategy/{sid}/trades")
+async def strategy_trades_endpoint(
+    sid: str,
+    mode: str = Query("spot"),
+    page: int = Query(1, ge=1),
+    limit: int = Query(50, ge=1, le=2000),
+    filter: str = Query("all"),
+    search: str = Query(""),
+):
+    return JSONResponse(await db.read_strategy_trades(sid, mode=mode, page=page, limit=limit, filter_type=filter, search=search))
 
 
 @app.get("/api/symbol/{symbol}")

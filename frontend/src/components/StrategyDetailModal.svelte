@@ -20,6 +20,11 @@
   let detailData = $state(null);
   let curvePoints = $state([]);
   let closedTrades = $state([]);
+  let loadingTrades = $state(false);
+  let serverTotalTrades = $state(0);
+  let serverTotalPages = $state(1);
+  let serverCounts = $state({ total: 0, wins: 0, losses: 0 });
+  let searchTimeout = null;
 
   // Trade History Filter State
   let tradeFilter = $state('all'); // 'all', 'win', 'loss'
@@ -33,17 +38,45 @@
     if (!sid) return;
     loadingData = true;
     try {
-      const res = await fetch(`/api/strategy/${sid}?mode=${mode}&hours=${hours}`);
+      const res = await fetch(`/api/strategy/${sid}?mode=${mode}&hours=${hours}&limit=50`);
       if (res.ok) {
         const json = await res.json();
         detailData = json;
         curvePoints = json.curve || [];
-        closedTrades = json.trades || [];
+        if (!loadingTrades && closedTrades.length === 0) {
+          closedTrades = json.trades || [];
+          serverTotalTrades = json.trade_counts?.total ?? json.trades?.length ?? 0;
+          serverCounts = json.trade_counts || { total: serverTotalTrades, wins: 0, losses: 0 };
+          serverTotalPages = Math.max(1, Math.ceil(serverTotalTrades / (typeof pageSize === 'number' ? pageSize : 50)));
+        }
       }
     } catch (e) {
       console.error('Failed to fetch detailed strategy stats:', e);
     } finally {
       loadingData = false;
+    }
+  }
+
+  async function fetchTrades(sid, mode, page, limit, filter, search) {
+    if (!sid) return;
+    loadingTrades = true;
+    try {
+      const limitParam = limit === 'all' ? 0 : limit;
+      const q = encodeURIComponent((search || '').trim());
+      const res = await fetch(`/api/strategy/${sid}/trades?mode=${mode}&page=${page}&limit=${limitParam}&filter=${filter}&search=${q}`);
+      if (res.ok) {
+        const json = await res.json();
+        closedTrades = json.trades || [];
+        serverTotalTrades = json.total ?? 0;
+        serverTotalPages = json.total_pages ?? 1;
+        if (json.counts) {
+          serverCounts = json.counts;
+        }
+      }
+    } catch (e) {
+      console.error('Failed to fetch paginated trades:', e);
+    } finally {
+      loadingTrades = false;
     }
   }
 
@@ -70,6 +103,7 @@
       lastLoadedHours = hours;
       currentPage = 1;
       fetchDetail(sid, mode, hours);
+      fetchTrades(sid, mode, 1, pageSize, tradeFilter, tradeSearch);
     }
   });
 
@@ -95,62 +129,43 @@
     return pts;
   });
 
-  // Filtered trades list
-  let filteredTrades = $derived.by(() => {
-    return closedTrades.filter((t) => {
-      // Filter by win/loss
-      if (tradeFilter === 'win' && t.pnl <= 0) return false;
-      if (tradeFilter === 'loss' && t.pnl > 0) return false;
-
-      // Filter by search query
-      if (tradeSearch.trim()) {
-        const q = tradeSearch.trim().toUpperCase();
-        if (!t.symbol?.toUpperCase().includes(q) && !t.reason?.toUpperCase().includes(q)) {
-          return false;
-        }
-      }
-      return true;
-    });
-  });
-
   // Table Pagination State
   let pageSize = $state(50); // 25, 50, 100, or 'all'
   let currentPage = $state(1);
   let tableWrapEl = $state(null);
 
   let totalPages = $derived.by(() => {
-    if (pageSize === 'all' || !filteredTrades.length) return 1;
-    return Math.max(1, Math.ceil(filteredTrades.length / pageSize));
-  });
-
-  let paginatedTrades = $derived.by(() => {
-    if (pageSize === 'all') return filteredTrades;
-    const start = (currentPage - 1) * pageSize;
-    return filteredTrades.slice(start, start + pageSize);
+    return Math.max(1, serverTotalPages || 1);
   });
 
   function setFilter(f) {
     tradeFilter = f;
     currentPage = 1;
-    if (tableWrapEl) {
-      tableWrapEl.scrollTop = 0;
-    }
+    if (tableWrapEl) tableWrapEl.scrollTop = 0;
+    fetchTrades(strategy?.id, arena.mode, 1, pageSize, f, tradeSearch);
   }
 
   function setPageSize(sz) {
     pageSize = sz;
     currentPage = 1;
-    if (tableWrapEl) {
-      tableWrapEl.scrollTop = 0;
-    }
+    if (tableWrapEl) tableWrapEl.scrollTop = 0;
+    fetchTrades(strategy?.id, arena.mode, 1, sz, tradeFilter, tradeSearch);
   }
 
   function goToPage(p) {
     const target = Math.max(1, Math.min(totalPages, p));
     currentPage = target;
-    if (tableWrapEl) {
-      tableWrapEl.scrollTop = 0;
-    }
+    if (tableWrapEl) tableWrapEl.scrollTop = 0;
+    fetchTrades(strategy?.id, arena.mode, target, pageSize, tradeFilter, tradeSearch);
+  }
+
+  function handleSearchInput() {
+    currentPage = 1;
+    if (tableWrapEl) tableWrapEl.scrollTop = 0;
+    if (searchTimeout) clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+      fetchTrades(strategy?.id, arena.mode, 1, pageSize, tradeFilter, tradeSearch);
+    }, 280);
   }
 
   // Generate visible page numbers for pagination bar (e.g. [1, 2, 3, 4, 5, '...', total])
@@ -171,20 +186,20 @@
 
   // Synchronized Trade Counts (prioritize API aggregate counts, then closedTrades, then strategy account)
   let totalTradesCount = $derived.by(() => {
+    if (serverCounts?.total != null && serverCounts.total > 0) return serverCounts.total;
     if (detailData?.trade_counts?.total != null) return detailData.trade_counts.total;
-    if (closedTrades.length > 0) return closedTrades.length;
     return strategy?.trades || 0;
   });
 
   let totalWinsCount = $derived.by(() => {
+    if (serverCounts?.wins != null) return serverCounts.wins;
     if (detailData?.trade_counts?.wins != null) return detailData.trade_counts.wins;
-    if (closedTrades.length > 0) return closedTrades.filter((t) => t.pnl > 0).length;
     return strategy?.wins || 0;
   });
 
   let totalLossesCount = $derived.by(() => {
+    if (serverCounts?.losses != null) return serverCounts.losses;
     if (detailData?.trade_counts?.losses != null) return detailData.trade_counts.losses;
-    if (closedTrades.length > 0) return closedTrades.filter((t) => t.pnl <= 0).length;
     return Math.max(0, totalTradesCount - totalWinsCount);
   });
 
@@ -835,14 +850,19 @@
                 type="text" 
                 placeholder="Cari pair (misal: BTC, PEPE, SOL)..." 
                 bind:value={tradeSearch}
-                oninput={() => { currentPage = 1; if (tableWrapEl) tableWrapEl.scrollTop = 0; }}
+                oninput={handleSearchInput}
                 class="mono"
               />
             </div>
           </div>
 
           <!-- Trades Table with Pagination -->
-          {#if filteredTrades.length === 0}
+          {#if loadingTrades}
+            <div class="loading-trades">
+              <div class="trade-spinner"></div>
+              <span>Memuat riwayat transaksi...</span>
+            </div>
+          {:else if closedTrades.length === 0}
             <div class="empty-trades">
               <span>Tidak ada riwayat trade yang cocok dengan filter yang dipilih.</span>
             </div>
@@ -865,7 +885,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  {#each paginatedTrades as tr (tr.closed_at + '_' + tr.symbol + '_' + tr.pnl)}
+                  {#each closedTrades as tr (tr.closed_at + '_' + tr.symbol + '_' + tr.pnl)}
                     {@const isWin = tr.pnl >= 0}
                     <tr>
                       <td class="mono date-cell">
@@ -914,9 +934,9 @@
               <div class="pg-info">
                 Menampilkan 
                 <b class="text-white">
-                  {filteredTrades.length === 0 ? 0 : (pageSize === 'all' ? 1 : (currentPage - 1) * pageSize + 1)}–{pageSize === 'all' ? filteredTrades.length : Math.min(currentPage * pageSize, filteredTrades.length)}
+                  {serverTotalTrades === 0 ? 0 : (pageSize === 'all' ? 1 : (currentPage - 1) * (typeof pageSize === 'number' ? pageSize : 50) + 1)}–{pageSize === 'all' ? serverTotalTrades : Math.min(currentPage * (typeof pageSize === 'number' ? pageSize : 50), serverTotalTrades)}
                 </b> 
-                dari <b class="text-white">{filteredTrades.length}</b> transaksi
+                dari <b class="text-white">{serverTotalTrades}</b> transaksi
               </div>
 
               {#if totalPages > 1}
@@ -1576,6 +1596,34 @@
     background: #070a12;
     border-radius: 8px;
     border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .loading-trades {
+    padding: 48px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: #94a3b8;
+    font-size: 12px;
+    background: #070a12;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+
+  .trade-spinner {
+    width: 22px;
+    height: 22px;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-top-color: #f59e0b;
+    border-radius: 50%;
+    animation: tradeSpin 0.7s linear infinite;
+  }
+
+  @keyframes tradeSpin {
+    to { transform: rotate(360deg); }
   }
 
   /* Utility Colors */

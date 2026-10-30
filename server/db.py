@@ -616,7 +616,7 @@ class DB:
                 await con.execute("DELETE FROM accounts;")
                 await con.execute("DELETE FROM arena_meta WHERE key = 'started_at';")
 
-    async def read_strategy_detail(self, strategy_id: str, mode: str = "spot", hours: int = 24, limit: int = 5000) -> dict[str, Any]:
+    async def read_strategy_detail(self, strategy_id: str, mode: str = "spot", hours: int = 24, limit: int = 50) -> dict[str, Any]:
         async with self.pool.acquire() as con:
             acct = await con.fetchrow("SELECT * FROM accounts WHERE strategy = $1 AND mode = $2", strategy_id, mode)
             if not acct:
@@ -647,6 +647,74 @@ class DB:
             "trade_counts": dict(trades_counts) if trades_counts else {"total": len(trades), "wins": 0, "losses": 0},
             "trades": [dict(t) for t in trades],
             "curve": [dict(c) for c in curve],
+        }
+
+    async def read_strategy_trades(
+        self,
+        strategy_id: str,
+        mode: str = "spot",
+        page: int = 1,
+        limit: int = 50,
+        filter_type: str = "all",
+        search: str = "",
+    ) -> dict[str, Any]:
+        offset = (page - 1) * limit if limit > 0 else 0
+        conditions = ["strategy = $1", "mode = $2"]
+        params: list[Any] = [strategy_id, mode]
+
+        if filter_type == "win":
+            conditions.append("pnl > 0")
+        elif filter_type == "loss":
+            conditions.append("pnl <= 0")
+
+        if search.strip():
+            params.append(f"%{search.strip().upper()}%")
+            idx = len(params)
+            conditions.append(f"(UPPER(symbol) LIKE ${idx} OR UPPER(reason) LIKE ${idx})")
+
+        where_clause = " AND ".join(conditions)
+
+        async with self.pool.acquire() as con:
+            count_sql = f"SELECT count(1) as total FROM trades WHERE {where_clause}"
+            total_row = await con.fetchrow(count_sql, *params)
+            total = total_row["total"] if total_row else 0
+
+            counts_row = await con.fetchrow(
+                """SELECT count(1) as total,
+                          count(1) FILTER (WHERE pnl > 0) as wins,
+                          count(1) FILTER (WHERE pnl <= 0) as losses
+                   FROM trades WHERE strategy = $1 AND mode = $2""",
+                strategy_id, mode,
+            )
+
+            if limit > 0:
+                p_query = list(params)
+                p_query.extend([limit, offset])
+                query_sql = f"""
+                    SELECT symbol, side, qty, entry, exit, opened_at, closed_at, pnl, fee, reason, equity_after, leverage
+                    FROM trades
+                    WHERE {where_clause}
+                    ORDER BY closed_at DESC
+                    LIMIT ${len(p_query)-1} OFFSET ${len(p_query)}
+                """
+                rows = await con.fetch(query_sql, *p_query)
+            else:
+                query_sql = f"""
+                    SELECT symbol, side, qty, entry, exit, opened_at, closed_at, pnl, fee, reason, equity_after, leverage
+                    FROM trades
+                    WHERE {where_clause}
+                    ORDER BY closed_at DESC
+                    LIMIT 2000
+                """
+                rows = await con.fetch(query_sql, *params)
+
+        return {
+            "total": total,
+            "page": page,
+            "limit": limit,
+            "total_pages": max(1, (total + limit - 1) // limit) if limit > 0 else 1,
+            "counts": dict(counts_row) if counts_row else {"total": total, "wins": 0, "losses": 0},
+            "trades": [dict(r) for r in rows],
         }
 
     async def read_symbol_bars(self, symbol: str, limit: int = 180) -> list[dict]:

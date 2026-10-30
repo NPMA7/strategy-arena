@@ -8,6 +8,17 @@
   // Tab & Filter State for Executive Leaderboard
   let activeMarketTab = $state('universal'); // 'universal', 'forex', 'futures', 'spot'
   let mobileMenuOpen = $state(false);
+
+  // Auto-close mobile drawer if user resizes window to desktop view
+  $effect(() => {
+    function handleResize() {
+      if (window.innerWidth > 900 && mobileMenuOpen) {
+        mobileMenuOpen = false;
+      }
+    }
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  });
   let boardLimit = $state(10); // 5, 10, 25, 88
   let chartViewMode = $state('lines'); // 'lines' or 'donut'
   let selectedTimeRangeDays = $state(30); // 30 (1 Bulan Kumulatif), 14, 7
@@ -616,6 +627,9 @@
               class="drawer-nav-item item-spot"
               onclick={() => { mobileMenuOpen = false; enterTerminal('spot'); }}
             >
+              <div class="drawer-icon icon-spot">
+                <span class="dot-spot"></span>
+              </div>
               <div class="drawer-item-info">
                 <span class="item-name">Terminal Spot</span>
                 <span class="item-desc">Binance Crypto Spot (No-Leverage)</span>
@@ -628,6 +642,9 @@
               class="drawer-nav-item item-futures"
               onclick={() => { mobileMenuOpen = false; enterTerminal('futures'); }}
             >
+              <div class="drawer-icon icon-futures">
+                <span class="dot-futures"></span>
+              </div>
               <div class="drawer-item-info">
                 <span class="item-name">Terminal Futures</span>
                 <span class="item-desc">Binance Perpetual (Leverage 1–20x)</span>
@@ -640,6 +657,9 @@
               class="drawer-nav-item item-forex"
               onclick={() => { mobileMenuOpen = false; enterTerminal('forex'); }}
             >
+              <div class="drawer-icon icon-forex">
+                <span class="dot-forex"></span>
+              </div>
               <div class="drawer-item-info">
                 <span class="item-name">Terminal Forex & Metals</span>
                 <span class="item-desc">MT5 Direct Feed & Eksekusi</span>
@@ -652,6 +672,9 @@
               class="drawer-nav-item item-neural"
               onclick={() => { mobileMenuOpen = false; arena.navigate('/neural-execution'); }}
             >
+              <div class="drawer-icon icon-neural">
+                <span class="dot-neural"></span>
+              </div>
               <div class="drawer-item-info">
                 <span class="item-name">Neural Execution</span>
                 <span class="item-desc">Visual 3D Matrix & Realtime Trade Feed</span>
@@ -1703,6 +1726,13 @@
     backdrop-filter: blur(10px);
     z-index: 100;
     animation: fadeIn 0.18s ease;
+  }
+
+  /* STRICTLY hide mobile drawer on Desktop/PC (width > 900px) */
+  @media (min-width: 901px) {
+    .mobile-drawer-backdrop {
+      display: none !important;
+    }
   }
 
   .mobile-drawer-content {
@@ -3451,7 +3481,7 @@
     }
   }
 
-  @media (max-width: 768px) {
+  @media (max-width: 900px) {
     .landing-nav-container {
       flex-direction: row;
       align-items: center;
@@ -3464,6 +3494,9 @@
     .hamburger-btn {
       display: flex;
     }
+  }
+
+  @media (max-width: 768px) {
     .hero-section {
       padding: 32px 14px 44px;
       min-height: auto;

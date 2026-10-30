@@ -76,8 +76,10 @@ class SignalHub:
             for ws, opts in list(self.clients.items()):
                 strat = opts.get("strategy")
                 mode = opts.get("mode")
-                if strat and strat != "all" and sig.get("strategy") != strat:
-                    continue
+                if strat and strat != "all":
+                    allowed_strats = {s.strip() for s in strat.split(",")} if "," in strat else {strat}
+                    if sig.get("strategy") not in allowed_strats:
+                        continue
                 if mode and mode != "all" and sig.get("mode") != mode:
                     continue
                 try:
@@ -562,9 +564,10 @@ async def get_all_executions_endpoint(
     if mode in ("forex", "all") and forex_engine:
         engines.append(("forex", forex_engine))
 
+    allowed_strats = {s.strip() for s in strategy.split(",")} if strategy != "all" else None
     for m_label, eng in engines:
         for sid, acct in eng.accounts.items():
-            if strategy != "all" and sid != strategy:
+            if allowed_strats is not None and sid not in allowed_strats:
                 continue
             for sym, p in acct["pos"].items():
                 if symbol != "all" and sym != symbol:
@@ -752,9 +755,10 @@ async def get_active_positions_api(
     if mode in ("forex", "all") and forex_engine:
         engines.append(("forex", forex_engine))
 
+    allowed_strats = {s.strip() for s in strategy.split(",")} if strategy != "all" else None
     for m_label, eng in engines:
         for sid, acct in eng.accounts.items():
-            if strategy != "all" and sid != strategy:
+            if allowed_strats is not None and sid not in allowed_strats:
                 continue
             for sym, p in acct["pos"].items():
                 cur_px = prices.get(sym, p["entry"])
@@ -846,9 +850,10 @@ async def ws_signals_endpoint(
     if mode in ("forex", "all") and forex_engine:
         engines.append(("forex", forex_engine))
 
+    allowed_strats = {s.strip() for s in strategy.split(",")} if strategy != "all" else None
     for m_label, eng in engines:
         for sid, acct in eng.accounts.items():
-            if strategy != "all" and sid != strategy:
+            if allowed_strats is not None and sid not in allowed_strats:
                 continue
             for sym, p in acct["pos"].items():
                 cur_positions.append({

@@ -156,6 +156,10 @@
       min-height: 0;
       overflow: visible;
     }
+    .market-logs-grid .cell {
+      height: 380px;
+      min-height: 340px;
+    }
   }
 
   @media (max-width: 768px) {
@@ -171,6 +175,10 @@
       height: auto;
       min-height: 0;
       overflow: visible;
+    }
+    .market-logs-grid .cell {
+      height: 360px;
+      min-height: 300px;
     }
   }
 </style>

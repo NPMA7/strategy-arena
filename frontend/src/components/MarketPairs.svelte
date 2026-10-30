@@ -109,7 +109,7 @@
     display: flex;
     flex-direction: column;
     height: 100%;
-    min-height: 0;
+    min-height: 320px;
     overflow: hidden;
   }
 
@@ -117,6 +117,8 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 6px 12px;
+    flex-wrap: wrap;
     padding: 10px 14px;
     background: #06090e;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -136,9 +138,10 @@
   }
 
   .mkt-grid {
-    flex: 1 1 0;
-    min-height: 0;
-    overflow-y: scroll;
+    flex: 1 1 auto;
+    min-height: 200px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     scrollbar-gutter: stable;
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
@@ -297,13 +300,22 @@
   }
 
   @media (max-width: 480px) {
+    .pasar-panel {
+      min-height: 280px;
+    }
     .phead {
       padding: 8px 10px;
+      gap: 4px;
+    }
+    .sub {
+      font-size: 9.5px;
+      line-height: 1.3;
     }
     .mkt-grid {
       grid-template-columns: repeat(auto-fill, minmax(115px, 1fr));
       gap: 4px;
       padding: 6px;
+      min-height: 180px;
     }
     .tile {
       padding: 5px 6px;

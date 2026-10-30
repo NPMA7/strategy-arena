@@ -50,7 +50,7 @@
     display: flex;
     flex-direction: column;
     height: 100%;
-    min-height: 0;
+    min-height: 280px;
     overflow: hidden;
   }
 
@@ -58,6 +58,8 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 6px 12px;
+    flex-wrap: wrap;
     padding: 10px 14px;
     background: #06090e;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -77,9 +79,10 @@
   }
 
   .feed-wrap {
-    flex: 1 1 0;
-    min-height: 0;
-    overflow-y: scroll;
+    flex: 1 1 auto;
+    min-height: 200px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     scrollbar-gutter: stable;
     padding: 8px 10px;
     background: #06090e;
@@ -165,6 +168,17 @@
   }
 
   @media (max-width: 480px) {
+    .logs-panel {
+      min-height: 260px;
+    }
+    .phead {
+      padding: 8px 10px;
+      gap: 4px;
+    }
+    .feed-wrap {
+      min-height: 180px;
+      padding: 6px 8px;
+    }
     .ev-row {
       flex-wrap: wrap;
       gap: 4px;

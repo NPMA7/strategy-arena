@@ -877,30 +877,51 @@
     to { transform: translateY(0); opacity: 1; }
   }
 
-  /* Laptop / Mid-size desktop optimization (e.g. 1024px, 1100px) */
-  @media (max-width: 1200px) and (min-width: 901px) {
+  /* Laptop / Mid-size desktop optimization (e.g. 1024px, 1100px, 1200px) */
+  @media (max-width: 1280px) and (min-width: 901px) {
     .header-root {
-      padding: 8px 14px;
+      padding: 8px 12px;
       gap: 10px;
     }
     .header-left {
-      gap: 12px;
+      gap: 10px;
+    }
+    .brand-sub {
+      display: none;
+    }
+    .brand-title {
+      font-size: 14px;
+    }
+    .market-switcher {
+      gap: 3px;
+      padding: 2px;
     }
     .switcher-btn {
-      padding: 5px 8px;
-      font-size: 11.5px;
-      gap: 6px;
+      padding: 4px 8px;
+      font-size: 11px;
+      gap: 5px;
+    }
+    .switcher-btn.disabled {
+      display: none !important;
+    }
+    .header-right {
+      gap: 8px;
     }
     .telemetry-pill {
-      gap: 8px;
-      padding: 0 9px;
+      gap: 6px;
+      padding: 0 8px;
       height: 32px;
-      font-size: 10.5px;
+      font-size: 10px;
+    }
+    .uptime-badge .lbl,
+    .db-size-badge .lbl {
+      font-size: 9px;
     }
     .btn-copy-trade {
       padding: 0 10px;
       height: 32px;
-      font-size: 11.5px;
+      font-size: 11px;
+      gap: 4px;
     }
   }
 

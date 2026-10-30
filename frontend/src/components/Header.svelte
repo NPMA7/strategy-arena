@@ -191,7 +191,6 @@
         class="switcher-btn {arena.currentRoute === 'spot' ? 'active-spot' : ''}"
         onclick={() => handleModeChange("spot")}
       >
-        <span class="indicator-dot dot-amber"></span>
         <span class="label">Crypto Spot</span>
       </button>
 
@@ -199,7 +198,6 @@
         class="switcher-btn {arena.currentRoute === 'futures' ? 'active-futures' : ''}"
         onclick={() => handleModeChange("futures")}
       >
-        <span class="indicator-dot dot-cyan"></span>
         <span class="label">Crypto Futures</span>
       </button>
 
@@ -207,7 +205,6 @@
         class="switcher-btn {arena.currentRoute === 'forex' ? 'active-forex' : ''}"
         onclick={() => handleModeChange("forex")}
       >
-        <span class="indicator-dot dot-emerald"></span>
         <span class="label">Forex & Metals</span>
       </button>
 
@@ -216,7 +213,6 @@
         onclick={() => arena.navigate("/neural-execution")}
         title="Lihat Visual Neural Network & Seluruh Eksekusi Trade Multi-Pasar"
       >
-        <span class="indicator-dot dot-purple"></span>
         <span class="label">Neural Execution</span>
       </button>
 
@@ -244,9 +240,6 @@
             class="drawer-nav-item item-spot {arena.currentRoute === 'spot' ? 'active-item' : ''}"
             onclick={() => handleNav('spot')}
           >
-            <div class="drawer-icon icon-spot">
-              <span class="dot-spot"></span>
-            </div>
             <div class="drawer-item-info">
               <span class="item-name">Terminal Spot</span>
               <span class="item-desc">Binance Crypto Spot (No-Leverage)</span>
@@ -262,9 +255,6 @@
             class="drawer-nav-item item-futures {arena.currentRoute === 'futures' ? 'active-item' : ''}"
             onclick={() => handleNav('futures')}
           >
-            <div class="drawer-icon icon-futures">
-              <span class="dot-futures"></span>
-            </div>
             <div class="drawer-item-info">
               <span class="item-name">Terminal Futures</span>
               <span class="item-desc">Binance Perpetual (Leverage 1–20x)</span>
@@ -280,9 +270,6 @@
             class="drawer-nav-item item-forex {arena.currentRoute === 'forex' ? 'active-item' : ''}"
             onclick={() => handleNav('forex')}
           >
-            <div class="drawer-icon icon-forex">
-              <span class="dot-forex"></span>
-            </div>
             <div class="drawer-item-info">
               <span class="item-name">Terminal Forex & Metals</span>
               <span class="item-desc">MT5 Direct Feed & Eksekusi Headway</span>
@@ -298,9 +285,6 @@
             class="drawer-nav-item item-neural {arena.currentRoute === 'executions' ? 'active-item' : ''}"
             onclick={() => handleNav('executions')}
           >
-            <div class="drawer-icon icon-neural">
-              <span class="dot-neural"></span>
-            </div>
             <div class="drawer-item-info">
               <span class="item-name">Neural Execution</span>
               <span class="item-desc">Visual 3D Matrix & Realtime Trade Feed</span>
@@ -467,28 +451,6 @@
   .switcher-btn.disabled {
     opacity: 0.45;
     cursor: not-allowed;
-  }
-
-  .indicator-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-  }
-
-  .dot-amber {
-    background-color: var(--color-amber);
-  }
-
-  .dot-cyan {
-    background-color: var(--color-cyan);
-  }
-
-  .dot-emerald {
-    background-color: #10b981;
-  }
-
-  .dot-purple {
-    background-color: #ffffffa6;
   }
 
   .tag-soon {
@@ -784,63 +746,6 @@
     border: 1px solid rgba(168, 85, 247, 0.35);
   }
 
-  .drawer-icon {
-    width: 28px;
-    height: 28px;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
-
-  .icon-spot {
-    background: rgba(245, 158, 11, 0.12);
-    border: 1px solid rgba(245, 158, 11, 0.3);
-  }
-  .dot-spot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #f59e0b;
-    box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
-  }
-
-  .icon-futures {
-    background: rgba(56, 189, 248, 0.12);
-    border: 1px solid rgba(56, 189, 248, 0.3);
-  }
-  .dot-futures {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #38bdf8;
-    box-shadow: 0 0 8px rgba(56, 189, 248, 0.6);
-  }
-
-  .icon-forex {
-    background: rgba(16, 185, 129, 0.12);
-    border: 1px solid rgba(16, 185, 129, 0.3);
-  }
-  .dot-forex {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #10b981;
-    box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
-  }
-
-  .icon-neural {
-    background: rgba(168, 85, 247, 0.15);
-    border: 1px solid rgba(168, 85, 247, 0.35);
-  }
-  .dot-neural {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #a855f7;
-    box-shadow: 0 0 8px rgba(168, 85, 247, 0.6);
-  }
 
   .drawer-item-info {
     flex: 1;

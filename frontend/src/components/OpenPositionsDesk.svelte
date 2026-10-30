@@ -1,6 +1,6 @@
 <script>
   import { arena } from '../lib/store.svelte.js';
-  import { formatUSD, formatPrice, calculateForexPips, calculateForexPnl } from '../lib/formatters.js';
+  import { formatUSD, formatPrice, calculateForexPips, calculateForexPnl, formatClock, formatFullDateTime, formatTimeAgo } from '../lib/formatters.js';
 
   let isForex = $derived(arena.mode === 'forex');
   let searchQuery = $state('');
@@ -59,6 +59,7 @@
             <th>Strategi</th>
             <th>Pair</th>
             <th>Arah</th>
+            <th>Waktu Open</th>
             <th>{isForex ? 'Lot' : 'Size'}</th>
             <th class="{isForex ? 'r' : ''}">{isForex ? 'Pips' : 'Lev'}</th>
             <th class="r">Entry</th>
@@ -89,6 +90,9 @@
                 <span class="chip {p.side === 'LONG' ? 'chip-long' : 'chip-short'}">
                   {p.side}
                 </span>
+              </td>
+              <td class="mono muted open-time-cell" title={formatFullDateTime(p.opened_at)}>
+                <span class="open-clock">{formatClock(p.opened_at)}</span>
               </td>
               <td class="mono muted">
                 {#if isPosForex}
@@ -257,6 +261,16 @@
   .muted {
     color: #64748b;
   }
+
+  .open-time-cell {
+    white-space: nowrap;
+  }
+
+  .open-clock {
+    color: #cbd5e1;
+    font-weight: 500;
+  }
+
 
   .up {
     color: #10b981;

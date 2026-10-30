@@ -122,7 +122,7 @@
         <span class="pulse-ring"></span>
         <span class="status-dot"></span>
         <span class="status-text"
-          >{arena.connected ? "LIVE FEED" : "RECONNECTING"}</span
+          >{arena.connected ? "" : "RECONNECTING"}</span
         >
       </span>
 

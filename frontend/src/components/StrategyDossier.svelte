@@ -1,6 +1,6 @@
 <script>
   import { arena } from '../lib/store.svelte.js';
-  import { formatUSD, formatPercent, formatPrice, calculateForexPnl } from '../lib/formatters.js';
+  import { formatUSD, formatPercent, formatPrice, calculateForexPnl, formatClock, formatFullDateTime, formatTimeAgo } from '../lib/formatters.js';
   import { getStrategyCategory, getRuleText } from '../lib/constants.js';
   import StrategyDetailModal from './StrategyDetailModal.svelte';
 
@@ -420,6 +420,7 @@
               <tr>
                 <th>Pair</th>
                 <th>Arah</th>
+                <th>Waktu Open</th>
                 <th>{arena.mode === 'forex' ? 'Lot' : 'Lev'}</th>
                 <th class="r">Entry</th>
                 <th class="r">Mark</th>
@@ -444,6 +445,9 @@
                     <span class="chip {p.side === 'LONG' ? 'chip-long' : 'chip-short'}">
                       {p.side}
                     </span>
+                  </td>
+                  <td class="mono muted open-time-cell" title={formatFullDateTime(p.opened_at)}>
+                    <span class="open-clock">{formatClock(p.opened_at)}</span>
                   </td>
                   <td class="mono muted">
                     {#if arena.mode === 'forex'}
@@ -756,6 +760,16 @@
   .muted {
     color: #64748b;
   }
+
+  .open-time-cell {
+    white-space: nowrap;
+  }
+
+  .open-clock {
+    color: #cbd5e1;
+    font-weight: 500;
+  }
+
 
   .up {
     color: #10b981;

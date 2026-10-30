@@ -37,7 +37,8 @@
 </script>
 
 <header class="header-root">
-  <div class="header-left">
+  <!-- Row 1: Brand & Identity (Left) | Telemetry & Copy-Trade Actions (Right) -->
+  <div class="header-top-bar">
     <a
       href="/"
       class="brand-link"
@@ -103,8 +104,89 @@
       </div>
     </a>
 
-    <!-- Multi-Asset Market Switcher Navigation (Desktop) -->
-    <nav class="market-switcher desktop-nav" aria-label="Market Mode Selection">
+    <div class="header-top-right">
+      <!-- Live Feed Telemetry Pill (Desktop) -->
+      <div class="telemetry-pill">
+        <span class="live-status {arena.connected ? 'online' : 'offline'}">
+          <span class="pulse-ring"></span>
+          <span class="status-dot"></span>
+          <span class="status-text"
+            >{arena.connected ? "" : "RECONNECTING"}</span
+          >
+        </span>
+
+        <span class="telemetry-divider"></span>
+
+        <!-- Database Size Badge -->
+        <div
+          class="db-size-badge"
+          title="Ukuran total penyimpanan database PostgreSQL ($PGDATA: data tabel, indeks & WAL)"
+        >
+          <span class="lbl">DB:</span>
+          <span class="val num">{arena.dbSize}</span>
+        </div>
+
+        <span class="telemetry-divider"></span>
+
+        <!-- Continuous Uptime Clock -->
+        <div
+          class="uptime-badge"
+          title="Waktu berjalan kontinu (tidak reset saat restart)"
+        >
+          <span class="lbl">UPTIME:</span>
+          <span class="val num">{formatUptime(arena.uptime)}</span>
+        </div>
+      </div>
+
+      <!-- Copy-Trade API Trigger Button -->
+      <button
+        class="btn-copy-trade"
+        onclick={() => (arena.copyTradeModalOpen = true)}
+        title="Buka panduan & API Key untuk menyalin sinyal trading"
+      >
+        <svg
+          class="btn-icon-svg"
+          viewBox="0 0 24 24"
+          width="13"
+          height="13"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+        </svg>
+        <span class="btn-text">Copy-Trade API</span>
+      </button>
+
+      <!-- Hamburger Button (Mobile / Tablet Only) -->
+      <button
+        type="button"
+        class="hamburger-btn"
+        class:active={mobileMenuOpen}
+        onclick={() => (mobileMenuOpen = !mobileMenuOpen)}
+        aria-label={mobileMenuOpen ? 'Tutup navigasi' : 'Buka menu terminal'}
+      >
+        {#if mobileMenuOpen}
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        {:else}
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="4" y1="7" x2="20" y2="7"></line>
+            <line x1="4" y1="12" x2="20" y2="12"></line>
+            <line x1="4" y1="17" x2="20" y2="17"></line>
+          </svg>
+        {/if}
+      </button>
+    </div>
+  </div>
+
+  <!-- Row 2: Dedicated Market Switcher Navigation Row (Desktop / Laptop) -->
+  <div class="header-nav-row desktop-nav-row">
+    <nav class="market-switcher" aria-label="Market Mode Selection">
       <button
         class="switcher-btn {arena.currentRoute === 'spot' ? 'active-spot' : ''}"
         onclick={() => handleModeChange("spot")}
@@ -143,85 +225,6 @@
         <span class="tag-soon">Segera</span>
       </div>
     </nav>
-  </div>
-
-  <div class="header-right">
-    <!-- Live Feed Telemetry Pill (Desktop/Tablet) -->
-    <div class="telemetry-pill">
-      <span class="live-status {arena.connected ? 'online' : 'offline'}">
-        <span class="pulse-ring"></span>
-        <span class="status-dot"></span>
-        <span class="status-text"
-          >{arena.connected ? "" : "RECONNECTING"}</span
-        >
-      </span>
-
-      <span class="telemetry-divider"></span>
-
-      <!-- Database Size Badge -->
-      <div
-        class="db-size-badge"
-        title="Ukuran total penyimpanan database PostgreSQL ($PGDATA: data tabel, indeks & WAL)"
-      >
-        <span class="lbl">DB:</span>
-        <span class="val num">{arena.dbSize}</span>
-      </div>
-
-      <span class="telemetry-divider"></span>
-
-      <!-- Continuous Uptime Clock -->
-      <div
-        class="uptime-badge"
-        title="Waktu berjalan kontinu (tidak reset saat restart)"
-      >
-        <span class="lbl">UPTIME:</span>
-        <span class="val num">{formatUptime(arena.uptime)}</span>
-      </div>
-    </div>
-
-    <!-- Copy-Trade API Trigger Button -->
-    <button
-      class="btn-copy-trade"
-      onclick={() => (arena.copyTradeModalOpen = true)}
-      title="Buka panduan & API Key untuk menyalin sinyal trading"
-    >
-      <svg
-        class="btn-icon-svg"
-        viewBox="0 0 24 24"
-        width="13"
-        height="13"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2.2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      >
-        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-      </svg>
-      <span class="btn-text">Copy-Trade API</span>
-    </button>
-
-    <!-- Hamburger Button (Mobile Only) -->
-    <button
-      type="button"
-      class="hamburger-btn"
-      class:active={mobileMenuOpen}
-      onclick={() => (mobileMenuOpen = !mobileMenuOpen)}
-      aria-label={mobileMenuOpen ? 'Tutup navigasi' : 'Buka menu terminal'}
-    >
-      {#if mobileMenuOpen}
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="18" y1="6" x2="6" y2="18"></line>
-          <line x1="6" y1="6" x2="18" y2="18"></line>
-        </svg>
-      {:else}
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="4" y1="7" x2="20" y2="7"></line>
-          <line x1="4" y1="12" x2="20" y2="12"></line>
-          <line x1="4" y1="17" x2="20" y2="17"></line>
-        </svg>
-      {/if}
-    </button>
   </div>
 
   <!-- Mobile Drawer Menu Dropdown -->
@@ -335,25 +338,24 @@
 <style>
   .header-root {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 18px;
+    flex-direction: column;
+    padding: 10px 20px 8px;
     background-color: var(--bg-surface);
     border-bottom: 1px solid var(--border-subtle);
-    gap: 14px;
+    gap: 8px;
     position: sticky;
     top: 0;
     z-index: 50;
     backdrop-filter: blur(8px);
-    flex-wrap: nowrap;
   }
 
-  .header-left {
+  /* Row 1: Brand & Identity | Telemetry & Actions */
+  .header-top-bar {
     display: flex;
     align-items: center;
-    gap: 18px;
-    flex-wrap: nowrap;
-    flex-shrink: 0;
+    justify-content: space-between;
+    width: 100%;
+    gap: 16px;
   }
 
   .brand-link {
@@ -362,6 +364,7 @@
     gap: 10px;
     text-decoration: none;
     color: inherit;
+    flex-shrink: 0;
   }
 
   .brand-emblem {
@@ -388,13 +391,29 @@
     color: var(--fg-muted);
   }
 
-  /* Market Switcher (Desktop) */
-  .market-switcher {
+  .header-top-right {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+
+  /* Row 2: Dedicated Market Switcher Nav Row */
+  .header-nav-row {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding-top: 4px;
+    border-top: 1px solid rgba(255, 255, 255, 0.04);
+  }
+
+  /* Market Switcher */
+  .market-switcher {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     background-color: var(--bg-base);
-    padding: 3px;
+    padding: 3px 4px;
     border-radius: 8px;
     border: 1px solid var(--border-subtle);
   }
@@ -403,12 +422,13 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 6px 12px;
+    padding: 6px 14px;
     border-radius: 6px;
     font-size: 12.5px;
     font-weight: 600;
     color: var(--fg-secondary);
     transition: all 0.15s ease;
+    white-space: nowrap;
   }
 
   .switcher-btn:hover:not(.disabled) {
@@ -481,14 +501,7 @@
     text-transform: uppercase;
   }
 
-  /* Right Section */
-  .header-right {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-shrink: 0;
-  }
-
+  /* Telemetry Pill */
   .telemetry-pill {
     display: inline-flex;
     align-items: center;
@@ -877,87 +890,23 @@
     to { transform: translateY(0); opacity: 1; }
   }
 
-  /* Laptop / Mid-size desktop optimization (e.g. 1024px, 1100px, 1200px) */
-  @media (max-width: 1280px) and (min-width: 901px) {
-    .header-root {
-      padding: 8px 12px;
-      gap: 10px;
-    }
-    .header-left {
-      gap: 10px;
-    }
-    .brand-sub {
-      display: none;
-    }
-    .brand-title {
-      font-size: 14px;
-    }
-    .market-switcher {
-      gap: 3px;
-      padding: 2px;
-    }
-    .switcher-btn {
-      padding: 4px 8px;
-      font-size: 11px;
-      gap: 5px;
-    }
-    .switcher-btn.disabled {
-      display: none !important;
-    }
-    .header-right {
-      gap: 8px;
-    }
-    .telemetry-pill {
-      gap: 6px;
-      padding: 0 8px;
-      height: 32px;
-      font-size: 10px;
-    }
-    .uptime-badge .lbl,
-    .db-size-badge .lbl {
-      font-size: 9px;
-    }
-    .btn-copy-trade {
-      padding: 0 10px;
-      height: 32px;
-      font-size: 11px;
-      gap: 4px;
-    }
-  }
-
-  /* Tablet & Mobile: Hide top telemetry pill, terminal switcher -> Hamburger */
+  /* Tablet & Mobile: Hide row 2 (dedicated nav row) & top telemetry, use Hamburger */
   @media (max-width: 900px) {
     .header-root {
-      flex-direction: row;
-      align-items: center;
-      justify-content: space-between;
       padding: 10px 14px;
+      gap: 0;
+    }
+    .header-top-bar {
       gap: 12px;
     }
-    .header-left {
-      flex-direction: row;
-      align-items: center;
-      gap: 12px;
-      width: auto;
+    .header-nav-row {
+      display: none !important;
     }
-    .brand-link {
-      width: auto;
-      justify-content: flex-start;
-    }
-    .market-switcher {
+    .header-top-right .telemetry-pill {
       display: none !important;
     }
     .hamburger-btn {
       display: flex;
-    }
-    .header-right {
-      width: auto;
-      border-top: none;
-      padding-top: 0;
-      gap: 8px;
-    }
-    .header-right .telemetry-pill {
-      display: none !important;
     }
   }
 

@@ -78,19 +78,19 @@
         <div class="pos-grid">
           <div class="grid-item">
             <span class="lbl">ENTRY</span>
-            <span class="val num">${formatPrice(pos.entry_price)}</span>
+            <span class="val num">${formatPrice(pos.entry_price, null, pos.symbol)}</span>
           </div>
           <div class="grid-item">
             <span class="lbl">MARK</span>
-            <span class="val num">${formatPrice(mark)}</span>
+            <span class="val num">${formatPrice(mark, null, pos.symbol)}</span>
           </div>
           <div class="grid-item">
             <span class="lbl">TP</span>
-            <span class="val num text-up">{pos.take_profit ? `$${formatPrice(pos.take_profit)}` : '---'}</span>
+            <span class="val num text-up">{pos.take_profit ? `$${formatPrice(pos.take_profit, null, pos.symbol)}` : '---'}</span>
           </div>
           <div class="grid-item">
             <span class="lbl">SL</span>
-            <span class="val num text-down">{pos.stop_loss ? `$${formatPrice(pos.stop_loss)}` : '---'}</span>
+            <span class="val num text-down">{pos.stop_loss ? `$${formatPrice(pos.stop_loss, null, pos.symbol)}` : '---'}</span>
           </div>
         </div>
 

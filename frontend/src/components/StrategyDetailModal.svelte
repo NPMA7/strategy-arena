@@ -892,8 +892,8 @@
                           {tr.leverage || 1}x
                         {/if}
                       </td>
-                      <td class="r mono">{formatPrice(tr.entry)}</td>
-                      <td class="r mono">{formatPrice(tr.exit)}</td>
+                      <td class="r mono">{formatPrice(tr.entry, null, tr.symbol)}</td>
+                      <td class="r mono">{formatPrice(tr.exit, null, tr.symbol)}</td>
                       <td class="r mono {isWin ? 'up' : 'down'}">
                         <b>{isWin ? '+' : ''}{formatUSD(tr.pnl)}</b>
                       </td>

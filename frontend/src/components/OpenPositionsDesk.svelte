@@ -108,12 +108,12 @@
               {:else}
                 <td class="mono muted">{p.leverage}x</td>
               {/if}
-              <td class="r mono">{formatPrice(p.entry)}</td>
-              <td class="r mono">{formatPrice(currentMark)}</td>
+              <td class="r mono">{formatPrice(p.entry, null, p.symbol)}</td>
+              <td class="r mono">{formatPrice(currentMark, null, p.symbol)}</td>
               <td class="r mono font-bold {isUp ? 'up' : 'down'}">
                 {formatUSD(liveUpnl)}
               </td>
-              <td class="r mono muted">{p.stop ? formatPrice(p.stop) : '—'}</td>
+              <td class="r mono muted">{p.stop ? formatPrice(p.stop, null, p.symbol) : '—'}</td>
             </tr>
           {/each}
         </tbody>

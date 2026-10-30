@@ -13,10 +13,25 @@ export function formatPercent(v, withSign = true) {
   return `${sign}${num.toFixed(2)}%`;
 }
 
-export function formatPrice(p, maxDecimals = null) {
+export function formatPrice(p, maxDecimals = null, symbol = null) {
   if (p === null || p === undefined || isNaN(p)) return '0.00';
   const num = Number(p);
   if (maxDecimals !== null) return num.toFixed(maxDecimals);
+  const sym = (symbol || '').toUpperCase();
+  if (sym) {
+    const is3Dec = sym.includes('JPY') ||
+                   sym.includes('XAU') ||
+                   sym.includes('GOLD') ||
+                   sym.includes('XAG') ||
+                   sym.includes('SILVER') ||
+                   sym.includes('XTI') ||
+                   sym.includes('OIL') ||
+                   sym.includes('USOIL');
+    if (is3Dec) return num.toFixed(3);
+    if (sym.length === 6 && (sym.endsWith('USD') || sym.endsWith('EUR') || sym.endsWith('GBP') || sym.endsWith('AUD') || sym.endsWith('NZD') || sym.endsWith('CAD') || sym.endsWith('CHF'))) {
+      return num.toFixed(5);
+    }
+  }
   if (num >= 1000) return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   if (num >= 200) return num.toFixed(2);
   if (num >= 20) return num.toFixed(3);

@@ -437,15 +437,23 @@ class DB:
             fut_pos = await con.fetch("SELECT * FROM positions WHERE mode = 'futures'")
             forex_pos = await con.fetch("SELECT * FROM positions WHERE mode = 'forex'")
 
-            # 60 titik ekuitas terakhir per strategi
-            cutoff = int(time.time() * 1000) - 2 * 3600 * 1000
+            # Kurva ekuitas rentang 24 jam terakhir per strategi (disampling setiap 30 menit = ~48 titik)
+            cutoff_24h = int(time.time() * 1000) - 24 * 3600 * 1000
             curve_rows = await con.fetch(
-                "SELECT strategy, mode, ts, equity FROM equity_curve WHERE ts > $1 ORDER BY strategy, mode, ts",
-                cutoff
+                """SELECT strategy, mode, ts, equity
+                   FROM (
+                       SELECT strategy, mode, ts, equity,
+                              ROW_NUMBER() OVER (PARTITION BY strategy, mode, ts / 1800000 ORDER BY ts ASC) as rn
+                       FROM equity_curve
+                       WHERE ts >= $1
+                   ) s
+                   WHERE rn = 1
+                   ORDER BY mode, strategy, ts ASC""",
+                cutoff_24h,
             )
-            spot_curves: dict[str, list[float]] = {}
-            fut_curves: dict[str, list[float]] = {}
-            forex_curves: dict[str, list[float]] = {}
+            spot_curves: dict[str, list[list]] = {}
+            fut_curves: dict[str, list[list]] = {}
+            forex_curves: dict[str, list[list]] = {}
             for r in curve_rows:
                 m = r["mode"]
                 sid = r["strategy"]
@@ -455,7 +463,7 @@ class DB:
                     target = fut_curves
                 else:
                     target = spot_curves
-                target.setdefault(sid, []).append(r["equity"])
+                target.setdefault(sid, []).append([int(r["ts"]), round(float(r["equity"]), 2)])
 
         return {
             "spot_accounts": [dict(r) for r in spot_accts],
@@ -578,10 +586,18 @@ class DB:
             events = await con.fetch(
                 "SELECT ts, strats, symbol, kind, message FROM events ORDER BY ts DESC LIMIT 60"
             )
+            cutoff_24h = int(time.time() * 1000) - 24 * 3600 * 1000
             curves = await con.fetch(
-                """SELECT strategy, mode, ts, equity FROM equity_curve
-                   WHERE ts > $1 ORDER BY strategy, mode, ts""",
-                int(time.time() * 1000) - 24 * 3600 * 1000,
+                """SELECT strategy, mode, ts, equity
+                   FROM (
+                       SELECT strategy, mode, ts, equity,
+                              ROW_NUMBER() OVER (PARTITION BY strategy, mode, ts / 1800000 ORDER BY ts ASC) as rn
+                       FROM equity_curve
+                       WHERE ts >= $1
+                   ) s
+                   WHERE rn = 1
+                   ORDER BY strategy, mode, ts ASC""",
+                cutoff_24h,
             )
         return {
             "pairs": [dict(r) for r in pairs],

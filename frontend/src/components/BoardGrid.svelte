@@ -118,33 +118,74 @@
     return list;
   });
 
-  // Calculate SVG sparkline path from curve numbers
-  function calculateSpark(id, equity) {
-    const pts = curves[id] || [];
+  // Calculate SVG sparkline path from curve numbers with a precise 24-hour range
+  function calculateSpark(id, curBal) {
+    const raw = curves[id] || [];
     const width = 180;
     const height = 22;
+    const now = Date.now();
+    const windowMs = 24 * 3600 * 1000;
+    const baseEq = arena.startEquity || 1000;
+    const liveBal = typeof curBal === 'number' ? curBal : baseEq;
 
-    if (!pts || pts.length < 2) {
-      // Flat baseline at current equity
-      const y = height / 2;
-      return {
-        path: `M 0,${y} L ${width},${y}`,
-        area: `M 0,${y} L ${width},${y} L ${width},${height} L 0,${height} Z`,
-        lastX: width,
-        lastY: y,
-      };
+    // Normalize points array
+    let pts = [];
+    if (Array.isArray(raw) && raw.length > 0) {
+      pts = raw.map((p, idx) => {
+        if (Array.isArray(p) && p.length >= 2) {
+          return { ts: Number(p[0]), equity: Number(p[1]) };
+        } else if (p && typeof p === 'object' && 'ts' in p && 'equity' in p) {
+          return { ts: Number(p.ts), equity: Number(p.equity) };
+        } else {
+          const val = typeof p === 'number' ? p : Number(p) || baseEq;
+          const fakeTs = now - windowMs + (idx / Math.max(raw.length - 1, 1)) * windowMs;
+          return { ts: fakeTs, equity: val };
+        }
+      }).sort((a, b) => a.ts - b.ts);
     }
 
-    // Extract raw numbers
-    const vals = pts.map((p) => (Array.isArray(p) ? p[1] : (typeof p === 'number' ? p : p.equity || arena.startEquity)));
-    const min = Math.min(...vals);
-    const max = Math.max(...vals);
-    const range = max - min || 1;
-    const step = width / (vals.length - 1);
+    if (pts.length === 0) {
+      pts = [
+        { ts: now - windowMs, equity: baseEq },
+        { ts: now, equity: liveBal },
+      ];
+    }
 
-    const coords = vals.map((val, i) => {
-      const x = i * step;
-      const y = height - 3 - ((val - min) / range) * (height - 6);
+    // Always ensure current live balance is attached at now
+    const lastPt = pts[pts.length - 1];
+    if (now - lastPt.ts > 4000 || Math.abs(liveBal - lastPt.equity) > 0.01) {
+      pts.push({ ts: now, equity: liveBal });
+    }
+
+    const endTs = Math.max(now, pts[pts.length - 1].ts);
+    const earliestDataTs = pts[0].ts;
+
+    // Rentang waktu 24 jam konsisten dengan StrategyDossier
+    const startTs = Math.max(endTs - windowMs, earliestDataTs);
+    const spanMs = Math.max(endTs - startTs, 60000);
+
+    // Filter titik dalam jendela 24 jam
+    pts = pts.filter((p) => p.ts >= startTs);
+    if (pts.length === 0) {
+      pts = [{ ts: startTs, equity: liveBal }, { ts: endTs, equity: liveBal }];
+    }
+    // Pastikan ada titik di startTs agar kurva membentang dari paling kiri
+    if (pts[0].ts > startTs + 60000) {
+      pts.unshift({ ts: startTs, equity: pts[0].equity });
+    }
+
+    // Skala Y konsisten dengan StrategyDossier (menyertakan baseline modal awal & padding)
+    const equities = pts.map((p) => p.equity);
+    let minV = Math.min(...equities, baseEq * 0.995);
+    let maxV = Math.max(...equities, baseEq * 1.005);
+    const vSpan = maxV - minV || 50;
+    minV = minV - vSpan * 0.08;
+    maxV = maxV + vSpan * 0.08;
+    const range = maxV - minV;
+
+    const coords = pts.map((p) => {
+      const x = Math.max(0, Math.min(1, (p.ts - startTs) / spanMs)) * width;
+      const y = height - 3 - Math.max(0, Math.min(1, (p.equity - minV) / range)) * (height - 6);
       return [x, y];
     });
 

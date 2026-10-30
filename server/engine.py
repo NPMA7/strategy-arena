@@ -150,8 +150,13 @@ class Engine:
         self.signals: list[dict] = []
         self.new_signals: list[dict] = []
         self.curve: dict[str, list[tuple[int, float]]] = {sid: [] for sid in self.strategy_ids}
-        self.sparklines: dict[str, list[float]] = {sid: [START_EQUITY] for sid in self.strategy_ids}
-        self.last_funding_ts = int(time.time() * 1000)
+        now_ms = int(time.time() * 1000)
+        start_24h = now_ms - 24 * 3600 * 1000
+        self.sparklines: dict[str, list] = {
+            sid: [[start_24h, START_EQUITY], [now_ms, START_EQUITY]]
+            for sid in self.strategy_ids
+        }
+        self.last_funding_ts = now_ms
         self._last_spark_time = 0.0
         self.started = time.time()
         self.bars_processed = 0
@@ -205,9 +210,20 @@ class Engine:
                 }
 
         if curves:
+            now_ms = int(time.time() * 1000)
+            cutoff_24h = now_ms - 24 * 3600 * 1000
             for sid, pts in curves.items():
                 if sid in self.sparklines and pts:
-                    self.sparklines[sid] = [float(x) for x in pts][-60:]
+                    norm_pts = []
+                    for p in pts:
+                        if isinstance(p, (list, tuple)) and len(p) >= 2:
+                            norm_pts.append([int(p[0]), round(float(p[1]), 2)])
+                        elif isinstance(p, (int, float)):
+                            norm_pts.append([now_ms, float(p)])
+                    if norm_pts:
+                        if norm_pts[0][0] > cutoff_24h + 60000:
+                            norm_pts.insert(0, [cutoff_24h, START_EQUITY])
+                        self.sparklines[sid] = norm_pts
 
     def _get_price(self, symbol: str, fallback: float = 0.0) -> float:
         """Ambil harga close terakhir dari ring buffer dengan fallback aman jika pair belum ada di feed."""
@@ -329,11 +345,10 @@ class Engine:
         acct["max_dd"] = 1.0  # Tercatat pernah drawdown 100%
 
         # Update sparkline agar visualisasi menunjukkan penurunan ke 0 dan refill ke $1.000
+        now_ms = int(time.time() * 1000)
         if sid in self.sparklines:
-            self.sparklines[sid].append(0.0)
-            self.sparklines[sid].append(START_EQUITY)
-            if len(self.sparklines[sid]) > 60:
-                self.sparklines[sid] = self.sparklines[sid][-60:]
+            self.sparklines[sid].append([now_ms - 1000, 0.0])
+            self.sparklines[sid].append([now_ms, START_EQUITY])
 
         # 3. Kirim notifikasi event ke feed realtime
         mode_str = self.mode.upper()
@@ -719,11 +734,29 @@ class Engine:
             bal = round(a["cash"], 2)
             if record_spark:
                 hist = self.sparklines[sid]
-                # Rekam perkembangan kurva saldo bersih terealisasi (Balance)
-                if not hist or abs(hist[-1] - bal) > 0.01 or len(hist) < 2:
-                    hist.append(bal)
-                    if len(hist) > 60:
+                now_ms = int(now * 1000)
+                cutoff_24h = now_ms - 24 * 3600 * 1000
+
+                last_ts = hist[-1][0] if (hist and isinstance(hist[-1], (list, tuple))) else 0
+                last_val = hist[-1][1] if (hist and isinstance(hist[-1], (list, tuple))) else (hist[-1] if hist else START_EQUITY)
+
+                # Rekam perkembangan kurva saldo bersih terealisasi (Balance) jika ada trade exit atau per 10 menit
+                if not hist or abs(last_val - bal) > 0.01 or (now_ms - last_ts >= 600_000):
+                    hist.append([now_ms, bal])
+
+                    # Prune titik yang lebih tua dari 24 jam (tetap jaga minimal 2 titik)
+                    while len(hist) > 2 and isinstance(hist[0], (list, tuple)) and hist[0][0] < cutoff_24h:
                         hist.pop(0)
+
+                    # Pastikan titik awal di cutoff_24h jika titik pertama lebih baru
+                    if hist and isinstance(hist[0], (list, tuple)) and hist[0][0] > cutoff_24h + 60000:
+                        hist.insert(0, [cutoff_24h, hist[0][1]])
+
+                    # Batasi maksimal 96 titik per strategi untuk menjaga performa
+                    if len(hist) > 96:
+                        step = len(hist) // 64 + 1
+                        hist = [hist[0]] + hist[1:-1:step] + [hist[-1]]
+                        self.sparklines[sid] = hist
 
             accts.append({
                 "id": sid, "name": a["name"], "family": a["family"], "color": a["color"],

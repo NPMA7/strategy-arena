@@ -337,21 +337,23 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 20px;
+    padding: 8px 18px;
     background-color: var(--bg-surface);
     border-bottom: 1px solid var(--border-subtle);
-    gap: 16px;
+    gap: 14px;
     position: sticky;
     top: 0;
     z-index: 50;
     backdrop-filter: blur(8px);
+    flex-wrap: nowrap;
   }
 
   .header-left {
     display: flex;
     align-items: center;
-    gap: 24px;
-    flex-wrap: wrap;
+    gap: 18px;
+    flex-wrap: nowrap;
+    flex-shrink: 0;
   }
 
   .brand-link {
@@ -483,27 +485,34 @@
   .header-right {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
+    flex-shrink: 0;
   }
 
   .telemetry-pill {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 10px;
     background-color: var(--bg-base);
-    padding: 5px 12px;
+    padding: 0 12px;
+    height: 34px;
     border-radius: 6px;
     border: 1px solid var(--border-subtle);
     font-size: 11.5px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    box-sizing: border-box;
   }
 
   .live-status {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 6px;
     position: relative;
     font-weight: 600;
     letter-spacing: 0.03em;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 
   .live-status.online {
@@ -519,6 +528,7 @@
     height: 7px;
     border-radius: 50%;
     background-color: currentColor;
+    flex-shrink: 0;
   }
 
   .pulse-ring {
@@ -543,41 +553,55 @@
     width: 1px;
     height: 12px;
     background: var(--border-muted);
+    flex-shrink: 0;
   }
 
   .uptime-badge {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 5px;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 
   .uptime-badge .lbl {
     color: var(--fg-muted);
     font-size: 10px;
     font-weight: 600;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
   }
 
   .uptime-badge .val {
     color: var(--fg-primary);
     font-weight: 600;
+    font-family: var(--font-mono, monospace);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
 
   .db-size-badge {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 5px;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 
   .db-size-badge .lbl {
     color: var(--fg-muted);
     font-size: 10px;
     font-weight: 600;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
   }
 
   .db-size-badge .val {
     color: #38bdf8;
     font-weight: 700;
     font-family: var(--font-mono, monospace);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
 
   /* Copy-Trade Button */
@@ -585,15 +609,18 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 14px;
+    padding: 0 13px;
+    height: 34px;
     border-radius: 6px;
     background: rgba(245, 158, 11, 0.08);
     border: 1px solid var(--border-amber);
     color: var(--color-amber);
-    font-size: 12.5px;
+    font-size: 12px;
     font-weight: 600;
     transition: all 0.2s ease;
     white-space: nowrap;
+    flex-shrink: 0;
+    box-sizing: border-box;
   }
 
   .btn-copy-trade:hover {
@@ -850,6 +877,34 @@
     to { transform: translateY(0); opacity: 1; }
   }
 
+  /* Laptop / Mid-size desktop optimization (e.g. 1024px, 1100px) */
+  @media (max-width: 1200px) and (min-width: 901px) {
+    .header-root {
+      padding: 8px 14px;
+      gap: 10px;
+    }
+    .header-left {
+      gap: 12px;
+    }
+    .switcher-btn {
+      padding: 5px 8px;
+      font-size: 11.5px;
+      gap: 6px;
+    }
+    .telemetry-pill {
+      gap: 8px;
+      padding: 0 9px;
+      height: 32px;
+      font-size: 10.5px;
+    }
+    .btn-copy-trade {
+      padding: 0 10px;
+      height: 32px;
+      font-size: 11.5px;
+    }
+  }
+
+  /* Tablet & Mobile: Hide top telemetry pill, terminal switcher -> Hamburger */
   @media (max-width: 900px) {
     .header-root {
       flex-direction: row;
@@ -880,11 +935,8 @@
       padding-top: 0;
       gap: 8px;
     }
-  }
-
-  @media (max-width: 640px) {
     .header-right .telemetry-pill {
-      display: none;
+      display: none !important;
     }
   }
 

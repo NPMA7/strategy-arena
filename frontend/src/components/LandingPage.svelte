@@ -616,9 +616,6 @@
               class="drawer-nav-item item-spot"
               onclick={() => { mobileMenuOpen = false; enterTerminal('spot'); }}
             >
-              <div class="drawer-icon icon-spot">
-                <span class="dot-spot"></span>
-              </div>
               <div class="drawer-item-info">
                 <span class="item-name">Terminal Spot</span>
                 <span class="item-desc">Binance Crypto Spot (No-Leverage)</span>
@@ -631,9 +628,6 @@
               class="drawer-nav-item item-futures"
               onclick={() => { mobileMenuOpen = false; enterTerminal('futures'); }}
             >
-              <div class="drawer-icon icon-futures">
-                <span class="dot-futures"></span>
-              </div>
               <div class="drawer-item-info">
                 <span class="item-name">Terminal Futures</span>
                 <span class="item-desc">Binance Perpetual (Leverage 1–20x)</span>
@@ -646,9 +640,6 @@
               class="drawer-nav-item item-forex"
               onclick={() => { mobileMenuOpen = false; enterTerminal('forex'); }}
             >
-              <div class="drawer-icon icon-forex">
-                <span class="dot-forex"></span>
-              </div>
               <div class="drawer-item-info">
                 <span class="item-name">Terminal Forex & Metals</span>
                 <span class="item-desc">MT5 Direct Feed & Eksekusi</span>
@@ -661,9 +652,6 @@
               class="drawer-nav-item item-neural"
               onclick={() => { mobileMenuOpen = false; arena.navigate('/neural-execution'); }}
             >
-              <div class="drawer-icon icon-neural">
-                <span class="dot-neural"></span>
-              </div>
               <div class="drawer-item-info">
                 <span class="item-name">Neural Execution</span>
                 <span class="item-desc">Visual 3D Matrix & Realtime Trade Feed</span>

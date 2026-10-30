@@ -230,6 +230,101 @@
             class="drawer-nav-item item-spot {arena.currentRoute === 'spot' ? 'active-item' : ''}"
             onclick={() => handleNav('spot')}
           >
+            <div class="drawer-item-info">
+              <span class="item-name">Terminal Spot</span>
+              <span class="item-desc">Binance Crypto Spot (No-Leverage)</span>
+            </div>
+            {#if arena.currentRoute === 'spot'}
+              <span class="active-badge spot">AKTIF</span>
+            {/if}
+            <svg class="chevron-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+
+          <button
+            type="button"
+            class="drawer-nav-item item-futures {arena.currentRoute === 'futures' ? 'active-item' : ''}"
+            onclick={() => handleNav('futures')}
+          >
+            <div class="drawer-item-info">
+              <span class="item-name">Terminal Futures</span>
+              <span class="item-desc">Binance Perpetual (Leverage 1–20x)</span>
+            </div>
+            {#if arena.currentRoute === 'futures'}
+              <span class="active-badge futures">AKTIF</span>
+            {/if}
+            <svg class="chevron-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+
+          <button
+            type="button"
+            class="drawer-nav-item item-forex {arena.currentRoute === 'forex' ? 'active-item' : ''}"
+            onclick={() => handleNav('forex')}
+          >
+            <div class="drawer-item-info">
+              <span class="item-name">Terminal Forex & Metals</span>
+              <span class="item-desc">MT5 Direct Feed & Eksekusi Headway</span>
+            </div>
+            {#if arena.currentRoute === 'forex'}
+              <span class="active-badge forex">AKTIF</span>
+            {/if}
+            <svg class="chevron-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+
+          <button
+            type="button"
+            class="drawer-nav-item item-neural {arena.currentRoute === 'executions' ? 'active-item' : ''}"
+            onclick={() => handleNav('executions')}
+          >
+            <div class="drawer-item-info">
+              <span class="item-name">Neural Execution</span>
+              <span class="item-desc">Visual 3D Matrix & Realtime Trade Feed</span>
+            </div>
+            {#if arena.currentRoute === 'executions'}
+              <span class="active-badge neural">AKTIF</span>
+            {/if}
+            <svg class="chevron-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+        </div>
+
+        <div class="drawer-footer">
+          <div class="drawer-telemetry-row">
+            <span class="live-status {arena.connected ? 'online' : 'offline'}">
+              <span class="status-dot"></span>
+              <span class="status-text">{arena.connected ? 'SYSTEM ONLINE' : 'RECONNECTING'}</span>
+            </span>
+            <span class="telemetry-divider"></span>
+            <div class="uptime-badge">
+              <span class="lbl">UPTIME:</span>
+              <span class="val num">{formatUptime(arena.uptime)}</span>
+            </div>
+            <span class="telemetry-divider"></span>
+            <div class="db-size-badge">
+              <span class="lbl">DB:</span>
+              <span class="val num">{arena.dbSize}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  <!-- Mobile Drawer Menu Dropdown -->
+  {#if mobileMenuOpen}
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="mobile-drawer-backdrop" onclick={() => (mobileMenuOpen = false)}>
+      <div class="mobile-drawer-content" onclick={(e) => e.stopPropagation()}>
+        <div class="drawer-header">
+          <span class="drawer-title mono">PILIH TERMINAL ARENA</span>
+          <span class="drawer-sub">Multi-Asset Quantitative Benchmark</span>
+        </div>
+
+        <div class="drawer-nav-list">
+          <button
+            type="button"
+            class="drawer-nav-item item-spot {arena.currentRoute === 'spot' ? 'active-item' : ''}"
+            onclick={() => handleNav('spot')}
+          >
             <div class="drawer-icon icon-spot">
               <span class="dot-spot"></span>
             </div>

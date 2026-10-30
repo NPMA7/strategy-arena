@@ -224,7 +224,7 @@ def _sync_fetch_ticks(conn):
 
 
 async def tick_updater_loop():
-    """Background polling loop yang mengambil harga live MT5 langsung dari broker Headway."""
+    """Background polling loop yang mengambil harga live MT5 langsung dari broker."""
     global _rpyc_conn
     while True:
         try:
@@ -300,7 +300,7 @@ async def handle_health(request):
         "account": cached_account_info.get("login") or 6310591,
         "balance": cached_account_info.get("balance", 0.0),
         "broker": "Headway",
-        "live_feed": "MetaTrader 5 Real-Time Price Bridge (Headway)",
+        "live_feed": "MetaTrader 5 Real-Time Price Bridge",
         "connected": True,
         "mt5_live_connected": cached_account_info.get("connected", False),
         "symbols_count": len(current_ticks),
@@ -362,5 +362,5 @@ async def init_app():
 
 if __name__ == "__main__":
     app = init_app()
-    log.info("MT5 Headway Bridge Server running on http://0.0.0.0:%d", PORT)
+    log.info("MT5 Bridge Server running on http://0.0.0.0:%d", PORT)
     web.run_app(app, host="0.0.0.0", port=PORT)

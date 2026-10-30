@@ -37,7 +37,7 @@
   <div class="phead">
     <h2>Pasar</h2>
     <span class="sub muted">
-      {pairs.length} pair {isForex ? 'Forex & Metals' : 'USDT'} · {isForex ? 'MT5 Headway Live (Bid / Ask / Spread)' : 'peringkat volume 24 jam'} · tiles: {pairs.length}
+      {pairs.length} pair {isForex ? 'Forex & Metals' : 'USDT'} · {isForex ? 'MT5 Live (Bid / Ask / Spread)' : 'peringkat volume 24 jam'} · tiles: {pairs.length}
     </span>
   </div>
 

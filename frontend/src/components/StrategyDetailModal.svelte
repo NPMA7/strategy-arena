@@ -786,7 +786,7 @@
             <div class="stat-card">
               <span class="s-label mono">{arena.mode === 'forex' ? 'EXECUTION & SPREAD' : 'LEVERAGE & MARGIN'}</span>
               <b class="s-val mono">{arena.mode === 'forex' ? 'MT5 Direct' : `${deepStats.leverage}x`}</b>
-              <span class="s-sub mono">{arena.mode === 'forex' ? 'MetaTrader 5 Direct (Live Headway Feed)' : (arena.mode === 'futures' ? 'Binance Futures (Funding 8h)' : 'Binance Spot (No-Loan)')}</span>
+              <span class="s-sub mono">{arena.mode === 'forex' ? 'MetaTrader 5 Direct (Live Feed)' : (arena.mode === 'futures' ? 'Binance Futures (Funding 8h)' : 'Binance Spot (No-Loan)')}</span>
             </div>
 
             <!-- Box 12: Margin Call Counter -->

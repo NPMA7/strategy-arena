@@ -16,7 +16,7 @@ Dirancang dengan standar visual **Institutional Craft** (Anti-AI-Slop, *function
 ┌────────────────────────────────────────────────────────────────────────┐
 │                   Market Feeds (Binance & MT5 Bridge)                  │
 │       • 100 Pair USDT Spot & Futures Streams (Binance WS/REST)         │
-│       • 28 Pair Forex & Logam Mulia (MT5 Headway Direct Bridge)        │
+│       • 28 Pair Forex & Logam Mulia (MT5 Direct Bridge)        │
 └───────────────────────────────────┬────────────────────────────────────┘
                                     │ Ring Buffer (250+ bar 1m)
                                     ▼
@@ -57,7 +57,7 @@ Dirancang dengan standar visual **Institutional Craft** (Anti-AI-Slop, *function
 - **Spot Engine (39 Strategi)**: Fokus pada akumulasi spot, rotasi swing, dan *trend following* long-only tanpa risiko likuidasi leverage.
 - **Futures Engine (53 Strategi)**: Mendukung posisi dua arah (**LONG & SHORT**) dengan leverage dinamis proporsional (5x hingga 20x) dan simulasi funding rate.
 - **Forex & Metals Engine (88 Strategi)**:
-  - Terintegrasi langsung dengan terminal MetaTrader 5 Headway Real via RPyC Bridge.
+  - Terintegrasi langsung dengan terminal MetaTrader 5 Real via RPyC Bridge.
   - Memperdagangkan 28 pair mayor, minor, dan logam mulia (**XAUUSD**, EURUSD, GBPUSD, USDJPY, dll.) dengan perhitungan pip dinamis dan spread floating riil.
   - Mendukung micro-lotting 0.01 dan mark-to-market live tick-by-tick.
 
@@ -75,7 +75,7 @@ Dirancang dengan standar visual **Institutional Craft** (Anti-AI-Slop, *function
 - **Three Market Core (3D WebGL)**: Representasi grafis sirkulasi likuiditas dan volatilitas pasar berbasis Three.js.
 
 ### 4. Hub Sinyal Publik & Integrasi Copy-Trading (v1)
-- **Mesin Eksekusi Copy-Trade Resmi**: Untuk menyalin sinyal trading secara langsung ke akun riil broker (Headway MT5, akun Cent maupun Standard), silakan gunakan repositori pendamping resmi [**`sa-copytrade`**](https://github.com/NPMA7/sa-copytrade).
+- **Mesin Eksekusi Copy-Trade Resmi**: Untuk menyalin sinyal trading secara langsung ke akun riil broker (MT5, akun Cent maupun Standard), silakan gunakan repositori pendamping resmi [**`sa-copytrade`**](https://github.com/NPMA7/sa-copytrade).
   - Repositori `sa-copytrade` menyediakan arsitektur bot daemon mandiri, hedging multi-strategi (`ALLOW_HEDGING`), remote command bot Telegram (`/my-posisi`, `/posisi`, `/status`, `/help`), smart fresh-trade reconciliation, dan tampilan GUI MT5 via browser (noVNC).
 - **Dukungan Multi-Strategi Komprehensif**: Endpoint WebSocket `/ws/signals` dan REST `/api/v1/signals/positions` mendukung penyalinan beberapa strategi sekaligus via query koma (contoh: `?strategy=roc_momentum,gap_fill&mode=forex`).
 - **Otentikasi Kunci Publik**: Menggunakan Public Key default `pk_live_strategyarena_public_feed`.

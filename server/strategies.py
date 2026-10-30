@@ -1316,7 +1316,7 @@ for sid in FUTURES_STRATEGIES:
 for sid in FOREX_STRATEGIES:
     assert sid in _all_ids, f"Forex strategy {sid} not in STRATEGIES"
 
-# ── Forex pair selection (28 Pairs sesuai watchlist broker Headway) ─────────
+# ── Forex pair selection (28 Pairs sesuai watchlist broker) ─────────
 FOREX_PAIRS = [
     "XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "USDCAD", "AUDCAD", "AUDJPY",
     "AUDUSD", "EURGBP", "EURAUD", "EURJPY", "EURNZD", "GBPJPY", "GBPAUD",

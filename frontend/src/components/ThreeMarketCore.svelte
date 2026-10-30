@@ -152,7 +152,7 @@
     const bladeGeo = new THREE.BoxGeometry(26, 4, 16);
     const bladeMat = new THREE.MeshPhongMaterial({ color: 0x0f172a, specular: 0x38bdf8 });
     const bladePositionsZ = [-20, 0, 20];
-    const bladePairs = ['BINANCE TICK', 'MT5 HEADWAY', '128+ PAIRS'];
+    const bladePairs = ['BINANCE TICK', 'MT5', '128+ PAIRS'];
     const bladeLeds = [];
 
     bladePositionsZ.forEach((bz, idx) => {

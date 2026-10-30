@@ -651,7 +651,7 @@
               </div>
               <div class="drawer-item-info">
                 <span class="item-name">Terminal Forex & Metals</span>
-                <span class="item-desc">MT5 Direct Feed & Eksekusi Headway</span>
+                <span class="item-desc">MT5 Direct Feed & Eksekusi</span>
               </div>
               <svg class="chevron-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
             </button>

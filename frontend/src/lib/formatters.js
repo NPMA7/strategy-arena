@@ -120,6 +120,9 @@ export function formatTimeAgo(ts) {
 export function calculateForexPips(symbol, entry, mark, side) {
   if (!entry || !mark) return 0;
   const sym = (symbol || '').toUpperCase();
+  if (sym.endsWith('USDT') || sym.endsWith('USDC') || sym.endsWith('BUSD')) {
+    return 0;
+  }
   let pipSize = 0.0001;
   if (sym.includes('JPY') || sym === 'USOIL' || sym.includes('XTI')) {
     pipSize = 0.01;
@@ -135,6 +138,12 @@ export function calculateForexPnl(symbol, entry, mark, side, lot = 0.10, prices 
   const sym = (symbol || '').toUpperCase();
   const sideSign = (side === 'LONG' || side === 1 || side === 'buy') ? 1 : -1;
   const diff = (Number(mark) - Number(entry)) * sideSign;
+
+  // Safety guard: Crypto pairs must NEVER be multiplied by forex contract sizes
+  if (sym.endsWith('USDT') || sym.endsWith('USDC') || sym.endsWith('BUSD')) {
+    return diff * (Number(lot) || 0);
+  }
+
   const numLot = Number(lot) || 0.10;
 
   let cSize = 100000;

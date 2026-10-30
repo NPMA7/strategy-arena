@@ -129,7 +129,8 @@
       const mark = arena.prices[sym] ?? p.mark ?? p.entry;
 
       let upnl = p.upnl;
-      if (p.mode === 'forex') {
+      const isForex = (p.mode === 'forex' || (p.strategy && p.strategy.startsWith('fx_'))) && !sym.endsWith('USDT');
+      if (isForex) {
         const lot = p.lot || 0.10;
         upnl = calculateForexPnl(sym, p.entry, mark, sideLabel, lot, arena.prices);
       } else if (p.qty && mark && p.entry) {

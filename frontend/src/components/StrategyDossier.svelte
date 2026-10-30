@@ -434,7 +434,7 @@
               {#each positions as p (p.strategy + '_' + p.symbol)}
                 {@const currentMark = arena.prices[p.symbol] ?? p.mark ?? p.entry}
                 {@const sideSign = (p.side === 'LONG' || p.side === 1) ? 1 : -1}
-                {@const isPosForex = arena.mode === 'forex' || p.mode === 'forex' || p.lot != null}
+                {@const isPosForex = (arena.mode === 'forex' || p.mode === 'forex' || (p.strategy && p.strategy.startsWith('fx_'))) && !p.symbol.endsWith('USDT')}
                 {@const liveUpnl = isPosForex
                   ? calculateForexPnl(p.symbol, p.entry, currentMark, p.side, p.lot || 0.10, arena.prices)
                   : (p.qty > 0 && currentMark > 0 ? (currentMark - p.entry) * p.qty * sideSign : (p.upnl ?? 0))}
@@ -450,10 +450,10 @@
                     </span>
                   </td>
                   <td class="mono muted">
-                    {#if arena.mode === 'forex'}
-                      {((p.lot != null && Number(p.lot) > 0) ? Number(p.lot).toFixed(2) : (p.qty >= 1000 ? (p.qty / 100000).toFixed(2) : Number(p.qty || 0.10).toFixed(2)))} Lot
+                    {#if isPosForex}
+                      {((p.lot != null && Number(p.lot) > 0) ? Number(p.lot).toFixed(2) : '0.10')} Lot
                     {:else}
-                      {p.leverage}x
+                      {p.leverage || 1}x
                     {/if}
                   </td>
                   <td class="r mono">{formatPrice(p.entry, null, p.symbol)}</td>

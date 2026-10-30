@@ -268,41 +268,50 @@ class ArenaStore {
     }, 1500);
   }
 
-  normalizePosition(p) {
+  normalizePosition(p, explicitMode = null) {
     const sym = p.symbol || '';
     const side = (p.side === 1 || p.side === 'LONG' || p.side === 'buy') ? 'LONG' : 'SHORT';
     const entry = p.entry ?? p.entry_price ?? 0;
     const mark = this.prices[sym] ?? p.mark ?? p.mark_price ?? entry;
     const sideSign = side === 'LONG' ? 1 : -1;
 
-    // Accurate MT5 Lot parsing (never divide an existing lot < 100 by 100)
-    let lot = (p.lot != null && Number(p.lot) > 0) ? Number(p.lot) : null;
-    if (lot == null && p.qty) {
-      const q = Number(p.qty);
-      if (q >= 1000) {
-        lot = Number((q / 100000).toFixed(2));
-      } else if (q > 0) {
-        lot = Number(q.toFixed(2));
+    // Deteksi apakah posisi benar-benar Forex (MT5) atau Crypto (Spot/Futures)
+    const isCrypto = sym.endsWith('USDT') || sym.endsWith('USDC') || sym.endsWith('BUSD');
+    const targetMode = explicitMode || p.mode || (isCrypto ? (this.mode === 'spot' ? 'spot' : 'futures') : this.mode);
+    const isForex = (targetMode === 'forex' || (p.strategy && p.strategy.startsWith('fx_'))) && !isCrypto;
+
+    let lot = null;
+    let upnl = 0;
+
+    if (isForex) {
+      if (p.lot != null && Number(p.lot) > 0) {
+        lot = Number(p.lot);
+      } else if (p.qty) {
+        const q = Number(p.qty);
+        lot = q >= 1000 ? Number((q / 100000).toFixed(2)) : Number(q.toFixed(2));
+      }
+      if (lot == null || lot <= 0) lot = 0.10;
+      upnl = calculateForexPnl(sym, entry, mark, side, lot, this.prices);
+    } else {
+      const qty = Number(p.qty) || 0;
+      if (qty > 0 && mark > 0 && entry > 0) {
+        upnl = (mark - entry) * qty * sideSign;
+      } else {
+        upnl = p.upnl ?? p.pnl ?? 0;
       }
     }
 
-    const isForex = this.mode === 'forex' || p.mode === 'forex' || lot != null || (p.strategy && p.strategy.startsWith('fx_'));
-    let upnl = 0;
-    if (isForex) {
-      upnl = calculateForexPnl(sym, entry, mark, side, lot || 0.10, this.prices);
-    } else {
-      upnl = p.qty > 0 && mark > 0 ? (mark - entry) * p.qty * sideSign : (p.upnl ?? p.pnl ?? 0);
-    }
-    const margin = p.margin_used ?? p.margin ?? p.notional ?? 0;
+    const notional = p.notional ?? (entry > 0 && p.qty ? entry * Number(p.qty) : (p.margin ?? 0));
+    const margin = p.margin_used ?? p.margin ?? (p.leverage && p.leverage > 1 ? notional / p.leverage : notional);
     const pnlPct = margin > 0 ? (upnl / margin) * 100 : 0;
 
     return {
       strategy: p.strategy,
-      mode: p.mode || (isForex ? 'forex' : this.mode),
+      mode: isForex ? 'forex' : (targetMode === 'spot' ? 'spot' : 'futures'),
       symbol: sym,
       side,
       qty: p.qty ?? 0,
-      lot: lot != null ? lot : (isForex ? 0.10 : null),
+      lot,
       entry,
       entry_price: entry,
       mark,
@@ -313,8 +322,9 @@ class ArenaStore {
       take_profit: p.target ?? p.take_profit ?? null,
       margin,
       margin_used: margin,
+      notional,
       risk_amount: p.risk_amount ?? 0,
-      leverage: p.leverage ?? 1,
+      leverage: isForex ? 1 : (p.leverage ?? (targetMode === 'futures' ? 15 : 1)),
       upnl: Math.round(upnl * 100) / 100,
       pnl: Math.round(upnl * 100) / 100,
       pnl_pct: pnlPct,
@@ -368,7 +378,7 @@ class ArenaStore {
       if (msg.spot) {
         this.spot = {
           accounts: mapAccounts(msg.spot.accounts),
-          positions: (msg.spot.positions || []).map((p) => this.normalizePosition(p)),
+          positions: (msg.spot.positions || []).map((p) => this.normalizePosition(p, 'spot')),
           curves: msg.spot.curves || this.spot.curves || {},
           events: msg.spot.events || this.spot.events || [],
           pairs: msg.spot.pairs || this.spot.pairs || [],
@@ -377,7 +387,7 @@ class ArenaStore {
       if (msg.futures) {
         this.futures = {
           accounts: mapAccounts(msg.futures.accounts),
-          positions: (msg.futures.positions || []).map((p) => this.normalizePosition(p)),
+          positions: (msg.futures.positions || []).map((p) => this.normalizePosition(p, 'futures')),
           curves: msg.futures.curves || this.futures.curves || {},
           events: msg.futures.events || this.futures.events || [],
           pairs: msg.futures.pairs || this.futures.pairs || [],
@@ -386,7 +396,7 @@ class ArenaStore {
       if (msg.forex) {
         this.forex = {
           accounts: mapAccounts(msg.forex.accounts),
-          positions: (msg.forex.positions || []).map((p) => this.normalizePosition(p)),
+          positions: (msg.forex.positions || []).map((p) => this.normalizePosition(p, 'forex')),
           curves: msg.forex.curves || this.forex.curves || {},
           events: msg.forex.events || this.forex.events || [],
           pairs: msg.forex.pairs || this.forex.pairs || [],

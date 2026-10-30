@@ -56,10 +56,10 @@
       <table>
         <thead>
           <tr>
+            <th>Waktu Open</th>
             <th>Strategi</th>
             <th>Pair</th>
             <th>Arah</th>
-            <th>Waktu Open</th>
             <th>{isForex ? 'Lot' : 'Size'}</th>
             <th class="{isForex ? 'r' : ''}">{isForex ? 'Pips' : 'Lev'}</th>
             <th class="r">Entry</th>
@@ -82,6 +82,9 @@
               onclick={() => selectStrategy(p.strategy)}
               title="Klik untuk melihat strategi {p.strategy}"
             >
+              <td class="mono muted open-time-cell" title={formatFullDateTime(p.opened_at)}>
+                <span class="open-clock">{formatClock(p.opened_at)}</span>
+              </td>
               <td class="strat-cell">
                 <span class="strat-link">{p.strategy}</span>
               </td>
@@ -90,9 +93,6 @@
                 <span class="chip {p.side === 'LONG' ? 'chip-long' : 'chip-short'}">
                   {p.side}
                 </span>
-              </td>
-              <td class="mono muted open-time-cell" title={formatFullDateTime(p.opened_at)}>
-                <span class="open-clock">{formatClock(p.opened_at)}</span>
               </td>
               <td class="mono muted">
                 {#if isPosForex}

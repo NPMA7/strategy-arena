@@ -542,6 +542,18 @@
     crosshair = { active: false, x: 0, y: 0, dataPoint: null };
   }
 
+  function formatTradeDate(ts) {
+    if (!ts) return '—';
+    const ms = ts > 1e12 ? ts : ts * 1000;
+    const d = new Date(ms);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleString('id-ID', {
+      timeZone: 'Asia/Jakarta',
+      dateStyle: 'short',
+      timeStyle: 'medium',
+    });
+  }
+
   function formatDuration(openedAt, closedAt) {
     if (!openedAt || !closedAt) return '—';
     const ms = closedAt - openedAt;
@@ -839,6 +851,7 @@
               <table class="trades-table">
                 <thead>
                   <tr>
+                    <th>Waktu Open</th>
                     <th>Waktu Closed</th>
                     <th>Durasi</th>
                     <th>Pair</th>
@@ -856,7 +869,10 @@
                     {@const isWin = tr.pnl >= 0}
                     <tr>
                       <td class="mono date-cell">
-                        {new Date(tr.closed_at).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'medium' })}
+                        {formatTradeDate(tr.opened_at)}
+                      </td>
+                      <td class="mono date-cell">
+                        {formatTradeDate(tr.closed_at)}
                       </td>
                       <td class="mono muted-cell">
                         {formatDuration(tr.opened_at, tr.closed_at)}

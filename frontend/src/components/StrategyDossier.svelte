@@ -418,9 +418,9 @@
           <table>
             <thead>
               <tr>
+                <th>Waktu Open</th>
                 <th>Pair</th>
                 <th>Arah</th>
-                <th>Waktu Open</th>
                 <th>{arena.mode === 'forex' ? 'Lot' : 'Lev'}</th>
                 <th class="r">Entry</th>
                 <th class="r">Mark</th>
@@ -440,14 +440,14 @@
                   : (p.qty > 0 && currentMark > 0 ? (currentMark - p.entry) * p.qty * sideSign : (p.upnl ?? 0))}
                 {@const isUp = liveUpnl >= 0}
                 <tr>
+                  <td class="mono muted open-time-cell" title={formatFullDateTime(p.opened_at)}>
+                    <span class="open-clock">{formatClock(p.opened_at)}</span>
+                  </td>
                   <td class="font-bold">{p.symbol}</td>
                   <td>
                     <span class="chip {p.side === 'LONG' ? 'chip-long' : 'chip-short'}">
                       {p.side}
                     </span>
-                  </td>
-                  <td class="mono muted open-time-cell" title={formatFullDateTime(p.opened_at)}>
-                    <span class="open-clock">{formatClock(p.opened_at)}</span>
                   </td>
                   <td class="mono muted">
                     {#if arena.mode === 'forex'}

@@ -2,8 +2,26 @@
   import { arena } from "../lib/store.svelte.js";
   import { formatUptime } from "../lib/formatters.js";
 
+  let mobileMenuOpen = $state(false);
+
   function handleModeChange(m) {
     arena.setMode(m);
+  }
+
+  function handleNav(mode) {
+    mobileMenuOpen = false;
+    if (mode === "executions") {
+      arena.navigate("/neural-execution");
+    } else {
+      arena.setMode(mode);
+      const target =
+        mode === "spot"
+          ? "/crypto-spot"
+          : mode === "futures"
+            ? "/crypto-futures"
+            : "/forex";
+      arena.navigate(target);
+    }
   }
 </script>
 
@@ -15,6 +33,7 @@
       title="Kembali ke Page Utama"
       onclick={(e) => {
         e.preventDefault();
+        mobileMenuOpen = false;
         arena.navigate("/");
       }}
     >
@@ -73,8 +92,8 @@
       </div>
     </a>
 
-    <!-- Multi-Asset Market Switcher Navigation -->
-    <nav class="market-switcher" aria-label="Market Mode Selection">
+    <!-- Multi-Asset Market Switcher Navigation (Desktop) -->
+    <nav class="market-switcher desktop-nav" aria-label="Market Mode Selection">
       <button
         class="switcher-btn {arena.currentRoute === 'spot' ? 'active-spot' : ''}"
         onclick={() => handleModeChange("spot")}
@@ -116,7 +135,7 @@
   </div>
 
   <div class="header-right">
-    <!-- Live Feed Telemetry Pill -->
+    <!-- Live Feed Telemetry Pill (Desktop/Tablet) -->
     <div class="telemetry-pill">
       <span class="live-status {arena.connected ? 'online' : 'offline'}">
         <span class="pulse-ring"></span>
@@ -147,7 +166,6 @@
         <span class="lbl">UPTIME:</span>
         <span class="val num">{formatUptime(arena.uptime)}</span>
       </div>
-
     </div>
 
     <!-- Copy-Trade API Trigger Button -->
@@ -171,7 +189,136 @@
       </svg>
       <span class="btn-text">Copy-Trade API</span>
     </button>
+
+    <!-- Hamburger Button (Mobile Only) -->
+    <button
+      type="button"
+      class="hamburger-btn"
+      class:active={mobileMenuOpen}
+      onclick={() => (mobileMenuOpen = !mobileMenuOpen)}
+      aria-label={mobileMenuOpen ? 'Tutup navigasi' : 'Buka menu terminal'}
+    >
+      {#if mobileMenuOpen}
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      {:else}
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="4" y1="7" x2="20" y2="7"></line>
+          <line x1="4" y1="12" x2="20" y2="12"></line>
+          <line x1="4" y1="17" x2="20" y2="17"></line>
+        </svg>
+      {/if}
+    </button>
   </div>
+
+  <!-- Mobile Drawer Menu Dropdown -->
+  {#if mobileMenuOpen}
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="mobile-drawer-backdrop" onclick={() => (mobileMenuOpen = false)}>
+      <div class="mobile-drawer-content" onclick={(e) => e.stopPropagation()}>
+        <div class="drawer-header">
+          <span class="drawer-title mono">PILIH TERMINAL ARENA</span>
+          <span class="drawer-sub">Multi-Asset Quantitative Benchmark</span>
+        </div>
+
+        <div class="drawer-nav-list">
+          <button
+            type="button"
+            class="drawer-nav-item item-spot {arena.currentRoute === 'spot' ? 'active-item' : ''}"
+            onclick={() => handleNav('spot')}
+          >
+            <div class="drawer-icon icon-spot">
+              <span class="dot-spot"></span>
+            </div>
+            <div class="drawer-item-info">
+              <span class="item-name">Terminal Spot</span>
+              <span class="item-desc">Binance Crypto Spot (No-Leverage)</span>
+            </div>
+            {#if arena.currentRoute === 'spot'}
+              <span class="active-badge spot">AKTIF</span>
+            {/if}
+            <svg class="chevron-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+
+          <button
+            type="button"
+            class="drawer-nav-item item-futures {arena.currentRoute === 'futures' ? 'active-item' : ''}"
+            onclick={() => handleNav('futures')}
+          >
+            <div class="drawer-icon icon-futures">
+              <span class="dot-futures"></span>
+            </div>
+            <div class="drawer-item-info">
+              <span class="item-name">Terminal Futures</span>
+              <span class="item-desc">Binance Perpetual (Leverage 1–20x)</span>
+            </div>
+            {#if arena.currentRoute === 'futures'}
+              <span class="active-badge futures">AKTIF</span>
+            {/if}
+            <svg class="chevron-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+
+          <button
+            type="button"
+            class="drawer-nav-item item-forex {arena.currentRoute === 'forex' ? 'active-item' : ''}"
+            onclick={() => handleNav('forex')}
+          >
+            <div class="drawer-icon icon-forex">
+              <span class="dot-forex"></span>
+            </div>
+            <div class="drawer-item-info">
+              <span class="item-name">Terminal Forex & Metals</span>
+              <span class="item-desc">MT5 Direct Feed & Eksekusi Headway</span>
+            </div>
+            {#if arena.currentRoute === 'forex'}
+              <span class="active-badge forex">AKTIF</span>
+            {/if}
+            <svg class="chevron-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+
+          <button
+            type="button"
+            class="drawer-nav-item item-neural {arena.currentRoute === 'executions' ? 'active-item' : ''}"
+            onclick={() => handleNav('executions')}
+          >
+            <div class="drawer-icon icon-neural">
+              <span class="dot-neural"></span>
+            </div>
+            <div class="drawer-item-info">
+              <span class="item-name">Neural Execution</span>
+              <span class="item-desc">Visual 3D Matrix & Realtime Trade Feed</span>
+            </div>
+            {#if arena.currentRoute === 'executions'}
+              <span class="active-badge neural">AKTIF</span>
+            {/if}
+            <svg class="chevron-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+        </div>
+
+        <div class="drawer-footer">
+          <div class="drawer-telemetry-row">
+            <span class="live-status {arena.connected ? 'online' : 'offline'}">
+              <span class="status-dot"></span>
+              <span class="status-text">{arena.connected ? 'SYSTEM ONLINE' : 'RECONNECTING'}</span>
+            </span>
+            <span class="telemetry-divider"></span>
+            <div class="uptime-badge">
+              <span class="lbl">UPTIME:</span>
+              <span class="val num">{formatUptime(arena.uptime)}</span>
+            </div>
+            <span class="telemetry-divider"></span>
+            <div class="db-size-badge">
+              <span class="lbl">DB:</span>
+              <span class="val num">{arena.dbSize}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  {/if}
 </header>
 
 <style>
@@ -284,7 +431,6 @@
     border: 1px solid rgba(255, 255, 255, 0.548);
   }
 
-
   .switcher-btn.disabled {
     opacity: 0.45;
     cursor: not-allowed;
@@ -311,7 +457,6 @@
   .dot-purple {
     background-color: #ffffffa6;
   }
-
 
   .tag-soon {
     font-size: 9.5px;
@@ -363,6 +508,24 @@
     height: 7px;
     border-radius: 50%;
     background-color: currentColor;
+  }
+
+  .pulse-ring {
+    position: absolute;
+    top: 50%;
+    left: 3.5px;
+    transform: translate(-50%, -50%);
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 1.5px solid var(--color-up);
+    opacity: 0.4;
+    animation: pulsePing 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+  }
+
+  @keyframes pulsePing {
+    0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0.8; }
+    80%, 100% { transform: translate(-50%, -50%) scale(2); opacity: 0; }
   }
 
   .telemetry-divider {
@@ -419,6 +582,7 @@
     font-size: 12.5px;
     font-weight: 600;
     transition: all 0.2s ease;
+    white-space: nowrap;
   }
 
   .btn-copy-trade:hover {
@@ -427,50 +591,300 @@
     box-shadow: 0 0 10px rgba(245, 158, 11, 0.2);
   }
 
+  /* Hamburger Menu (Mobile Only) */
+  .hamburger-btn {
+    display: none;
+    background: #0d121c;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    color: #e2e8f0;
+    padding: 6px 8px;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+  }
+
+  .hamburger-btn:hover {
+    background: #151d2c;
+    border-color: rgba(245, 158, 11, 0.4);
+    color: #f59e0b;
+  }
+
+  .hamburger-btn.active {
+    background: rgba(245, 158, 11, 0.15);
+    border-color: #f59e0b;
+    color: #f59e0b;
+  }
+
+  /* Mobile Drawer Dropdown */
+  .mobile-drawer-backdrop {
+    position: fixed;
+    top: 56px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(3, 7, 18, 0.85);
+    backdrop-filter: blur(10px);
+    z-index: 100;
+    animation: fadeIn 0.18s ease;
+  }
+
+  .mobile-drawer-content {
+    background: #090e17;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    padding: 16px 16px 20px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
+    animation: slideDown 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .drawer-header {
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .drawer-title {
+    display: block;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    color: #f59e0b;
+  }
+
+  .drawer-sub {
+    display: block;
+    font-size: 12px;
+    color: #94a3b8;
+    margin-top: 2px;
+  }
+
+  .drawer-nav-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .drawer-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #0c121d;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 12px 14px;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    width: 100%;
+    color: inherit;
+    box-sizing: border-box;
+  }
+
+  .drawer-nav-item:hover,
+  .drawer-nav-item:active {
+    background: #151d2c;
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: translateX(2px);
+  }
+
+  .drawer-nav-item.active-item {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  .active-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 4px;
+    letter-spacing: 0.05em;
+    flex-shrink: 0;
+  }
+
+  .active-badge.spot {
+    background: rgba(245, 158, 11, 0.15);
+    color: var(--color-amber);
+    border: 1px solid rgba(245, 158, 11, 0.35);
+  }
+
+  .active-badge.futures {
+    background: rgba(56, 189, 248, 0.15);
+    color: var(--color-cyan);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+  }
+
+  .active-badge.forex {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.35);
+  }
+
+  .active-badge.neural {
+    background: rgba(168, 85, 247, 0.15);
+    color: #c084fc;
+    border: 1px solid rgba(168, 85, 247, 0.35);
+  }
+
+  .drawer-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .icon-spot {
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+  }
+  .dot-spot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #f59e0b;
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+  }
+
+  .icon-futures {
+    background: rgba(56, 189, 248, 0.12);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+  }
+  .dot-futures {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #38bdf8;
+    box-shadow: 0 0 8px rgba(56, 189, 248, 0.6);
+  }
+
+  .icon-forex {
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+  }
+  .dot-forex {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+  }
+
+  .icon-neural {
+    background: rgba(168, 85, 247, 0.15);
+    border: 1px solid rgba(168, 85, 247, 0.35);
+  }
+  .dot-neural {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #a855f7;
+    box-shadow: 0 0 8px rgba(168, 85, 247, 0.6);
+  }
+
+  .drawer-item-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .item-name {
+    display: block;
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #f1f5f9;
+  }
+
+  .item-desc {
+    display: block;
+    font-size: 11px;
+    color: #64748b;
+    margin-top: 2px;
+  }
+
+  .chevron-svg {
+    color: #475569;
+    flex-shrink: 0;
+  }
+
+  .drawer-footer {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .drawer-telemetry-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    font-size: 11px;
+    color: var(--fg-muted);
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideDown {
+    from { transform: translateY(-12px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
   @media (max-width: 900px) {
     .header-root {
-      flex-direction: column;
-      align-items: stretch;
-      padding: 8px 12px;
-      gap: 10px;
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      gap: 12px;
     }
     .header-left {
-      flex-direction: column;
-      align-items: stretch;
-      gap: 10px;
-      width: 100%;
+      flex-direction: row;
+      align-items: center;
+      gap: 12px;
+      width: auto;
     }
     .brand-link {
-      width: 100%;
+      width: auto;
       justify-content: flex-start;
     }
     .market-switcher {
-      overflow-x: auto;
-      max-width: 100%;
-      white-space: nowrap;
-      -webkit-overflow-scrolling: touch;
-      padding-bottom: 2px;
+      display: none !important;
     }
-    .switcher-btn {
-      white-space: nowrap;
-      flex-shrink: 0;
+    .hamburger-btn {
+      display: flex;
     }
     .header-right {
-      justify-content: space-between;
-      width: 100%;
-      overflow-x: auto;
-      padding-top: 4px;
-      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      width: auto;
+      border-top: none;
+      padding-top: 0;
+      gap: 8px;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .header-right .telemetry-pill {
+      display: none;
     }
   }
 
   @media (max-width: 480px) {
-    .telemetry-pill {
-      padding: 4px 8px;
-      font-size: 10px;
+    .header-root {
+      padding: 8px 12px;
+    }
+    .brand-title {
+      font-size: 14px;
+    }
+    .brand-sub {
+      font-size: 8px;
     }
     .btn-copy-trade {
-      padding: 4px 8px;
+      padding: 5px 9px;
+      font-size: 11px;
+    }
+    .btn-copy-trade .btn-text {
       font-size: 11px;
     }
   }

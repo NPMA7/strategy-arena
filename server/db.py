@@ -758,6 +758,7 @@ class DB:
             )
         d = dict(row)
         if d.get("db_size_mb") is not None:
+            d["db_size_mb"] = float(d["db_size_mb"])
             d["db_size"] = f"{d['db_size_mb']} MB"
         return d
 

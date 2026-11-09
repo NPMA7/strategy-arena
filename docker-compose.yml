@@ -38,6 +38,8 @@ services:
       MT5_LOGIN: "${MT5_LOGIN:-6310591}"
       MT5_PASSWORD: "${MT5_PASSWORD:-dL7ny!PE}"
       MT5_SERVER: "${MT5_SERVER:-Headway-Demo}"
+      UI_PASSWORD: "${MT5_VNC_PASSWORD:-1234}"
+      MT5_VNC_PASSWORD: "${MT5_VNC_PASSWORD:-1234}"
 
   novnc-proxy:
     image: nginx:alpine

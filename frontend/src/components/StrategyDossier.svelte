@@ -331,7 +331,9 @@
               {(strategy.family || getStrategyCategory(strategy.id)).toUpperCase()}
             {/if}
           </span>
-          {#if strategy.refillCount > 0}
+          {#if strategy.disabled || strategy.refillCount >= 5}
+            <span class="chip-mc-disabled">OFF (5x MC)</span>
+          {:else if strategy.refillCount > 0}
             <span class="chip-mc">MC {strategy.refillCount}x</span>
           {/if}
         </div>
@@ -546,6 +548,17 @@
     background: rgba(244, 63, 94, 0.2);
     color: #f43f5e;
     border: 1px solid rgba(244, 63, 94, 0.4);
+  }
+
+  .chip-mc-disabled {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(225, 29, 72, 0.25);
+    color: #f43f5e;
+    border: 1px solid rgba(225, 29, 72, 0.5);
+    letter-spacing: 0.3px;
   }
 
   .chip-long {

@@ -742,6 +742,7 @@ async def list_strategies_api(
                 "win_rate_pct": round(a["wins"] / a["trades"] * 100, 1) if a["trades"] > 0 else 0.0,
                 "max_drawdown_pct": round(a["max_dd"] * 100, 2),
                 "mc_count": a.get("mc_count", 0),
+                "disabled": bool(a.get("disabled", False) or a.get("mc_count", 0) >= 5),
                 "open_positions": a.get("open", 0),
                 "leverage": a.get("leverage", 1),
             })

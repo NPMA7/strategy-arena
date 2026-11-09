@@ -89,6 +89,7 @@ class DB:
                 ALTER TABLE accounts ADD COLUMN IF NOT EXISTS mode TEXT NOT NULL DEFAULT 'spot';
                 ALTER TABLE accounts ADD COLUMN IF NOT EXISTS funding_paid DOUBLE PRECISION NOT NULL DEFAULT 0;
                 ALTER TABLE accounts ADD COLUMN IF NOT EXISTS mc_count INTEGER NOT NULL DEFAULT 0;
+                ALTER TABLE accounts ADD COLUMN IF NOT EXISTS disabled BOOLEAN NOT NULL DEFAULT FALSE;
             """)
             # update primary key accounts menjadi (strategy, mode)
             await con.execute("""
@@ -256,23 +257,30 @@ class DB:
 
             # 1. Accounts (Spot + Futures + Forex)
             acct_rows = []
+            pruned_strats = []
             for mode in ("spot", "futures", "forex"):
                 m_data = data.get(mode)
                 if not m_data:
                     continue
                 for a in m_data.get("accounts", []):
+                    is_dis = bool(a.get("disabled", False) or a.get("mc_count", 0) >= 5)
                     acct_rows.append((
                         a["id"], mode, a["equity"], a["cash"], a["peak"], a["max_dd"],
                         a["trades"], a["wins"], a["gross_win"], a["gross_loss"], a["realized"],
-                        a.get("funding_paid", 0.0), a.get("mc_count", 0), now
+                        a.get("funding_paid", 0.0), a.get("mc_count", 0), is_dis, now
                     ))
+                for sid in m_data.get("pruned_strategies", []):
+                    pruned_strats.append((sid, mode))
 
             # 2. Positions (Spot + Futures + Forex)
             spot_pos = data.get("spot", {}).get("positions", [])
             fut_pos = data.get("futures", {}).get("positions", [])
             forex_pos = data.get("forex", {}).get("positions", [])
 
-            # 3. Trades dari buffer
+            # 3. Trades dari buffer (filter out yang strategi-nya sudah di-prune)
+            if pruned_strats:
+                pruned_set = set(pruned_strats)
+                self._new_trades = [t for t in self._new_trades if (t[0], t[1]) not in pruned_set]
             trade_rows = list(self._new_trades)
 
             # 4. Curves
@@ -293,18 +301,24 @@ class DB:
 
             async with self.pool.acquire() as con:
                 async with con.transaction():
+                    # Hapus riwayat trade untuk strategi yang mencapai batas 5x MC
+                    if pruned_strats:
+                        for p_sid, p_mode in pruned_strats:
+                            await con.execute("DELETE FROM trades WHERE strategy = $1 AND mode = $2", p_sid, p_mode)
+                            await con.execute("DELETE FROM positions WHERE strategy = $1 AND mode = $2", p_sid, p_mode)
+
                     # Simpan Akun
                     if acct_rows:
                         await con.executemany(
                             """INSERT INTO accounts (strategy, mode, equity, cash, peak, max_dd, trades, wins,
-                                                     gross_win, gross_loss, realized, funding_paid, mc_count, updated_at)
-                               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+                                                     gross_win, gross_loss, realized, funding_paid, mc_count, disabled, updated_at)
+                               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
                                ON CONFLICT (strategy, mode) DO UPDATE SET
                                  equity=EXCLUDED.equity, cash=EXCLUDED.cash, peak=EXCLUDED.peak,
                                  max_dd=EXCLUDED.max_dd, trades=EXCLUDED.trades, wins=EXCLUDED.wins,
                                  gross_win=EXCLUDED.gross_win, gross_loss=EXCLUDED.gross_loss,
                                  realized=EXCLUDED.realized, funding_paid=EXCLUDED.funding_paid,
-                                 mc_count=EXCLUDED.mc_count, updated_at=EXCLUDED.updated_at""",
+                                 mc_count=EXCLUDED.mc_count, disabled=EXCLUDED.disabled, updated_at=EXCLUDED.updated_at""",
                             acct_rows,
                         )
 
@@ -423,7 +437,7 @@ class DB:
                     FROM trades
                     GROUP BY strategy, mode
                 ) t
-                WHERE a.strategy = t.strategy AND a.mode = t.mode;
+                WHERE a.strategy = t.strategy AND a.mode = t.mode AND a.disabled = FALSE AND a.mc_count < 5;
             """)
 
     async def load_full_state(self) -> dict[str, Any]:
@@ -574,7 +588,7 @@ class DB:
                 "SELECT symbol, base, quote, rank, quote_volume, last_close FROM pairs ORDER BY rank, symbol"
             )
             accounts = await con.fetch(
-                "SELECT strategy, mode, equity, cash, peak, max_dd, trades, wins, gross_win, gross_loss, realized, funding_paid, mc_count, updated_at FROM accounts"
+                "SELECT strategy, mode, equity, cash, peak, max_dd, trades, wins, gross_win, gross_loss, realized, funding_paid, mc_count, disabled, updated_at FROM accounts"
             )
             positions = await con.fetch(
                 "SELECT strategy, mode, symbol, side, qty, lot, entry, stop, target, opened_at, notional, margin_used, risk_amount, score, leverage, rr, reason FROM positions"
@@ -628,6 +642,13 @@ class DB:
                    FROM trades WHERE strategy = $1 AND mode = $2""",
                 strategy_id, mode,
             )
+            t_counts = dict(trades_counts) if trades_counts else {"total": 0, "wins": 0, "losses": 0}
+            if t_counts.get("total", 0) == 0 and acct and acct.get("trades", 0) > 0:
+                t_counts = {
+                    "total": acct["trades"],
+                    "wins": acct["wins"],
+                    "losses": max(0, acct["trades"] - acct["wins"]),
+                }
             trades = await con.fetch(
                 """SELECT symbol, side, qty, entry, exit, opened_at, closed_at, pnl, fee, reason, equity_after, leverage
                    FROM trades WHERE strategy = $1 AND mode = $2 ORDER BY closed_at DESC LIMIT $3""",
@@ -644,7 +665,7 @@ class DB:
             )
         return {
             "account": dict(acct) if acct else None,
-            "trade_counts": dict(trades_counts) if trades_counts else {"total": len(trades), "wins": 0, "losses": 0},
+            "trade_counts": t_counts,
             "trades": [dict(t) for t in trades],
             "curve": [dict(c) for c in curve],
         }
@@ -686,6 +707,17 @@ class DB:
                    FROM trades WHERE strategy = $1 AND mode = $2""",
                 strategy_id, mode,
             )
+            acct = await con.fetchrow(
+                "SELECT trades, wins, disabled, mc_count FROM accounts WHERE strategy = $1 AND mode = $2",
+                strategy_id, mode,
+            )
+            c_dict = dict(counts_row) if counts_row else {"total": total, "wins": 0, "losses": 0}
+            if c_dict.get("total", 0) == 0 and acct and acct.get("trades", 0) > 0:
+                c_dict = {
+                    "total": acct["trades"],
+                    "wins": acct["wins"],
+                    "losses": max(0, acct["trades"] - acct["wins"]),
+                }
 
             if limit > 0:
                 p_query = list(params)
@@ -713,7 +745,7 @@ class DB:
             "page": page,
             "limit": limit,
             "total_pages": max(1, (total + limit - 1) // limit) if limit > 0 else 1,
-            "counts": dict(counts_row) if counts_row else {"total": total, "wins": 0, "losses": 0},
+            "counts": c_dict,
             "trades": [dict(r) for r in rows],
         }
 

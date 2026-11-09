@@ -201,7 +201,11 @@
 
             <!-- MC Refill Status Badge -->
             <td class="td-status">
-              {#if s.refillCount > 0}
+              {#if s.disabled || s.refillCount >= 5}
+                <span class="badge badge-down badge-mc" title="Strategi ini telah dinonaktifkan permanen karena mencapai batas 5x Margin Call">
+                  <span>OFF (5x MC)</span>
+                </span>
+              {:else if s.refillCount > 0}
                 <span class="badge badge-amber badge-mc" title="Strategi ini pernah mencapai $0 dan telah diisi ulang modalnya">
                   <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>

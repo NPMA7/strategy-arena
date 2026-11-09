@@ -70,6 +70,7 @@ def _new_account(idx: int, mode: str = "spot") -> dict:
         "realized": 0.0,
         "funding_paid": 0.0,
         "mc_count": 0,
+        "disabled": False,
         "pos": {},          # symbol -> position dict
         "pending": None,
         "warmed": False,
@@ -161,6 +162,7 @@ class Engine:
         self.started = time.time()
         self.bars_processed = 0
         self.signal_count = 0
+        self.disabled_strats_to_prune: list[str] = []
 
     def restore_state(self, saved_accounts: list[dict], saved_positions: list[dict], curves: dict[str, list[float]] = None) -> None:
         """Pulihkan saldo, trade, drawdown, dan posisi terbuka dari DB setelah restart."""
@@ -179,12 +181,20 @@ class Engine:
                 acct["realized"] = float(saved.get("realized", 0.0))
                 acct["funding_paid"] = float(saved.get("funding_paid", 0.0))
                 acct["mc_count"] = int(saved.get("mc_count", 0))
+                acct["disabled"] = bool(saved.get("disabled", False) or acct["mc_count"] >= 5)
+                if acct["disabled"]:
+                    acct["cash"] = 0.0
+                    acct["equity"] = 0.0
+                    acct["max_dd"] = 1.0
+                    acct["pos"].clear()
                 acct["warmed"] = True
 
         for p in saved_positions:
             sid = p.get("strategy")
             sym = p.get("symbol")
             if sid in self.accounts:
+                if self.accounts[sid].get("disabled") or self.accounts[sid].get("mc_count", 0) >= 5:
+                    continue
                 lot_val = p.get("lot")
                 if lot_val is None and self.mode == "forex":
                     qty_f = float(p.get("qty", 0.10))
@@ -255,6 +265,9 @@ class Engine:
 
         signals: list[tuple[float, str, str]] = []  # (score, sid, symbol)
         for sid in self.strategy_ids:
+            acct = self.accounts[sid]
+            if acct.get("disabled") or acct.get("mc_count", 0) >= 5:
+                continue
             fn = SIGNAL_FN[sid]
             try:
                 sc = fn(snap)
@@ -307,6 +320,8 @@ class Engine:
         return 10.0 if self.mode == "futures" else 0.0
 
     def is_mc_breached(self, acct: dict, current_equity: Optional[float] = None) -> bool:
+        if acct.get("disabled") or acct.get("mc_count", 0) >= 5:
+            return False
         thresh = self.mc_threshold
         eq = current_equity if current_equity is not None else acct.get("equity", acct.get("cash", 0.0))
         cash = acct.get("cash", 0.0)
@@ -316,8 +331,11 @@ class Engine:
 
     def _handle_mc(self, acct: dict, ts: int) -> None:
         """Margin Call / saldo habis (< $10 di Futures, <= $0 di pasar lain):
-        Likuidasi semua posisi terbuka, refill ke START_EQUITY ($1.000), catat mc_count.
-        Statistik historis (trades, wins, pnl, curves) tetap dipertahankan."""
+        Jika mc_count < 5: Likuidasi semua posisi terbuka, refill ke START_EQUITY ($1.000), catat mc_count.
+        Jika mc_count >= 5: Likuidasi semua posisi terbuka, disable strategi (tidak refill balance lagi, tidak open posisi),
+        dan hapus riwayat trade individual dari DB (hanya sisakan statistik dan grafik tren)."""
+        if acct.get("disabled") or acct.get("mc_count", 0) >= 5:
+            return
         sid = acct["id"]
         acct["mc_count"] = acct.get("mc_count", 0) + 1
         mc_num = acct["mc_count"]
@@ -345,22 +363,42 @@ class Engine:
                 acct["gross_loss"] += -net
             acct["realized"] += net
 
-            self.new_trades.append({
-                "strategy": sid, "symbol": sym, "side": p["side"], "qty": p["qty"],
-                "entry": p["entry"], "exit": px, "opened_at": p["opened_at"], "closed_at": ts,
-                "pnl": net, "fee": fee, "reason": f"MC #{mc_num} Likuidasi",
-                "leverage": p.get("leverage", 1),
-                "equity_after": 0.0,
-            })
+            # Jika belum 5x MC, simpan trade ke self.new_trades
+            if mc_num < 5:
+                self.new_trades.append({
+                    "strategy": sid, "symbol": sym, "side": p["side"], "qty": p["qty"],
+                    "entry": p["entry"], "exit": px, "opened_at": p["opened_at"], "closed_at": ts,
+                    "pnl": net, "fee": fee, "reason": f"MC #{mc_num} Likuidasi",
+                    "leverage": p.get("leverage", 1),
+                    "equity_after": 0.0,
+                })
 
-        # 2. Refill saldo kembali ke modal awal ($1.000) tanpa mereset riwayat/statistik
+        now_ms = int(time.time() * 1000)
+
+        # Cek apakah sudah mencapai batas 5x MC
+        if mc_num >= 5:
+            acct["disabled"] = True
+            acct["cash"] = 0.0
+            acct["equity"] = 0.0
+            acct["max_dd"] = 1.0
+            if sid not in self.disabled_strats_to_prune:
+                self.disabled_strats_to_prune.append(sid)
+
+            if sid in self.sparklines:
+                self.sparklines[sid].append([now_ms, 0.0])
+
+            mode_str = self.mode.upper()
+            msg = f"⛔ STRATEGI DINONAKTIFKAN (5x MC) [{mode_str}]: {acct['name']} mencapai batas 5x Margin Call. Saldo tidak di-refill lagi dan strategi dinonaktifkan."
+            self._push_event([sid], None, "mc_disabled", msg)
+            return
+
+        # 2. Refill saldo kembali ke modal awal ($1.000) jika MC < 5x
         acct["cash"] = START_EQUITY
         acct["equity"] = START_EQUITY
         acct["peak"] = max(acct.get("peak", START_EQUITY), START_EQUITY)
         acct["max_dd"] = 1.0  # Tercatat pernah drawdown 100%
 
         # Update sparkline agar visualisasi menunjukkan penurunan ke 0 dan refill ke $1.000
-        now_ms = int(time.time() * 1000)
         if sid in self.sparklines:
             self.sparklines[sid].append([now_ms - 1000, 0.0])
             self.sparklines[sid].append([now_ms, START_EQUITY])
@@ -384,6 +422,8 @@ class Engine:
         return tc, tr
 
     def _handle_signal(self, acct: dict, score: float, symbol: str, snap, ts: int) -> None:
+        if acct.get("disabled") or acct.get("mc_count", 0) >= 5:
+            return
         side = LONG if score > 0 else SHORT
         price = snap.c[snap.i]
         atr = snap.atr14[snap.i]
@@ -439,6 +479,8 @@ class Engine:
         self._open(acct, symbol, side, price, atr, ts, score)
 
     def _open(self, acct: dict, symbol: str, side: int, price: float, atr: float, ts: int, score: float) -> None:
+        if acct.get("disabled") or acct.get("mc_count", 0) >= 5:
+            return
         # Spot mode: skip short signals
         if self.mode == "spot" and side == SHORT:
             return
@@ -733,27 +775,36 @@ class Engine:
         positions = []
         fx_px = self._forex_prices() if self.mode == "forex" else None
         for sid, a in self.accounts.items():
-            # Mark-to-market live equity real-time tiap tick snapshot
-            if a["pos"]:
-                live_eq = a["cash"]
-                for sym, p in a["pos"].items():
-                    px = self._get_price(sym, p["entry"])
-                    if self.mode == "forex":
-                        pnl = calculate_forex_pnl(sym, p["entry"], px, p["side"], p.get("lot", 0.10), fx_px)
-                    else:
-                        pnl = (px - p["entry"]) * p["qty"] * p["side"]
-                    live_eq += pnl
-                eq = round(max(0.0, live_eq), 2)
+            is_dis = bool(a.get("disabled", False) or a.get("mc_count", 0) >= 5)
+            if is_dis:
+                a["disabled"] = True
+                a["pos"].clear()
+                a["cash"] = 0.0
+                a["equity"] = 0.0
+                bal = 0.0
+                eq = 0.0
             else:
-                eq = round(a["equity"], 2)
+                # Mark-to-market live equity real-time tiap tick snapshot
+                if a["pos"]:
+                    live_eq = a["cash"]
+                    for sym, p in a["pos"].items():
+                        px = self._get_price(sym, p["entry"])
+                        if self.mode == "forex":
+                            pnl = calculate_forex_pnl(sym, p["entry"], px, p["side"], p.get("lot", 0.10), fx_px)
+                        else:
+                            pnl = (px - p["entry"]) * p["qty"] * p["side"]
+                        live_eq += pnl
+                    eq = round(max(0.0, live_eq), 2)
+                else:
+                    eq = round(a["equity"], 2)
 
-            # Cek apakah akun terkena MC (misal di Futures saldo/equity < $10)
-            if self.is_mc_breached(a, eq):
-                self._handle_mc(a, int(now * 1000))
-                bal = round(a["cash"], 2)
-                eq = round(a["equity"], 2)
-            else:
-                bal = round(a["cash"], 2)
+                # Cek apakah akun terkena MC (misal di Futures saldo/equity < $10)
+                if self.is_mc_breached(a, eq):
+                    self._handle_mc(a, int(now * 1000))
+                    bal = round(a["cash"], 2)
+                    eq = round(a["equity"], 2)
+                else:
+                    bal = round(a["cash"], 2)
             if record_spark:
                 hist = self.sparklines[sid]
                 now_ms = int(now * 1000)
@@ -789,6 +840,7 @@ class Engine:
                 "funding_paid": round(a.get("funding_paid", 0), 4),
                 "open": len(a["pos"]), "warmed": a["warmed"],
                 "mc_count": a.get("mc_count", 0),
+                "disabled": is_dis,
             })
             for sym, p in a["pos"].items():
                 px = self._get_price(sym, p["entry"])
@@ -821,6 +873,7 @@ class Engine:
     def drain(self) -> dict:
         trades, self.new_trades = self.new_trades, []
         signals, self.new_signals = self.new_signals, []
+        pruned, self.disabled_strats_to_prune = self.disabled_strats_to_prune, []
         # events TIDAK dikosongkan — UI butuh history tetap ada.
         # Hanya trim kalau terlalu panjang (sudah dilakukan di _push_event).
         pts = []
@@ -831,7 +884,8 @@ class Engine:
             "new_trades": trades,
             "new_signals": signals,
             "new_events": list(self.events[-60:]),
-            "equity_points": pts
+            "equity_points": pts,
+            "pruned_strategies": pruned,
         }
 
 

@@ -365,13 +365,16 @@ class ArenaStore {
       const mapAccounts = (rawList) => (rawList || []).map((a) => {
         const bal = a.balance ?? a.cash ?? a.equity ?? startEq;
         const initial = a.initial_balance ?? startEq;
+        const refillCount = a.mc_count ?? a.refill_count ?? 0;
+        const isDis = Boolean(a.disabled || refillCount >= 5);
         return {
           ...a,
           balance: bal,
           equity: a.equity ?? bal,
           ret: (bal - initial) / initial,
           returnPct: ((bal - initial) / initial) * 100,
-          refillCount: a.mc_count ?? a.refill_count ?? 0,
+          refillCount,
+          disabled: isDis,
         };
       });
 
@@ -447,11 +450,13 @@ class ArenaStore {
       const initial = a.initial_balance ?? startEq;
       const ret = (bal - initial) / initial;
       const refillCount = a.mc_count ?? a.refill_count ?? 0;
+      const isDis = Boolean(a.disabled || refillCount >= 5);
       return {
         ...a,
         balance: bal,
         returnPct: ret,
         refillCount,
+        disabled: isDis,
       };
     });
   }

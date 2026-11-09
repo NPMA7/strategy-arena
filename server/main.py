@@ -32,7 +32,7 @@ log = logging.getLogger("arena")
 ROOT_DIR = os.path.dirname(os.path.dirname(__file__))
 FRONTEND_DIR = os.path.join(ROOT_DIR, "frontend")
 DIST_DIR = os.path.join(FRONTEND_DIR, "dist")
-from .config import START_EQUITY, SNAPSHOT_SEC, ADMIN_RESET_KEY, get_client_config
+from .config import START_EQUITY, SNAPSHOT_SEC, ADMIN_RESET_KEY, get_client_config, MT5_BRIDGE_URL
 PRICE_TICK_SEC = 0.5
 
 db = DB()
@@ -361,7 +361,17 @@ async def lifespan(app: FastAPI):
 
     # Start Forex Feed & seed 240 M1 bars into rings so indicators can run immediately
     forex_feed = ForexFeed(on_trade)
-    forex_feed.seed_rings(rings)
+    init_ticks = None
+    try:
+        import aiohttp
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=2.0)) as session:
+            async with session.get(f"{MT5_BRIDGE_URL}/ticks") as resp:
+                if resp.status == 200:
+                    init_ticks = await resp.json()
+    except Exception as exc:
+        log.warning("Tidak dapat mengambil initial ticks dari MT5 bridge sebelum seeding: %s", exc)
+
+    forex_feed.seed_rings(rings, initial_ticks=init_ticks)
     for a in forex_engine.accounts.values():
         a["warmed"] = True
     await forex_feed.start()

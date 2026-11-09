@@ -25,34 +25,34 @@ log = logging.getLogger("arena.forex")
 from .config import MT5_BRIDGE_URL
 
 FOREX_METAS: list[dict] = [
-    {"symbol": "XAUUSD", "base": "XAU", "quote": "USD", "name": "Spot Gold / US Dollar", "digits": 2, "base_price": 4048.45, "pip": 0.1, "vol": 0.50},
-    {"symbol": "EURUSD", "base": "EUR", "quote": "USD", "name": "Euro / US Dollar", "digits": 5, "base_price": 1.11317, "pip": 0.0001, "vol": 0.00008},
-    {"symbol": "GBPUSD", "base": "GBP", "quote": "USD", "name": "British Pound / US Dollar", "digits": 5, "base_price": 1.32963, "pip": 0.0001, "vol": 0.00010},
-    {"symbol": "USDJPY", "base": "USD", "quote": "JPY", "name": "US Dollar / Japanese Yen", "digits": 3, "base_price": 158.060, "pip": 0.01, "vol": 0.015},
-    {"symbol": "USDCAD", "base": "USD", "quote": "CAD", "name": "US Dollar / Canadian Dollar", "digits": 5, "base_price": 1.40579, "pip": 0.0001, "vol": 0.010},
-    {"symbol": "AUDCAD", "base": "AUD", "quote": "CAD", "name": "Aussie / Canadian Dollar", "digits": 5, "base_price": 0.98874, "pip": 0.0001, "vol": 0.00008},
-    {"symbol": "AUDJPY", "base": "AUD", "quote": "JPY", "name": "Aussie / Japanese Yen", "digits": 3, "base_price": 111.175, "pip": 0.01, "vol": 0.015},
-    {"symbol": "AUDUSD", "base": "AUD", "quote": "USD", "name": "Aussie / US Dollar", "digits": 5, "base_price": 0.70340, "pip": 0.0001, "vol": 0.00008},
-    {"symbol": "EURGBP", "base": "EUR", "quote": "GBP", "name": "Euro / British Pound", "digits": 5, "base_price": 0.83729, "pip": 0.0001, "vol": 0.00006},
-    {"symbol": "EURAUD", "base": "EUR", "quote": "AUD", "name": "Euro / Aussie", "digits": 5, "base_price": 1.58271, "pip": 0.0001, "vol": 0.00012},
-    {"symbol": "EURJPY", "base": "EUR", "quote": "JPY", "name": "Euro / Japanese Yen", "digits": 3, "base_price": 175.976, "pip": 0.01, "vol": 0.015},
-    {"symbol": "EURNZD", "base": "EUR", "quote": "NZD", "name": "Euro / Kiwi", "digits": 5, "base_price": 1.98163, "pip": 0.0001, "vol": 0.00015},
-    {"symbol": "GBPJPY", "base": "GBP", "quote": "JPY", "name": "British Pound / Japanese Yen", "digits": 3, "base_price": 210.158, "pip": 0.01, "vol": 0.020},
-    {"symbol": "GBPAUD", "base": "GBP", "quote": "AUD", "name": "British Pound / Aussie", "digits": 5, "base_price": 1.89029, "pip": 0.0001, "vol": 0.00015},
-    {"symbol": "GBPCAD", "base": "GBP", "quote": "CAD", "name": "British Pound / Canadian Dollar", "digits": 5, "base_price": 1.86909, "pip": 0.0001, "vol": 0.00012},
-    {"symbol": "GBPNZD", "base": "GBP", "quote": "NZD", "name": "British Pound / Kiwi", "digits": 5, "base_price": 2.36661, "pip": 0.0001, "vol": 0.00020},
-    {"symbol": "NZDUSD", "base": "NZD", "quote": "USD", "name": "Kiwi / US Dollar", "digits": 5, "base_price": 0.56180, "pip": 0.0001, "vol": 0.00008},
-    {"symbol": "NZDCAD", "base": "NZD", "quote": "CAD", "name": "Kiwi / Canadian Dollar", "digits": 5, "base_price": 0.78968, "pip": 0.0001, "vol": 0.00010},
-    {"symbol": "XTIUSD", "base": "XTI", "quote": "USD", "name": "WTI Crude Oil / US Dollar", "digits": 3, "base_price": 105.690, "pip": 0.01, "vol": 0.05},
-    {"symbol": "USDCHF", "base": "USD", "quote": "CHF", "name": "US Dollar / Swiss Franc", "digits": 5, "base_price": 0.83011, "pip": 0.0001, "vol": 0.00008},
-    {"symbol": "EURCHF", "base": "EUR", "quote": "CHF", "name": "Euro / Swiss Franc", "digits": 5, "base_price": 0.92439, "pip": 0.0001, "vol": 0.00008},
-    {"symbol": "GBPCHF", "base": "GBP", "quote": "CHF", "name": "British Pound / Swiss Franc", "digits": 5, "base_price": 1.10372, "pip": 0.0001, "vol": 0.00010},
-    {"symbol": "CADJPY", "base": "CAD", "quote": "JPY", "name": "Canadian Dollar / Japanese Yen", "digits": 3, "base_price": 112.525, "pip": 0.01, "vol": 0.012},
-    {"symbol": "CHFJPY", "base": "CHF", "quote": "JPY", "name": "Swiss Franc / Japanese Yen", "digits": 3, "base_price": 190.424, "pip": 0.01, "vol": 0.018},
-    {"symbol": "NZDJPY", "base": "NZD", "quote": "JPY", "name": "Kiwi / Japanese Yen", "digits": 3, "base_price": 88.812, "pip": 0.01, "vol": 0.012},
-    {"symbol": "AUDNZD", "base": "AUD", "quote": "NZD", "name": "Aussie / Kiwi", "digits": 5, "base_price": 1.25169, "pip": 0.0001, "vol": 0.00008},
-    {"symbol": "CADCHF", "base": "CAD", "quote": "CHF", "name": "Canadian Dollar / Swiss Franc", "digits": 5, "base_price": 0.59120, "pip": 0.0001, "vol": 0.00008},
-    {"symbol": "AUDCHF", "base": "AUD", "quote": "CHF", "name": "Aussie / Swiss Franc", "digits": 5, "base_price": 0.58410, "pip": 0.0001, "vol": 0.00008},
+    {"symbol": "XAUUSD", "base": "XAU", "quote": "USD", "name": "Spot Gold / US Dollar", "digits": 2, "base_price": 4094.68, "pip": 0.1, "vol": 0.50},
+    {"symbol": "EURUSD", "base": "EUR", "quote": "USD", "name": "Euro / US Dollar", "digits": 5, "base_price": 1.11870, "pip": 0.0001, "vol": 0.00008},
+    {"symbol": "GBPUSD", "base": "GBP", "quote": "USD", "name": "British Pound / US Dollar", "digits": 5, "base_price": 1.34131, "pip": 0.0001, "vol": 0.00010},
+    {"symbol": "USDJPY", "base": "USD", "quote": "JPY", "name": "US Dollar / Japanese Yen", "digits": 3, "base_price": 158.000, "pip": 0.01, "vol": 0.015},
+    {"symbol": "USDCAD", "base": "USD", "quote": "CAD", "name": "US Dollar / Canadian Dollar", "digits": 5, "base_price": 1.40808, "pip": 0.0001, "vol": 0.010},
+    {"symbol": "AUDCAD", "base": "AUD", "quote": "CAD", "name": "Aussie / Canadian Dollar", "digits": 5, "base_price": 0.97166, "pip": 0.0001, "vol": 0.00008},
+    {"symbol": "AUDJPY", "base": "AUD", "quote": "JPY", "name": "Aussie / Japanese Yen", "digits": 3, "base_price": 109.041, "pip": 0.01, "vol": 0.015},
+    {"symbol": "AUDUSD", "base": "AUD", "quote": "USD", "name": "Aussie / US Dollar", "digits": 5, "base_price": 0.69012, "pip": 0.0001, "vol": 0.00008},
+    {"symbol": "EURGBP", "base": "EUR", "quote": "GBP", "name": "Euro / British Pound", "digits": 5, "base_price": 0.83405, "pip": 0.0001, "vol": 0.00006},
+    {"symbol": "EURAUD", "base": "EUR", "quote": "AUD", "name": "Euro / Aussie", "digits": 5, "base_price": 1.62111, "pip": 0.0001, "vol": 0.00012},
+    {"symbol": "EURJPY", "base": "EUR", "quote": "JPY", "name": "Euro / Japanese Yen", "digits": 3, "base_price": 176.768, "pip": 0.01, "vol": 0.015},
+    {"symbol": "EURNZD", "base": "EUR", "quote": "NZD", "name": "Euro / Kiwi", "digits": 5, "base_price": 1.99576, "pip": 0.0001, "vol": 0.00015},
+    {"symbol": "GBPJPY", "base": "GBP", "quote": "JPY", "name": "British Pound / Japanese Yen", "digits": 3, "base_price": 211.923, "pip": 0.01, "vol": 0.020},
+    {"symbol": "GBPAUD", "base": "GBP", "quote": "AUD", "name": "British Pound / Aussie", "digits": 5, "base_price": 1.94353, "pip": 0.0001, "vol": 0.00015},
+    {"symbol": "GBPCAD", "base": "GBP", "quote": "CAD", "name": "British Pound / Canadian Dollar", "digits": 5, "base_price": 1.88852, "pip": 0.0001, "vol": 0.012},
+    {"symbol": "GBPNZD", "base": "GBP", "quote": "NZD", "name": "British Pound / Kiwi", "digits": 5, "base_price": 2.39270, "pip": 0.0001, "vol": 0.00020},
+    {"symbol": "NZDUSD", "base": "NZD", "quote": "USD", "name": "Kiwi / US Dollar", "digits": 5, "base_price": 0.56057, "pip": 0.0001, "vol": 0.00008},
+    {"symbol": "NZDCAD", "base": "NZD", "quote": "CAD", "name": "Kiwi / Canadian Dollar", "digits": 5, "base_price": 0.78924, "pip": 0.0001, "vol": 0.00010},
+    {"symbol": "XTIUSD", "base": "XTI", "quote": "USD", "name": "WTI Crude Oil / US Dollar", "digits": 3, "base_price": 93.990, "pip": 0.01, "vol": 0.05},
+    {"symbol": "USDCHF", "base": "USD", "quote": "CHF", "name": "US Dollar / Swiss Franc", "digits": 5, "base_price": 0.81824, "pip": 0.0001, "vol": 0.00008},
+    {"symbol": "EURCHF", "base": "EUR", "quote": "CHF", "name": "Euro / Swiss Franc", "digits": 5, "base_price": 0.91543, "pip": 0.0001, "vol": 0.00008},
+    {"symbol": "GBPCHF", "base": "GBP", "quote": "CHF", "name": "British Pound / Swiss Franc", "digits": 5, "base_price": 1.09749, "pip": 0.0001, "vol": 0.00010},
+    {"symbol": "CADJPY", "base": "CAD", "quote": "JPY", "name": "Canadian Dollar / Japanese Yen", "digits": 3, "base_price": 112.217, "pip": 0.01, "vol": 0.012},
+    {"symbol": "CHFJPY", "base": "CHF", "quote": "JPY", "name": "Swiss Franc / Japanese Yen", "digits": 3, "base_price": 193.095, "pip": 0.01, "vol": 0.018},
+    {"symbol": "NZDJPY", "base": "NZD", "quote": "JPY", "name": "Kiwi / Japanese Yen", "digits": 3, "base_price": 88.569, "pip": 0.01, "vol": 0.012},
+    {"symbol": "AUDNZD", "base": "AUD", "quote": "NZD", "name": "Aussie / Kiwi", "digits": 5, "base_price": 1.23111, "pip": 0.0001, "vol": 0.00008},
+    {"symbol": "CADCHF", "base": "CAD", "quote": "CHF", "name": "Canadian Dollar / Swiss Franc", "digits": 5, "base_price": 0.58113, "pip": 0.0001, "vol": 0.00008},
+    {"symbol": "AUDCHF", "base": "AUD", "quote": "CHF", "name": "Aussie / Swiss Franc", "digits": 5, "base_price": 0.56468, "pip": 0.0001, "vol": 0.00008},
 ]
 
 META_MAP = {m["symbol"]: m for m in FOREX_METAS}
@@ -74,7 +74,7 @@ class ForexFeed:
         self._task: asyncio.Task | None = None
         self.session: aiohttp.ClientSession | None = None
 
-    def seed_rings(self, rings: dict) -> None:
+    def seed_rings(self, rings: dict, initial_ticks: dict | None = None) -> None:
         """Seed 240 bars (4 jam candle M1) untuk setiap pair Forex agar indikator langsung aktif."""
         from .bars import BarRing
         now_ms = int(time.time() * 1000)
@@ -87,23 +87,35 @@ class ForexFeed:
                 ring = rings[sym] = BarRing(offset_ms=(abs(hash(sym)) % 60) * 1000)
 
             base = meta["base_price"]
+            if initial_ticks and sym in initial_ticks:
+                t_val = initial_ticks[sym]
+                t_px = t_val.get("price") or t_val.get("last") or t_val.get("bid")
+                if t_px and float(t_px) > 0:
+                    base = float(t_px)
+
             vol = meta["vol"]
-            p = base * (1.0 + random.uniform(-0.004, 0.004))
+            p = base * (1.0 + random.uniform(-0.001, 0.001))
             self.open_prices_24h[sym] = p
 
             for b in range(240):
                 b_ts = start_ms + (b * 60 * 1000)
-                drift = random.gauss(0, vol * 0.8)
-                o = p
-                c = round(o + drift, meta["digits"])
-                h = round(max(o, c) + abs(random.gauss(0, vol * 0.5)), meta["digits"])
-                l = round(min(o, c) - abs(random.gauss(0, vol * 0.5)), meta["digits"])
+                if b == 239:
+                    c = base
+                    o = p
+                    h = max(o, c)
+                    l = min(o, c)
+                else:
+                    drift = random.gauss(0, vol * 0.4)
+                    o = p
+                    c = round(o + drift, meta["digits"])
+                    h = round(max(o, c) + abs(random.gauss(0, vol * 0.3)), meta["digits"])
+                    l = round(min(o, c) - abs(random.gauss(0, vol * 0.3)), meta["digits"])
                 v = round(random.uniform(50, 450), 2)
                 ring.seed(b_ts, o, h, l, c, v)
                 p = c
 
-            self.current_prices[sym] = p
-            ring.price = p
+            self.current_prices[sym] = base
+            ring.price = base
             ring.last_tick = now_ms
 
     async def start(self) -> None:

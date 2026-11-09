@@ -40,6 +40,7 @@ RISK_PER_TRADE = float(os.getenv("RISK_PER_TRADE", "0.02"))
 SINGLE_POS_CAP = float(os.getenv("SINGLE_POS_CAP", "0.20"))
 SL_MULT = float(os.getenv("SL_MULT", "2.0"))
 FOREX_TARGET_RISK = float(os.getenv("FOREX_TARGET_RISK", "15.0"))
+MAX_MC_LIMIT = int(os.getenv("MAX_MC_LIMIT", "3"))
 
 # Database
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://arena:arena@db:5432/arena")
@@ -73,6 +74,7 @@ def get_client_config() -> dict:
         "sl_mult": SL_MULT,
         "forex_target_risk": FOREX_TARGET_RISK,
         "universal_start_equity": START_EQUITY * 3.0,
+        "max_mc_limit": MAX_MC_LIMIT,
         "arena_pairs": ARENA_PAIRS,
         "snapshot_sec": ARENA_SNAPSHOT_SEC,
     }

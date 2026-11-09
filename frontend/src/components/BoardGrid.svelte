@@ -309,9 +309,9 @@
         <div class="r1">
           <span class="pos mono">#{rank}</span>
           <span class="nm" title={a.name}>{a.name}</span>
-          {#if a.disabled || a.refillCount >= 5}
-            <span class="chip-mc-disabled" title="Strategi ini telah dinonaktifkan permanen karena mencapai batas 5x Margin Call">
-              OFF 5x MC
+          {#if a.disabled || a.refillCount >= 3}
+            <span class="chip-mc-disabled" title="Strategi ini telah dinonaktifkan permanen karena mencapai batas 3x Margin Call">
+              OFF 3x MC
             </span>
           {:else if a.refillCount > 0}
             <span class="chip-mc" title="Strategi ini telah mengalami margin call dan direfill {a.refillCount}x">

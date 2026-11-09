@@ -14,7 +14,7 @@ import asyncpg
 
 log = logging.getLogger("arena.db")
 
-from .config import DATABASE_URL as DSN
+from .config import DATABASE_URL as DSN, MAX_MC_LIMIT
 DEFAULT_PUBLIC_KEY = "pk_live_strategyarena_public_feed"
 
 
@@ -263,7 +263,7 @@ class DB:
                 if not m_data:
                     continue
                 for a in m_data.get("accounts", []):
-                    is_dis = bool(a.get("disabled", False) or a.get("mc_count", 0) >= 5)
+                    is_dis = bool(a.get("disabled", False) or a.get("mc_count", 0) >= MAX_MC_LIMIT)
                     acct_rows.append((
                         a["id"], mode, a["equity"], a["cash"], a["peak"], a["max_dd"],
                         a["trades"], a["wins"], a["gross_win"], a["gross_loss"], a["realized"],
@@ -301,7 +301,7 @@ class DB:
 
             async with self.pool.acquire() as con:
                 async with con.transaction():
-                    # Hapus riwayat trade untuk strategi yang mencapai batas 5x MC
+                    # Hapus riwayat trade untuk strategi yang mencapai batas MAX_MC_LIMIT MC
                     if pruned_strats:
                         for p_sid, p_mode in pruned_strats:
                             await con.execute("DELETE FROM trades WHERE strategy = $1 AND mode = $2", p_sid, p_mode)
@@ -437,8 +437,8 @@ class DB:
                     FROM trades
                     GROUP BY strategy, mode
                 ) t
-                WHERE a.strategy = t.strategy AND a.mode = t.mode AND a.disabled = FALSE AND a.mc_count < 5;
-            """)
+                WHERE a.strategy = t.strategy AND a.mode = t.mode AND a.disabled = FALSE AND a.mc_count < $1;
+            """, MAX_MC_LIMIT)
 
     async def load_full_state(self) -> dict[str, Any]:
         """Dipanggil saat engine startup: mengembalikan akun, posisi, dan kurva dari DB."""

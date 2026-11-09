@@ -366,7 +366,8 @@ class ArenaStore {
         const bal = a.balance ?? a.cash ?? a.equity ?? startEq;
         const initial = a.initial_balance ?? startEq;
         const refillCount = a.mc_count ?? a.refill_count ?? 0;
-        const isDis = Boolean(a.disabled || refillCount >= 5);
+        const maxMc = this.config?.max_mc_limit ?? 3;
+        const isDis = Boolean(a.disabled || refillCount >= maxMc);
         return {
           ...a,
           balance: bal,
@@ -450,7 +451,8 @@ class ArenaStore {
       const initial = a.initial_balance ?? startEq;
       const ret = (bal - initial) / initial;
       const refillCount = a.mc_count ?? a.refill_count ?? 0;
-      const isDis = Boolean(a.disabled || refillCount >= 5);
+      const maxMc = this.config?.max_mc_limit ?? 3;
+      const isDis = Boolean(a.disabled || refillCount >= maxMc);
       return {
         ...a,
         balance: bal,

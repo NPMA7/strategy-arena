@@ -32,7 +32,7 @@ log = logging.getLogger("arena")
 ROOT_DIR = os.path.dirname(os.path.dirname(__file__))
 FRONTEND_DIR = os.path.join(ROOT_DIR, "frontend")
 DIST_DIR = os.path.join(FRONTEND_DIR, "dist")
-from .config import START_EQUITY, SNAPSHOT_SEC, ADMIN_RESET_KEY, get_client_config, MT5_BRIDGE_URL
+from .config import START_EQUITY, SNAPSHOT_SEC, ADMIN_RESET_KEY, get_client_config, MT5_BRIDGE_URL, MAX_MC_LIMIT
 PRICE_TICK_SEC = 0.5
 
 db = DB()
@@ -752,7 +752,7 @@ async def list_strategies_api(
                 "win_rate_pct": round(a["wins"] / a["trades"] * 100, 1) if a["trades"] > 0 else 0.0,
                 "max_drawdown_pct": round(a["max_dd"] * 100, 2),
                 "mc_count": a.get("mc_count", 0),
-                "disabled": bool(a.get("disabled", False) or a.get("mc_count", 0) >= 5),
+                "disabled": bool(a.get("disabled", False) or a.get("mc_count", 0) >= MAX_MC_LIMIT),
                 "open_positions": a.get("open", 0),
                 "leverage": a.get("leverage", 1),
             })

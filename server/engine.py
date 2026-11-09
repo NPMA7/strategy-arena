@@ -19,7 +19,7 @@ from typing import Iterable
 
 from .bars import BarRing
 from .indicators import compute
-from .config import START_EQUITY, RISK_PER_TRADE as RISK, SL_MULT, FOREX_TARGET_RISK
+from .config import START_EQUITY, RISK_PER_TRADE as RISK, SL_MULT, FOREX_TARGET_RISK, MAX_MC_LIMIT
 from .strategies import (
     LONG, MAX_POS, SHORT, SIGNAL_FN, STRATEGY_IDS, STRATEGY_META, THRESHOLD,
     SINGLE_POS_CAP, TOTAL_NOTIONAL_CAP, TOTAL_RISK_CAP, DEFAULT_LEVERAGE,
@@ -181,7 +181,7 @@ class Engine:
                 acct["realized"] = float(saved.get("realized", 0.0))
                 acct["funding_paid"] = float(saved.get("funding_paid", 0.0))
                 acct["mc_count"] = int(saved.get("mc_count", 0))
-                acct["disabled"] = bool(saved.get("disabled", False) or acct["mc_count"] >= 5)
+                acct["disabled"] = bool(saved.get("disabled", False) or acct["mc_count"] >= MAX_MC_LIMIT)
                 if acct["disabled"]:
                     acct["cash"] = 0.0
                     acct["equity"] = 0.0
@@ -193,7 +193,7 @@ class Engine:
             sid = p.get("strategy")
             sym = p.get("symbol")
             if sid in self.accounts:
-                if self.accounts[sid].get("disabled") or self.accounts[sid].get("mc_count", 0) >= 5:
+                if self.accounts[sid].get("disabled") or self.accounts[sid].get("mc_count", 0) >= MAX_MC_LIMIT:
                     continue
                 lot_val = p.get("lot")
                 if lot_val is None and self.mode == "forex":
@@ -266,7 +266,7 @@ class Engine:
         signals: list[tuple[float, str, str]] = []  # (score, sid, symbol)
         for sid in self.strategy_ids:
             acct = self.accounts[sid]
-            if acct.get("disabled") or acct.get("mc_count", 0) >= 5:
+            if acct.get("disabled") or acct.get("mc_count", 0) >= MAX_MC_LIMIT:
                 continue
             fn = SIGNAL_FN[sid]
             try:
@@ -320,7 +320,7 @@ class Engine:
         return 10.0 if self.mode == "futures" else 0.0
 
     def is_mc_breached(self, acct: dict, current_equity: Optional[float] = None) -> bool:
-        if acct.get("disabled") or acct.get("mc_count", 0) >= 5:
+        if acct.get("disabled") or acct.get("mc_count", 0) >= MAX_MC_LIMIT:
             return False
         thresh = self.mc_threshold
         eq = current_equity if current_equity is not None else acct.get("equity", acct.get("cash", 0.0))
@@ -331,10 +331,10 @@ class Engine:
 
     def _handle_mc(self, acct: dict, ts: int) -> None:
         """Margin Call / saldo habis (< $10 di Futures, <= $0 di pasar lain):
-        Jika mc_count < 5: Likuidasi semua posisi terbuka, refill ke START_EQUITY ($1.000), catat mc_count.
-        Jika mc_count >= 5: Likuidasi semua posisi terbuka, disable strategi (tidak refill balance lagi, tidak open posisi),
+        Jika mc_count < MAX_MC_LIMIT: Likuidasi semua posisi terbuka, refill ke START_EQUITY ($1.000), catat mc_count.
+        Jika mc_count >= MAX_MC_LIMIT: Likuidasi semua posisi terbuka, disable strategi (tidak refill balance lagi, tidak open posisi),
         dan hapus riwayat trade individual dari DB (hanya sisakan statistik dan grafik tren)."""
-        if acct.get("disabled") or acct.get("mc_count", 0) >= 5:
+        if acct.get("disabled") or acct.get("mc_count", 0) >= MAX_MC_LIMIT:
             return
         sid = acct["id"]
         acct["mc_count"] = acct.get("mc_count", 0) + 1
@@ -363,8 +363,8 @@ class Engine:
                 acct["gross_loss"] += -net
             acct["realized"] += net
 
-            # Jika belum 5x MC, simpan trade ke self.new_trades
-            if mc_num < 5:
+            # Jika belum MAX_MC_LIMIT MC, simpan trade ke self.new_trades
+            if mc_num < MAX_MC_LIMIT:
                 self.new_trades.append({
                     "strategy": sid, "symbol": sym, "side": p["side"], "qty": p["qty"],
                     "entry": p["entry"], "exit": px, "opened_at": p["opened_at"], "closed_at": ts,
@@ -375,8 +375,8 @@ class Engine:
 
         now_ms = int(time.time() * 1000)
 
-        # Cek apakah sudah mencapai batas 5x MC
-        if mc_num >= 5:
+        # Cek apakah sudah mencapai batas MAX_MC_LIMIT MC
+        if mc_num >= MAX_MC_LIMIT:
             acct["disabled"] = True
             acct["cash"] = 0.0
             acct["equity"] = 0.0
@@ -388,11 +388,11 @@ class Engine:
                 self.sparklines[sid].append([now_ms, 0.0])
 
             mode_str = self.mode.upper()
-            msg = f"⛔ STRATEGI DINONAKTIFKAN (5x MC) [{mode_str}]: {acct['name']} mencapai batas 5x Margin Call. Saldo tidak di-refill lagi dan strategi dinonaktifkan."
+            msg = f"⛔ STRATEGI DINONAKTIFKAN ({MAX_MC_LIMIT}x MC) [{mode_str}]: {acct['name']} mencapai batas {MAX_MC_LIMIT}x Margin Call. Saldo tidak di-refill lagi dan strategi dinonaktifkan."
             self._push_event([sid], None, "mc_disabled", msg)
             return
 
-        # 2. Refill saldo kembali ke modal awal ($1.000) jika MC < 5x
+        # 2. Refill saldo kembali ke modal awal ($1.000) jika MC < MAX_MC_LIMIT
         acct["cash"] = START_EQUITY
         acct["equity"] = START_EQUITY
         acct["peak"] = max(acct.get("peak", START_EQUITY), START_EQUITY)
@@ -422,7 +422,7 @@ class Engine:
         return tc, tr
 
     def _handle_signal(self, acct: dict, score: float, symbol: str, snap, ts: int) -> None:
-        if acct.get("disabled") or acct.get("mc_count", 0) >= 5:
+        if acct.get("disabled") or acct.get("mc_count", 0) >= MAX_MC_LIMIT:
             return
         side = LONG if score > 0 else SHORT
         price = snap.c[snap.i]
@@ -479,7 +479,7 @@ class Engine:
         self._open(acct, symbol, side, price, atr, ts, score)
 
     def _open(self, acct: dict, symbol: str, side: int, price: float, atr: float, ts: int, score: float) -> None:
-        if acct.get("disabled") or acct.get("mc_count", 0) >= 5:
+        if acct.get("disabled") or acct.get("mc_count", 0) >= MAX_MC_LIMIT:
             return
         # Spot mode: skip short signals
         if self.mode == "spot" and side == SHORT:
@@ -775,7 +775,7 @@ class Engine:
         positions = []
         fx_px = self._forex_prices() if self.mode == "forex" else None
         for sid, a in self.accounts.items():
-            is_dis = bool(a.get("disabled", False) or a.get("mc_count", 0) >= 5)
+            is_dis = bool(a.get("disabled", False) or a.get("mc_count", 0) >= MAX_MC_LIMIT)
             if is_dis:
                 a["disabled"] = True
                 a["pos"].clear()

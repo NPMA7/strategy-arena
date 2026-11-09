@@ -601,8 +601,8 @@
                 {(strategy.family || getStrategyCategory(strategy.id)).toUpperCase()}
               {/if}
             </span>
-            {#if strategy.disabled || strategy.refillCount >= 5}
-              <span class="chip-mc-disabled mono">DINONAKTIFKAN (5x MC)</span>
+            {#if strategy.disabled || strategy.refillCount >= 3}
+              <span class="chip-mc-disabled mono">DINONAKTIFKAN (3x MC)</span>
             {:else if strategy.refillCount > 0}
               <span class="chip-mc mono">MC {strategy.refillCount}x</span>
             {/if}
@@ -809,9 +809,9 @@
             <!-- Box 12: Margin Call Counter -->
             <div class="stat-card">
               <span class="s-label mono">MARGIN CALL STATUS</span>
-              {#if strategy.disabled || deepStats.refillCount >= 5}
-                <b class="s-val mono text-rose">5x MC (DINONAKTIFKAN)</b>
-                <span class="s-sub mono text-rose">Mencapai batas 5x MC: Saldo tidak di-refill lagi & strategi dinonaktifkan</span>
+              {#if strategy.disabled || deepStats.refillCount >= 3}
+                <b class="s-val mono text-rose">3x MC (DINONAKTIFKAN)</b>
+                <span class="s-sub mono text-rose">Mencapai batas 3x MC: Saldo tidak di-refill lagi & strategi dinonaktifkan</span>
               {:else}
                 <b class="s-val mono {deepStats.refillCount > 0 ? 'down' : 'up'}">
                   {deepStats.refillCount === 0 ? 'SEHAT (0 MC)' : `${deepStats.refillCount}x TERKENA MC`}
@@ -871,12 +871,12 @@
             </div>
           {:else if closedTrades.length === 0}
             <div class="empty-trades">
-              {#if strategy.disabled || strategy.refillCount >= 5}
+              {#if strategy.disabled || strategy.refillCount >= 3}
                 <div class="disabled-notice">
                   <div class="dn-icon">⛔</div>
                   <div class="dn-body">
-                    <b class="dn-title mono">STRATEGI DINONAKTIFKAN KARENA 5x MARGIN CALL</b>
-                    <p class="dn-desc">Strategi ini telah mencapai batas maksimal 5x Margin Call sehingga tidak lagi melakukan entry order atau membuka posisi baru. Riwayat transaksi individual telah dibersihkan untuk optimalisasi database, namun seluruh metrik statistik kuantitatif dan kurva tren tetap tersimpan utuh di tab Statistik & Grafik.</p>
+                    <b class="dn-title mono">STRATEGI DINONAKTIFKAN KARENA 3x MARGIN CALL</b>
+                    <p class="dn-desc">Strategi ini telah mencapai batas maksimal 3x Margin Call sehingga tidak lagi melakukan entry order atau membuka posisi baru. Riwayat transaksi individual telah dibersihkan untuk optimalisasi database, namun seluruh metrik statistik kuantitatif dan kurva tren tetap tersimpan utuh di tab Statistik & Grafik.</p>
                   </div>
                 </div>
               {:else}

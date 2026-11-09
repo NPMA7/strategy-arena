@@ -331,8 +331,8 @@
               {(strategy.family || getStrategyCategory(strategy.id)).toUpperCase()}
             {/if}
           </span>
-          {#if strategy.disabled || strategy.refillCount >= 5}
-            <span class="chip-mc-disabled">OFF (5x MC)</span>
+          {#if strategy.disabled || strategy.refillCount >= 3}
+            <span class="chip-mc-disabled">OFF (3x MC)</span>
           {:else if strategy.refillCount > 0}
             <span class="chip-mc">MC {strategy.refillCount}x</span>
           {/if}

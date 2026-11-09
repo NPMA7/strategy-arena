@@ -201,9 +201,9 @@
 
             <!-- MC Refill Status Badge -->
             <td class="td-status">
-              {#if s.disabled || s.refillCount >= 5}
-                <span class="badge badge-down badge-mc" title="Strategi ini telah dinonaktifkan permanen karena mencapai batas 5x Margin Call">
-                  <span>OFF (5x MC)</span>
+              {#if s.disabled || s.refillCount >= 3}
+                <span class="badge badge-down badge-mc" title="Strategi ini telah dinonaktifkan permanen karena mencapai batas 3x Margin Call">
+                  <span>OFF (3x MC)</span>
                 </span>
               {:else if s.refillCount > 0}
                 <span class="badge badge-amber badge-mc" title="Strategi ini pernah mencapai $0 dan telah diisi ulang modalnya">

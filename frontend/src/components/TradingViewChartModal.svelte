@@ -73,11 +73,11 @@
     return px ? Number(px) : null;
   });
 
-  // TradingView Iframe Embed URL with hidesidetoolbar=1 (NO DRAWING TOOLS)
+  // TradingView Iframe Embed URL with hidesidetoolbar=0 (WITH DRAWING TOOLS)
   let iframeUrl = $derived.by(() => {
     const s = encodeURIComponent(symbolInfo.tvSymbol);
     const i = selectedInterval;
-    return `https://s.tradingview.com/widgetembed/?frameElementId=tradingview_widget&symbol=${s}&interval=${i}&hidesidetoolbar=1&symboledit=0&saveimage=0&toolbarbg=060910&theme=dark&style=1&timezone=Asia%2FJakarta&locale=id`;
+    return `https://s.tradingview.com/widgetembed/?frameElementId=tradingview_widget&symbol=${s}&interval=${i}&hidesidetoolbar=0&symboledit=1&saveimage=1&toolbarbg=060910&theme=dark&style=1&timezone=Asia%2FJakarta&locale=id`;
   });
 
   function handleKeyDown(e) {

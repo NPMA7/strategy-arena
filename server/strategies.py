@@ -1,4 +1,4 @@
-"""50 strategy untuk Spot dan Futures.
+"""89 Universal Multi-Market Quantitative Strategies (Spot, Futures, Forex).
 
 Kontrak sinyal per strategy (dipanggil satu kali per bar tertutup per symbol):
 
@@ -7,8 +7,9 @@ Kontrak sinyal per strategy (dipanggil satu kali per bar tertutup per symbol):
   > +0.15  long   ·   < -0.15  short   ·   selain itu diam.
 
 Spot mode: hanya LONG yang dieksekusi, fee 0.05% per sisi.
-Futures mode: LONG + SHORT, leverage configurable per strategi, funding rate 8 jam,
+Futures mode: LONG + SHORT, leverage configurable per strategi (5-20x), funding rate 8 jam,
               fee maker 0.02% / taker 0.05%.
+Forex mode: LONG + SHORT, MT5 direct lot sizing & spread broker riil, no funding fee.
 """
 
 from __future__ import annotations
@@ -201,26 +202,48 @@ def vwap_band(s):
 
 
 def supertrend(s):
-    """SuperTrend 10 x 3 ATR sederhana (arah dari posisi close vs ATR band)."""
+    """SuperTrend 14 x 3.0 ATR stateful trailing band."""
     i = s.i
-    atr = s.atr14[i]
-    hl2 = (s.h[i] + s.l[i]) / 2
-    if not _ok(atr):
+    if i < 20 or not _ok(s.atr14[i]):
         return 0.0
-    up_line = hl2 - 3 * atr
-    dn_line = hl2 + 3 * atr
-    c0, c1 = s.c[i - 1], s.c[i]
-    if c0 <= up_line:
+    start = max(1, i - 59)
+    final_ub = None
+    final_lb = None
+    trend = 1
+    prev_trend = 1
+    for k in range(start, i + 1):
+        atr_k = s.atr14[k]
+        c_k = s.c[k]
+        if not _ok(atr_k, c_k, s.h[k], s.l[k]) or atr_k <= 0:
+            continue
+        hl2 = 0.5 * (s.h[k] + s.l[k])
+        basic_ub = hl2 + 3.0 * atr_k
+        basic_lb = hl2 - 3.0 * atr_k
+        prev_c = s.c[k - 1]
+        if final_ub is None:
+            final_ub = basic_ub
+            final_lb = basic_lb
+            trend = 1 if c_k >= hl2 else -1
+            prev_trend = trend
+            continue
+        prev_trend = trend
+        final_ub = basic_ub if (basic_ub < final_ub or prev_c > final_ub) else final_ub
+        final_lb = basic_lb if (basic_lb > final_lb or prev_c < final_lb) else final_lb
+        if c_k > final_ub:
+            trend = 1
+        elif c_k < final_lb:
+            trend = -1
+    if final_ub is None or final_lb is None:
         return 0.0
-    if c1 > up_line and c0 <= up_line:
-        return 0.7
-    if c1 < dn_line and c0 >= dn_line:
-        return -0.7
-    # sinyal lanjutan: harga jauh di luar band bertahan = momentum
-    if c1 > up_line and c1 < s.ema21[i]:
-        return 0.3
-    if c1 < dn_line and c1 > s.ema21[i]:
-        return -0.3
+    if prev_trend == -1 and trend == 1:
+        return 0.8
+    if prev_trend == 1 and trend == -1:
+        return -0.8
+    if _ok(s.ema21[i]):
+        if trend == 1 and s.c[i] > final_lb and s.c[i] < s.ema21[i]:
+            return 0.35
+        if trend == -1 and s.c[i] < final_ub and s.c[i] > s.ema21[i]:
+            return -0.35
     return 0.0
 
 
@@ -364,14 +387,15 @@ def fib_expansion_1618(s):
 
 
 def pivot_bounce(s):
+    """Support/Resistance Bounce: memantul naik dari S1 atau ditolak turun dari R1."""
     i = s.i
     piv = (s.h[i - 1] + s.l[i - 1] + s.c[i - 1]) / 3
     r1 = 2 * piv - s.l[i - 1]
     s1 = 2 * piv - s.h[i - 1]
     c = s.c[i]
-    if c < s1 and s.c[i - 1] >= s1:
+    if (s.l[i] <= s1 or s.c[i - 1] <= s1) and c > s1 and c > s.o[i]:
         return 0.6
-    if c > r1 and s.c[i - 1] <= r1:
+    if (s.h[i] >= r1 or s.c[i - 1] >= r1) and c < r1 and c < s.o[i]:
         return -0.6
     return 0.0
 
@@ -462,7 +486,7 @@ def volatility_target(s):
     if not _ok(atr, c) or c <= 0:
         return 0.0
     vol = atr / c
-    if not (0.0015 <= vol <= 0.012):
+    if not (0.0003 <= vol <= 0.012):
         return 0.0
     return trend_stack(s) * 0.8
 
@@ -495,17 +519,18 @@ def rotation(s):
 
 
 def macd_divergence(s):
+    """Deteksi divergensi MACD vs harga dengan dua jendela terpisah (disjoint)."""
     i = s.i
-    if i < 25:
+    if i < 30:
         return 0.0
-    px_low_prev = float(s.l[i - 25:i - 5].min())
-    px_low_now = float(s.l[i - 20:i + 1].min())
-    macd_low_prev = float(s.macd[i - 25:i - 5].min())
-    macd_low_now = float(s.macd[i - 20:i + 1].min())
-    px_hi_prev = float(s.h[i - 25:i - 5].max())
-    px_hi_now = float(s.h[i - 20:i + 1].max())
-    macd_hi_prev = float(s.macd[i - 25:i - 5].max())
-    macd_hi_now = float(s.macd[i - 20:i + 1].max())
+    px_low_prev = float(s.l[i - 30:i - 14].min())
+    px_low_now = float(s.l[i - 14:i + 1].min())
+    macd_low_prev = float(s.macd[i - 30:i - 14].min())
+    macd_low_now = float(s.macd[i - 14:i + 1].min())
+    px_hi_prev = float(s.h[i - 30:i - 14].max())
+    px_hi_now = float(s.h[i - 14:i + 1].max())
+    macd_hi_prev = float(s.macd[i - 30:i - 14].max())
+    macd_hi_now = float(s.macd[i - 14:i + 1].max())
     if px_low_now < px_low_prev and macd_low_now > macd_low_prev and s.c[i] > s.ema9[i]:
         return 0.65
     if px_hi_now > px_hi_prev and macd_hi_now < macd_hi_prev and s.c[i] < s.ema9[i]:
@@ -522,7 +547,11 @@ def tr_break(s):
     tr = max(s.h[i] - s.l[i], abs(s.h[i] - s.c[i - 1]), abs(s.l[i] - s.c[i - 1]))
     if tr < 2.4 * atr:
         return 0.0
-    return -1 if s.c[i] < s.o[i] else 1
+    if s.c[i] > s.o[i]:
+        return -0.8
+    if s.c[i] < s.o[i]:
+        return 0.8
+    return 0.0
 
 
 def ewma_trend(s):
@@ -625,15 +654,221 @@ def zscore_reversion(s):
 
 
 def paint_bar(s):
+    """3-Bar Key Reversal / Paint-Bar: sweep high/low 2 bar lalu tutup berbalik menembus kedua bar."""
     i = s.i
     if i < 3:
         return 0.0
-    # Engulfing sederhana
+    h1, h2 = s.h[i - 1], s.h[i - 2]
+    l1, l2 = s.l[i - 1], s.l[i - 2]
+    c, l_now, h_now = s.c[i], s.l[i], s.h[i]
+    if l_now < min(l1, l2) and c > max(h1, h2) and c > s.o[i]:
+        return 0.7
+    if h_now > max(h1, h2) and c < min(l1, l2) and c < s.o[i]:
+        return -0.7
+    return 0.0
+
+
+def engulfing_pattern(s):
+    """Bullish/Bearish Engulfing klasik dengan dominasi body & toleransi ATR kecil."""
+    i = s.i
+    if i < 2:
+        return 0.0
     o1, c1, o2, c2 = s.o[i - 1], s.c[i - 1], s.o[i], s.c[i]
-    if c1 < o1 and c2 > o2 and c2 > o1 and o2 < c1:
-        return 0.6
-    if c1 > o1 and c2 < o2 and c2 < o1 and o2 > c1:
-        return -0.6
+    atr = s.atr14[i]
+    if not _ok(o1, c1, o2, c2, atr) or atr <= 0:
+        return 0.0
+    tol = 0.05 * atr
+    b1, b2 = abs(c1 - o1), abs(c2 - o2)
+    if b1 <= 0 or b2 < 1.05 * b1:
+        return 0.0
+    if c1 < o1 and c2 > o2 and o2 <= c1 + tol and c2 >= o1 - tol:
+        return 0.65
+    if c1 > o1 and c2 < o2 and o2 >= c1 - tol and c2 <= o1 + tol:
+        return -0.65
+    return 0.0
+
+
+def ict_orderblock_sweep(s):
+    """ICT Order Block Sweep: bar sebelumnya menyapu swing low/high lalu dimitigasi sebagai OB."""
+    i = s.i
+    if i < 20:
+        return 0.0
+    atr = s.atr14[i]
+    c, o, h, l = s.c[i], s.o[i], s.h[i], s.l[i]
+    if not _ok(atr, c, o, h, l) or atr <= 0:
+        return 0.0
+    for k in range(i - 2, max(i - 10, 15), -1):
+        ll_prev = float(s.l[k - 15:k].min())
+        if s.l[k] < ll_prev and s.c[k] > s.o[k] and s.c[k + 1] > s.h[k]:
+            if float(s.l[k + 1:i].min()) >= s.l[k] and l <= s.h[k] and c >= s.l[k] and c > o:
+                return 0.78
+            break
+    for k in range(i - 2, max(i - 10, 15), -1):
+        hh_prev = float(s.h[k - 15:k].max())
+        if s.h[k] > hh_prev and s.c[k] < s.o[k] and s.c[k + 1] < s.l[k]:
+            if float(s.h[k + 1:i].max()) <= s.h[k] and h >= s.l[k] and c <= s.h[k] and c < o:
+                return -0.78
+            break
+    return 0.0
+
+
+def two_b_close_reversal(s):
+    """Sperandeo 2B Reversal: false breakout 20-bar high/low diikuti close konfirmasi ke dalam range."""
+    i = s.i
+    if i < 22:
+        return 0.0
+    hh = float(s.h[i - 21:i - 1].max())
+    ll = float(s.l[i - 21:i - 1].min())
+    c, o = s.c[i], s.o[i]
+    if s.h[i - 1] > hh and c < hh and c < s.l[i - 1] and c < o:
+        return -0.75
+    if s.l[i - 1] < ll and c > ll and c > s.h[i - 1] and c > o:
+        return 0.75
+    return 0.0
+
+
+def value_area_profile(s):
+    """Volume Profile Auction: POC & 70% Value Area (VAH/VAL) dari distribusi volume 90 bar."""
+    import numpy as np
+    i = s.i
+    if i < 60:
+        return 0.0
+    a = max(0, i - 89)
+    closes = s.c[a:i + 1]
+    vols = s.v[a:i + 1]
+    lo, hi = float(closes.min()), float(closes.max())
+    if hi <= lo:
+        return 0.0
+    bins = 12
+    weights = np.where(vols > 0, vols, 1.0)
+    hist, edges = np.histogram(closes, bins=bins, range=(lo, hi), weights=weights)
+    tot = float(hist.sum())
+    if tot <= 0:
+        return 0.0
+    poc_idx = int(np.argmax(hist))
+    acc = float(hist[poc_idx])
+    l_idx = r_idx = poc_idx
+    while acc < 0.70 * tot and (l_idx > 0 or r_idx < bins - 1):
+        left_v = float(hist[l_idx - 1]) if l_idx > 0 else -1.0
+        right_v = float(hist[r_idx + 1]) if r_idx < bins - 1 else -1.0
+        if left_v >= right_v:
+            l_idx -= 1
+            acc += left_v
+        else:
+            r_idx += 1
+            acc += right_v
+    val, vah = float(edges[l_idx]), float(edges[r_idx + 1])
+    c, o = s.c[i], s.o[i]
+    if c < val and c > o:
+        return 0.7
+    if c > vah and c < o:
+        return -0.7
+    return 0.0
+
+
+def mean_sd_band_mad(s):
+    """Robust Median + MAD (Median Absolute Deviation) mean-reversion band."""
+    import numpy as np
+    i = s.i
+    if i < 30:
+        return 0.0
+    win = s.c[i - 29:i + 1]
+    med = float(np.median(win))
+    mad = float(np.median(np.abs(win - med)))
+    scale = 1.4826 * mad
+    if scale <= 0:
+        return 0.0
+    z = (s.c[i] - med) / scale
+    if z <= -2.2:
+        return 0.72
+    if z >= 2.2:
+        return -0.72
+    return 0.0
+
+
+def vwap_trend_follow(s):
+    """VWAP Trend Follow: searah VWAP 60-bar + EMA21/EMA50 stack."""
+    i = s.i
+    if i < 50:
+        return 0.0
+    a = max(0, i - 59)
+    vv = s.v[a:i + 1]
+    tot = float(vv.sum())
+    if tot <= 0 or not _ok(s.ema21[i], s.ema50[i]):
+        return 0.0
+    vwap = float((s.c[a:i + 1] * vv).sum() / tot)
+    c = s.c[i]
+    if c > vwap and c > s.ema21[i] > s.ema50[i]:
+        return 0.65
+    if c < vwap and c < s.ema21[i] < s.ema50[i]:
+        return -0.65
+    return 0.0
+
+
+def candle_imbalance(s):
+    """Candle Imbalance (Order Flow Delta Proxy) selaras EMA21."""
+    i = s.i
+    c, h, l, e21 = s.c[i], s.h[i], s.l[i], s.ema21[i]
+    if not _ok(c, h, l, e21):
+        return 0.0
+    rng = max(h - l, 1e-12)
+    if (c - l) > 0.65 * rng and c > e21:
+        return 0.65
+    if (h - c) > 0.65 * rng and c < e21:
+        return -0.65
+    return 0.0
+
+
+def wick_rejection(s):
+    """Wick Rejection (Hammer & Shooting Star) pada level EMA21."""
+    i = s.i
+    o, h, l, c, e21 = s.o[i], s.h[i], s.l[i], s.c[i], s.ema21[i]
+    if not _ok(o, h, l, c, e21):
+        return 0.0
+    body = abs(c - o) + 1e-12
+    lower_wick = min(o, c) - l
+    upper_wick = h - max(o, c)
+    if lower_wick > 1.8 * body and l < e21 and c >= o:
+        return 0.65
+    if upper_wick > 1.8 * body and h > e21 and c <= o:
+        return -0.65
+    return 0.0
+
+
+def opening_range_breakout(s):
+    """Opening Hour Range Breakout (30m opening box pada awal sesi Asia/London/NY)."""
+    i = s.i
+    if i < 60 or not _ok(s.c[i], s.c[i - 1], s.ts[i]):
+        return 0.0
+    cur_ts = int(s.ts[i])
+    hour = (cur_ts // 3_600_000) % 24
+    # Sesi aktif 2-3 jam pasca open utama: Asia 00-02, London 08-10, NY 13-15 UTC
+    if 0 <= hour < 3:
+        sess_start_hr = 0
+    elif 8 <= hour < 10:
+        sess_start_hr = 8
+    elif 13 <= hour < 15:
+        sess_start_hr = 13
+    else:
+        return 0.0
+    day_ms = (cur_ts // 86_400_000) * 86_400_000
+    box_start = day_ms + sess_start_hr * 3_600_000
+    box_end = box_start + 30 * 60_000
+    if cur_ts < box_end:
+        return 0.0
+    or_high = None
+    or_low = None
+    for k in range(max(0, i - 180), i):
+        tk = int(s.ts[k])
+        if box_start <= tk < box_end:
+            or_high = s.h[k] if or_high is None else max(or_high, s.h[k])
+            or_low = s.l[k] if or_low is None else min(or_low, s.l[k])
+    if or_high is None or or_low is None or or_high <= or_low:
+        return 0.0
+    if s.c[i] > or_high and s.c[i - 1] <= or_high and s.c[i] > s.o[i]:
+        return 0.75
+    if s.c[i] < or_low and s.c[i - 1] >= or_low and s.c[i] < s.o[i]:
+        return -0.75
     return 0.0
 
 
@@ -652,8 +887,8 @@ def momentum_weeks(s):
     return 0.0
 
 
-# ── Forex Specific Quantitative Strategies (22 Models) ───────────────
-def fx_lob_alpha(s):
+# ── Extended Quantitative Strategies (Universal Multi-Market, 33 Models) ─
+def lob_alpha(s):
     """London Open Breakout: Breakout sesi London dengan konfirmasi volume & EMA."""
     hour = int((s.ts[s.i] // 3600000) % 24)
     if hour not in (7, 8, 9):
@@ -668,7 +903,7 @@ def fx_lob_alpha(s):
     return 0.0
 
 
-def fx_tokyo_fader(s):
+def tokyo_fader(s):
     """Asian Range Mean-Reversion: Fading rentang sempit sesi Tokyo."""
     hour = int((s.ts[s.i] // 3600000) % 24)
     if hour >= 7:
@@ -683,7 +918,7 @@ def fx_tokyo_fader(s):
     return 0.0
 
 
-def fx_frankfurt_probe(s):
+def frankfurt_probe(s):
     """Frankfurt Liquidity Probe: Menjebak likuiditas awal jam 06:00 UTC."""
     hour = int((s.ts[s.i] // 3600000) % 24)
     if hour != 6:
@@ -698,7 +933,7 @@ def fx_frankfurt_probe(s):
     return 0.0
 
 
-def fx_ny_reversal(s):
+def ny_reversal(s):
     """New York Institutional Fixing Reversal: Jam 15:00 - 17:00 UTC."""
     hour = int((s.ts[s.i] // 3600000) % 24)
     if hour not in (15, 16, 17):
@@ -713,8 +948,8 @@ def fx_ny_reversal(s):
     return 0.0
 
 
-def fx_sunday_gap(s):
-    """Sunday Gap Fill: Fade lonjakan harga pembukaan terhadap penutupan."""
+def sunday_gap(s):
+    """Sunday / Session Gap Fill: Fade lonjakan harga pembukaan terhadap penutupan sebelumnya."""
     c0, o1 = s.c[s.i - 1], s.o[s.i]
     atr = s.atr14[s.i]
     if not _ok(c0, o1, atr) or atr <= 0:
@@ -727,8 +962,8 @@ def fx_sunday_gap(s):
     return 0.0
 
 
-def fx_aud_nzd_arb(s):
-    """Aussie-Kiwi Cointegration Arb: Deviasi statistik Z-Score."""
+def aud_nzd_arb(s):
+    """Cointegration / Mean-Distance Arb: Deviasi statistik ATR Z-Score dari EMA50."""
     c, e50, atr = s.c[s.i], s.ema50[s.i], s.atr14[s.i]
     if not _ok(c, e50, atr) or atr <= 0:
         return 0.0
@@ -740,8 +975,8 @@ def fx_aud_nzd_arb(s):
     return 0.0
 
 
-def fx_triangular_synth(s):
-    """Cross-Rate Triangular Arbitrage Synth: Inefisiensi harga mikro."""
+def triangular_synth(s):
+    """Cross-Rate Triangular Arbitrage Synth: Inefisiensi harga mikro SMA20 + MACD + Stoch."""
     c, sma, hist, stoch = s.c[s.i], s.sma20[s.i], s.macd_hist[s.i], s.stoch_k[s.i]
     if not _ok(c, sma, hist, stoch):
         return 0.0
@@ -752,8 +987,8 @@ def fx_triangular_synth(s):
     return 0.0
 
 
-def fx_oil_cad_divergence(s):
-    """Commodity-Petro Currency Divergence."""
+def oil_cad_divergence(s):
+    """Macro Divergence Pullback: Pullback melawan tren EMA21/50 pada kondisi RSI moderat."""
     c, e21, e50, rsi = s.c[s.i], s.ema21[s.i], s.ema50[s.i], s.rsi14[s.i]
     if not _ok(c, e21, e50, rsi):
         return 0.0
@@ -764,8 +999,8 @@ def fx_oil_cad_divergence(s):
     return 0.0
 
 
-def fx_gold_safehaven_relay(s):
-    """Safe-Haven Risk Divergence Relay (Gold/Metals)."""
+def gold_safehaven_relay(s):
+    """Momentum Breakout Relay: Donchian 20 breakout dengan konfirmasi DI+/DI- & ADX > 22."""
     c, hh, ll, pdi, mdi, adx = s.c[s.i], s.hh20[s.i - 1], s.ll20[s.i - 1], s.plus_di[s.i], s.minus_di[s.i], s.adx[s.i]
     if not _ok(c, hh, ll, pdi, mdi, adx):
         return 0.0
@@ -776,8 +1011,8 @@ def fx_gold_safehaven_relay(s):
     return 0.0
 
 
-def fx_dragon_momentum(s):
-    """The Dragon Momentum Rider (GBPJPY): Volatilitas tinggi."""
+def dragon_momentum(s):
+    """The Dragon Momentum Rider: High-beta breakout Donchian 20 + EMA9."""
     c, hh, ll, e9, atr = s.c[s.i], s.hh20[s.i - 1], s.ll20[s.i - 1], s.ema9[s.i], s.atr14[s.i]
     if not _ok(c, hh, ll, e9, atr):
         return 0.0
@@ -788,7 +1023,7 @@ def fx_dragon_momentum(s):
     return 0.0
 
 
-def fx_bb_squeeze(s):
+def bb_squeeze(s):
     """Bollinger Bandwidth Volatility Explosion."""
     w0, w1 = s.bb_w[s.i - 1], s.bb_w[s.i]
     c, bu, bl = s.c[s.i], s.bb_u[s.i], s.bb_l[s.i]
@@ -801,7 +1036,7 @@ def fx_bb_squeeze(s):
     return 0.0
 
 
-def fx_atr_expansion(s):
+def atr_expansion(s):
     """ATR Expansion Channel Breakout."""
     h, l, c, o, atr = s.h[s.i], s.l[s.i], s.c[s.i], s.o[s.i], s.atr14[s.i]
     if not _ok(h, l, c, o, atr) or atr <= 0:
@@ -813,8 +1048,8 @@ def fx_atr_expansion(s):
     return 0.0
 
 
-def fx_gold_flash_spike(s):
-    """Gold Flash-Spike Mean Reversion."""
+def gold_flash_spike(s):
+    """Flash-Spike Mean Reversion: Fade lonjakan > 1.8x ATR pada RSI ekstrem."""
     h, l, c, atr, rsi = s.h[s.i], s.l[s.i], s.c[s.i], s.atr14[s.i], s.rsi14[s.i]
     if not _ok(h, l, c, atr, rsi) or atr <= 0:
         return 0.0
@@ -825,7 +1060,7 @@ def fx_gold_flash_spike(s):
     return 0.0
 
 
-def fx_ema_ribbon(s):
+def ema_ribbon(s):
     """Multi-Timeframe EMA Ribbon Alignment."""
     e9, e21, e50, e200, c = s.ema9[s.i], s.ema21[s.i], s.ema50[s.i], s.ema200[s.i], s.c[s.i]
     if not _ok(e9, e21, e50, e200, c):
@@ -837,22 +1072,44 @@ def fx_ema_ribbon(s):
     return 0.0
 
 
-def fx_supertrend_trailing(s):
-    """SuperTrend Dynamic Trailing System."""
-    c0, c1 = s.c[s.i - 1], s.c[s.i]
-    sma, atr = s.sma20[s.i], s.atr14[s.i]
-    if not _ok(c0, c1, sma, atr):
+def supertrend_trailing(s):
+    """SuperTrend Dynamic Trailing System (ATR14 x 2.0 fast trailing + EMA21 filter)."""
+    i = s.i
+    if i < 20 or not _ok(s.atr14[i], s.ema21[i]):
         return 0.0
-    up = sma + 1.2 * atr
-    dn = sma - 1.2 * atr
-    if c0 <= up and c1 > up:
-        return 0.8
-    if c0 >= dn and c1 < dn:
-        return -0.8
+    start = max(1, i - 39)
+    final_ub = None
+    final_lb = None
+    trend = 1
+    prev_trend = 1
+    for k in range(start, i + 1):
+        atr_k, c_k = s.atr14[k], s.c[k]
+        if not _ok(atr_k, c_k, s.h[k], s.l[k]) or atr_k <= 0:
+            continue
+        hl2 = 0.5 * (s.h[k] + s.l[k])
+        b_ub = hl2 + 2.0 * atr_k
+        b_lb = hl2 - 2.0 * atr_k
+        pc = s.c[k - 1]
+        if final_ub is None:
+            final_ub, final_lb = b_ub, b_lb
+            trend = 1 if c_k >= hl2 else -1
+            prev_trend = trend
+            continue
+        prev_trend = trend
+        final_ub = b_ub if (b_ub < final_ub or pc > final_ub) else final_ub
+        final_lb = b_lb if (b_lb > final_lb or pc < final_lb) else final_lb
+        if c_k > final_ub:
+            trend = 1
+        elif c_k < final_lb:
+            trend = -1
+    if prev_trend == -1 and trend == 1 and s.c[i] > s.ema21[i]:
+        return 0.82
+    if prev_trend == 1 and trend == -1 and s.c[i] < s.ema21[i]:
+        return -0.82
     return 0.0
 
 
-def fx_ichimoku_quantum(s):
+def ichimoku_quantum(s):
     """Ichimoku Kumo Cloud Quantum Breakout."""
     h10, l10 = s.hh10[s.i], s.ll10[s.i]
     h20, l20 = s.hh20[s.i], s.ll20[s.i]
@@ -868,20 +1125,32 @@ def fx_ichimoku_quantum(s):
     return 0.0
 
 
-def fx_heikin_ashi_smooth(s):
-    """Heikin-Ashi Smoothed Trend Continuum."""
-    c, o, adx = s.c[s.i], s.o[s.i], s.adx[s.i]
-    c1, o1 = s.c[s.i - 1], s.o[s.i - 1]
-    if not _ok(c, o, c1, o1, adx):
+def heikin_ashi_smooth(s):
+    """Heikin-Ashi Smoothed Trend Continuum (kalkulasi HA Open/Close riil)."""
+    i = s.i
+    if i < 15 or not _ok(s.adx[i]) or s.adx[i] <= 20:
         return 0.0
-    if c > o and c1 > o1 and adx > 22:
-        return 0.75
-    if c < o and c1 < o1 and adx > 22:
-        return -0.75
+    ha_o = 0.5 * (s.o[i - 10] + s.c[i - 10])
+    ha_c = 0.25 * (s.o[i - 10] + s.h[i - 10] + s.l[i - 10] + s.c[i - 10])
+    prev_bull = False
+    for k in range(i - 9, i):
+        if not _ok(s.o[k], s.h[k], s.l[k], s.c[k]):
+            return 0.0
+        ha_o = 0.5 * (ha_o + ha_c)
+        ha_c = 0.25 * (s.o[k] + s.h[k] + s.l[k] + s.c[k])
+        prev_bull = ha_c > ha_o
+    cur_ha_o = 0.5 * (ha_o + ha_c)
+    cur_ha_c = 0.25 * (s.o[i] + s.h[i] + s.l[i] + s.c[i])
+    no_lower_wick = abs(min(cur_ha_o, cur_ha_c) - min(s.l[i], cur_ha_o, cur_ha_c)) < 0.15 * max(s.h[i] - s.l[i], 1e-12)
+    no_upper_wick = abs(max(s.h[i], cur_ha_o, cur_ha_c) - max(cur_ha_o, cur_ha_c)) < 0.15 * max(s.h[i] - s.l[i], 1e-12)
+    if cur_ha_c > cur_ha_o and prev_bull and (no_lower_wick or cur_ha_c > ha_c):
+        return 0.78
+    if cur_ha_c < cur_ha_o and not prev_bull and (no_upper_wick or cur_ha_c < ha_c):
+        return -0.78
     return 0.0
 
 
-def fx_hedging_grid(s):
+def hedging_grid(s):
     """Dynamic Hedging Grid (Range-Optimized)."""
     c, sma, atr, adx = s.c[s.i], s.sma20[s.i], s.atr14[s.i], s.adx[s.i]
     if not _ok(c, sma, atr, adx) or adx >= 20:
@@ -893,20 +1162,30 @@ def fx_hedging_grid(s):
     return 0.0
 
 
-def fx_camarilla_fader(s):
-    """Camarilla Pivot Points Multi-Confluence."""
-    c, h, l, ll, hh = s.c[s.i], s.h[s.i], s.l[s.i], s.ll20[s.i - 1], s.hh20[s.i - 1]
-    rng = h - l
-    if not _ok(c, h, l, ll, hh) or rng <= 0:
+def camarilla_fader(s):
+    """Camarilla Pivot Points Multi-Confluence (H3/H4/L3/L4 dari blok 60-bar sebelumnya)."""
+    i = s.i
+    if i < 62 or not _ok(s.c[i], s.h[i], s.l[i], s.o[i]):
         return 0.0
-    if c < ll and (c - l) > 0.6 * rng:
+    prev_h = float(s.h[i - 61:i - 1].max())
+    prev_l = float(s.l[i - 61:i - 1].min())
+    prev_c = float(s.c[i - 2])
+    rng = prev_h - prev_l
+    if rng <= 0:
+        return 0.0
+    h3 = prev_c + rng * 1.1 / 4.0
+    h4 = prev_c + rng * 1.1 / 2.0
+    l3 = prev_c - rng * 1.1 / 4.0
+    l4 = prev_c - rng * 1.1 / 2.0
+    c, o, h, l = s.c[i], s.o[i], s.h[i], s.l[i]
+    if l <= l3 and c > l3 and c > o and c > l4:
         return 0.75
-    if c > hh and (h - c) > 0.6 * rng:
+    if h >= h3 and c < h3 and c < o and c < h4:
         return -0.75
     return 0.0
 
 
-def fx_orderflow_sweep(s):
+def orderflow_sweep(s):
     """Support/Resistance Order Flow Imbalance."""
     c, o, l, h, ll, hh, e9 = s.c[s.i], s.o[s.i], s.l[s.i], s.h[s.i], s.ll20[s.i - 1], s.hh20[s.i - 1], s.ema9[s.i]
     if not _ok(c, o, l, h, ll, hh, e9):
@@ -918,7 +1197,7 @@ def fx_orderflow_sweep(s):
     return 0.0
 
 
-def fx_carry_yield_momentum(s):
+def carry_yield_momentum(s):
     """Synthetic Carry-Trade Yield Momentum."""
     c, e50, e200, rsi = s.c[s.i], s.ema50[s.i], s.ema200[s.i], s.rsi14[s.i]
     if not _ok(c, e50, e200, rsi):
@@ -930,7 +1209,7 @@ def fx_carry_yield_momentum(s):
     return 0.0
 
 
-def fx_economic_straddle(s):
+def economic_straddle(s):
     """Economic Event Straddle & Volatility Rider."""
     h, l, c, o, atr = s.h[s.i], s.l[s.i], s.c[s.i], s.o[s.i], s.atr14[s.i]
     rng = h - l
@@ -943,68 +1222,69 @@ def fx_economic_straddle(s):
     return 0.0
 
 
-def fx_smc_orderblock(s):
+def smc_orderblock(s):
     """Institutional Order Block Mitigation (SMC)."""
     if s.i < 15:
         return 0.0
     c, o, h, l, atr = s.c[s.i], s.o[s.i], s.h[s.i], s.l[s.i], s.atr14[s.i]
     if not _ok(c, o, h, l, atr) or atr <= 0:
         return 0.0
-    # Bullish OB: last down candle before displacement wave up, retested by current candle
-    for k in range(s.i - 2, max(s.i - 10, 1), -1):
+    for k in range(s.i - 2, max(s.i - 12, 1), -1):
         if s.c[k] < s.o[k] and (s.c[k + 1] - s.c[k]) > 1.1 * atr:
             ob_high, ob_low = s.h[k], s.l[k]
+            if float(s.l[k + 1:s.i].min()) < ob_low:
+                continue
             if l <= ob_high and c >= ob_low and c > o:
                 return 0.80
-            break
-    # Bearish OB: last up candle before displacement wave down, retested by current candle
-    for k in range(s.i - 2, max(s.i - 10, 1), -1):
+    for k in range(s.i - 2, max(s.i - 12, 1), -1):
         if s.c[k] > s.o[k] and (s.c[k] - s.c[k + 1]) > 1.1 * atr:
             ob_high, ob_low = s.h[k], s.l[k]
+            if float(s.h[k + 1:s.i].max()) > ob_high:
+                continue
             if h >= ob_low and c <= ob_high and c < o:
                 return -0.80
-            break
     return 0.0
 
 
-def fx_ict_fair_value_gap(s):
-    """ICT Fair Value Gap (FVG) Imbalance Retest."""
-    if s.i < 5:
+def ict_fair_value_gap(s):
+    """ICT Fair Value Gap (FVG) Imbalance 3-Candle Mitigation."""
+    i = s.i
+    if i < 6:
         return 0.0
-    c, o, h, l = s.c[s.i], s.o[s.i], s.h[s.i], s.l[s.i]
-    h2, l2, h0, l0 = s.h[s.i - 2], s.l[s.i - 2], s.h[s.i], s.l[s.i]
-    if not _ok(c, o, h, l, h2, l2):
+    c, o, h, l, atr = s.c[i], s.o[i], s.h[i], s.l[i], s.atr14[i]
+    if not _ok(c, o, h, l, atr) or atr <= 0:
         return 0.0
-    # Bullish FVG created at bar i-1 (low[i-1] > high[i-3] or low[i] > high[i-2])
-    gap_low, gap_high = s.h[s.i - 2], s.l[s.i - 1]
-    if gap_high > gap_low:
-        # Price dips into FVG and closes bullish
-        if l <= gap_high and c >= gap_low and c > o:
-            return 0.80
-    # Bearish FVG (high[i-1] < low[i-3] or high[i-1] < low[i-2])
-    bgap_high, bgap_low = s.l[s.i - 2], s.h[s.i - 1]
-    if bgap_high > bgap_low:
-        if h >= bgap_low and c <= bgap_high and c < o:
-            return -0.80
+    for k in range(i - 1, max(i - 12, 2), -1):
+        # Bullish 3-candle FVG: low[k] > high[k-2]
+        gap_low, gap_high = s.h[k - 2], s.l[k]
+        if gap_high - gap_low >= 0.2 * atr:
+            # Pastikan gap belum terisi penuh sebelumnya
+            filled = (k + 1 < i) and (float(s.l[k + 1:i].min()) <= gap_low)
+            if not filled and l <= gap_high and c >= gap_low and c > o:
+                return 0.80
+        # Bearish 3-candle FVG: high[k] < low[k-2]
+        bgap_low, bgap_high = s.h[k], s.l[k - 2]
+        if bgap_high - bgap_low >= 0.2 * atr:
+            filled = (k + 1 < i) and (float(s.h[k + 1:i].max()) >= bgap_high)
+            if not filled and h >= bgap_low and c <= bgap_high and c < o:
+                return -0.80
     return 0.0
 
 
-def fx_smc_liquidity_sweep(s):
+def smc_liquidity_sweep(s):
     """SMC Liquidity Sweep & Market Structure Shift (MSS)."""
     c, o, h, l, hh, ll = s.c[s.i], s.o[s.i], s.h[s.i], s.l[s.i], s.hh20[s.i - 1], s.ll20[s.i - 1]
     if not _ok(c, o, h, l, hh, ll):
         return 0.0
     rng = max(h - l, 1e-9)
-    # Sellside Liquidity Sweep: price sweeps below 20-bar low, but closes back above with lower wick >= 50%
     if l < ll and c > ll and (min(o, c) - l) / rng >= 0.45:
         return 0.85
-    # Buyside Liquidity Sweep: price sweeps above 20-bar high, but closes back below with upper wick >= 50%
     if h > hh and c < hh and (h - max(o, c)) / rng >= 0.45:
         return -0.85
     return 0.0
 
 
-def fx_ict_optimal_trade_entry(s):
+def ict_optimal_trade_entry(s):
     """ICT Optimal Trade Entry (OTE 62% - 79% Retracement)."""
     c, o, hh, ll, e21, e50 = s.c[s.i], s.o[s.i], s.hh20[s.i], s.ll20[s.i], s.ema21[s.i], s.ema50[s.i]
     if not _ok(c, o, hh, ll, e21, e50):
@@ -1012,12 +1292,10 @@ def fx_ict_optimal_trade_entry(s):
     rng = hh - ll
     if rng <= 0:
         return 0.0
-    # Uptrend OTE: pullback into 61.8% - 78.6% discount zone
     if e21 > e50 and c > o:
         depth = (hh - c) / rng
         if 0.58 <= depth <= 0.80:
             return 0.78
-    # Downtrend OTE: rally into 61.8% - 78.6% premium zone
     if e21 < e50 and c < o:
         depth = (c - ll) / rng
         if 0.58 <= depth <= 0.80:
@@ -1025,7 +1303,7 @@ def fx_ict_optimal_trade_entry(s):
     return 0.0
 
 
-def fx_momentum_candle_burst(s):
+def momentum_candle_burst(s):
     """Momentum Candle (Marubozu / Full-Body Range Expansion)."""
     c, o, h, l, atr, e9 = s.c[s.i], s.o[s.i], s.h[s.i], s.l[s.i], s.atr14[s.i], s.ema9[s.i]
     if not _ok(c, o, h, l, atr, e9) or atr <= 0:
@@ -1040,7 +1318,134 @@ def fx_momentum_candle_burst(s):
     return 0.0
 
 
-def fx_three_line_strike(s):
+def xauusd_mc_fibo(s):
+    """M15 Momentum Candle + M30/H1 alignment + Fibonacci [0.236..0.786] retest zones.
+
+    Strict specs:
+    - Forex mode: XAUUSD only. Spot/Futures: all pairs.
+    - Completed M15/M30/H1 bars only (no mid-candle repainting).
+    - Asia (00-07 UTC) & New York (12-21 UTC) sessions only.
+    - Anchors: wick/body extreme for 1.0 (SL) & 0.0, TP = -0.27.
+    - Fires ONLY when price genuinely retests inside [0.236, 0.786] without invalidation.
+    """
+    if s.i < 180 or not _ok(s.c[s.i], s.ts[s.i]):
+        return 0.0
+
+    symbol = getattr(s, "symbol", None)
+    if getattr(s, "market_mode", "forex") == "forex" and symbol != "XAUUSD":
+        return 0.0
+
+    import numpy as np
+
+    n = s.i + 1
+    ts_a = s.ts[:n].astype(np.int64)
+    o_a, h_a, l_a, c_a = s.o[:n], s.h[:n], s.l[:n], s.c[:n]
+
+    # UTC session filter: Asia 00:00-06:59 UTC, New York 12:00-20:59 UTC
+    hour = int((int(ts_a[-1]) // 3_600_000) % 24)
+    if not (0 <= hour < 7 or 12 <= hour < 21):
+        return 0.0
+
+    def aggregate_closed(minutes: int):
+        bucket = ts_a // (minutes * 60_000)
+        cur_bucket = int(bucket[-1])
+        cur_done = (((int(ts_a[-1]) // 60_000) + 1) % minutes) == 0
+        min_bars = max(3, minutes // 3)
+        groups = []
+        for key in np.unique(bucket):
+            k_int = int(key)
+            if k_int == cur_bucket and not cur_done:
+                continue
+            ix = np.flatnonzero(bucket == key)
+            if ix.size < min_bars:
+                continue
+            groups.append((
+                k_int,
+                int(ts_a[ix[-1]]),
+                float(o_a[ix[0]]),
+                float(h_a[ix].max()),
+                float(l_a[ix].min()),
+                float(c_a[ix[-1]]),
+            ))
+        return groups
+
+    m15 = aggregate_closed(15)
+    m30 = aggregate_closed(30)
+    h1 = aggregate_closed(60)
+    if len(m15) < 16 or len(m30) < 6 or len(h1) < 4:
+        return 0.0
+
+    def direction(bars):
+        closes = np.array([x[5] for x in bars], dtype=float)
+        fast = float(closes[-min(5, len(closes)):].mean())
+        slow = float(closes[-min(20, len(closes)):].mean())
+        if slow <= 0 or abs(fast - slow) / slow < 0.00008:
+            return 0
+        _, _, bo, bh, bl, bc = bars[-1]
+        body_ratio = abs(bc - bo) / max(bh - bl, 1e-12)
+        if body_ratio < 0.35:
+            return 0
+        if bc > bo and fast > slow:
+            return 1
+        if bc < bo and fast < slow:
+            return -1
+        return 0
+
+    h1_dir, m30_dir = direction(h1), direction(m30)
+    if not h1_dir or h1_dir != m30_dir:
+        return 0.0
+
+    px_now = float(c_a[-1])
+    m1_m15_bucket = ts_a // (15 * 60_000)
+
+    for idx_mc in range(len(m15) - 1, max(14, len(m15) - 4) - 1, -1):
+        key_mc, _, o_mc, h_mc, l_mc, c_mc = m15[idx_mc]
+        atr_ranges = np.array([x[3] - x[4] for x in m15[idx_mc - 14:idx_mc]], dtype=float)
+        atr14 = float(atr_ranges.mean()) if atr_ranges.size else 0.0
+        rng = h_mc - l_mc
+        body = abs(c_mc - o_mc)
+        if rng <= 0 or atr14 <= 0 or body / rng < 0.65 or rng < 1.5 * atr14:
+            continue
+        if (h1_dir > 0 and c_mc <= o_mc) or (h1_dir < 0 and c_mc >= o_mc):
+            continue
+
+        if h1_dir > 0:
+            origin = l_mc if l_mc < o_mc else o_mc
+            terminal = h_mc if h_mc > c_mc else c_mc
+            delta = abs(terminal - origin)
+            if delta <= 0:
+                continue
+            fibo_236 = terminal - 0.236 * delta
+            fibo_786 = terminal - 0.786 * delta
+            tp_neg_027 = terminal + 0.27 * delta
+            after_ix = np.flatnonzero(m1_m15_bucket[:-1] > key_mc)
+            if after_ix.size > 0:
+                if float(l_a[after_ix].min()) <= origin or float(h_a[after_ix].max()) >= tp_neg_027:
+                    continue
+            if fibo_786 <= px_now <= fibo_236 and px_now > origin:
+                s.custom_sl_tp = (origin, tp_neg_027)
+                return 0.9
+        else:
+            origin = h_mc if h_mc > o_mc else o_mc
+            terminal = l_mc if l_mc < c_mc else c_mc
+            delta = abs(terminal - origin)
+            if delta <= 0:
+                continue
+            fibo_236 = terminal + 0.236 * delta
+            fibo_786 = terminal + 0.786 * delta
+            tp_neg_027 = terminal - 0.27 * delta
+            after_ix = np.flatnonzero(m1_m15_bucket[:-1] > key_mc)
+            if after_ix.size > 0:
+                if float(h_a[after_ix].max()) >= origin or float(l_a[after_ix].min()) <= tp_neg_027:
+                    continue
+            if fibo_236 <= px_now <= fibo_786 and px_now < origin:
+                s.custom_sl_tp = (origin, tp_neg_027)
+                return -0.9
+
+    return 0.0
+
+
+def three_line_strike(s):
     """Three Line Strike Price Action Reversal."""
     if s.i < 4:
         return 0.0
@@ -1048,44 +1453,41 @@ def fx_three_line_strike(s):
     c1, o1 = s.c[s.i - 1], s.o[s.i - 1]
     c2, o2 = s.c[s.i - 2], s.o[s.i - 2]
     c3, o3 = s.c[s.i - 3], s.o[s.i - 3]
-    if not _ok(c0, o0, c1, o1, c2, o2, c3, o3):
+    atr = s.atr14[s.i]
+    if not _ok(c0, o0, c1, o1, c2, o2, c3, o3, atr):
         return 0.0
-    # Bullish Strike: 3 consecutive bear bars wiped out by 1 powerful bull candle
+    tol = max(0.0, 0.08 * atr)
     if c3 < o3 and c2 < o2 and c1 < o1 and c1 < c2 < c3:
-        if c0 > o0 and c0 > o3 and o0 <= c1:
+        if c0 > o0 and c0 > o3 and o0 <= c1 + tol:
             return 0.85
-    # Bearish Strike: 3 consecutive bull bars wiped out by 1 powerful bear candle
     if c3 > o3 and c2 > o2 and c1 > o1 and c1 > c2 > c3:
-        if c0 < o0 and c0 < o3 and o0 >= c1:
+        if c0 < o0 and c0 < o3 and o0 >= c1 - tol:
             return -0.85
     return 0.0
 
 
-def fx_pinbar_liquidity_reject(s):
+def pinbar_liquidity_reject(s):
     """Pin Bar Rejection of Dynamic S/R (EMA21/50)."""
     c, o, h, l, e21 = s.c[s.i], s.o[s.i], s.h[s.i], s.l[s.i], s.ema21[s.i]
     if not _ok(c, o, h, l, e21):
         return 0.0
     rng = max(h - l, 1e-9)
     body = abs(c - o)
-    # Bullish Hammer/Pin: lower wick >= 60% of candle range, body <= 30%
     if (min(o, c) - l) / rng >= 0.60 and body / rng <= 0.32:
         if l < e21 and c >= e21 * 0.999:
             return 0.80
-    # Bearish Shooting Star/Pin: upper wick >= 60% of candle range, body <= 30%
     if (h - max(o, c)) / rng >= 0.60 and body / rng <= 0.32:
         if h > e21 and c <= e21 * 1.001:
             return -0.80
     return 0.0
 
 
-def fx_london_ny_overlap(s):
-    """London - New York Session Overlap Scalper (13:00 - 17:00 UTC)."""
+def london_ny_overlap(s):
+    """London - New York Session Overlap Scalper (12:00 - 17:59 UTC)."""
     c, o, e9, e21, adx = s.c[s.i], s.o[s.i], s.ema9[s.i], s.ema21[s.i], s.adx[s.i]
     if not _ok(c, o, e9, e21, adx):
         return 0.0
     hr = int((s.ts[s.i] // 3600000) % 24)
-    # Peak overlap hours
     if 12 <= hr <= 17:
         if c > e9 > e21 and adx > 20 and c > o:
             return 0.75
@@ -1094,38 +1496,42 @@ def fx_london_ny_overlap(s):
     return 0.0
 
 
-def fx_supply_demand_zone(s):
-    """Institutional Supply & Demand Imbalance Retest."""
-    if s.i < 5:
+def supply_demand_zone(s):
+    """Institutional Supply & Demand Imbalance Retest (scan 2..10 bar terakhir)."""
+    if s.i < 12:
         return 0.0
     c, o, h, l, atr = s.c[s.i], s.o[s.i], s.h[s.i], s.l[s.i], s.atr14[s.i]
     if not _ok(c, o, h, l, atr) or atr <= 0:
         return 0.0
-    # Demand Zone (Rally-Base-Rally): base at i-2, rally at i-1, retest at i
-    base_h, base_l = s.h[s.i - 2], s.l[s.i - 2]
-    rally = s.c[s.i - 1] - s.o[s.i - 1]
-    if rally > 1.0 * atr and (base_h - base_l) < 0.8 * atr:
-        if l <= base_h and c >= base_l and c > o:
-            return 0.80
-    # Supply Zone (Drop-Base-Drop): base at i-2, drop at i-1, retest at i
-    drop = s.o[s.i - 1] - s.c[s.i - 1]
-    if drop > 1.0 * atr and (base_h - base_l) < 0.8 * atr:
-        if h >= base_l and c <= base_h and c < o:
-            return -0.80
+    for k in range(s.i - 2, max(s.i - 10, 1), -1):
+        base_h, base_l = s.h[k], s.l[k]
+        if (base_h - base_l) >= 0.9 * atr:
+            continue
+        impulse = s.c[k + 1] - s.o[k + 1]
+        # Demand Zone: base sempit + rally impulsif + belum jebol ke bawah base_l
+        if impulse > 1.0 * atr:
+            invalid = (k + 2 <= s.i - 1) and (float(s.l[k + 2:s.i].min()) < base_l)
+            if not invalid and l <= base_h and c >= base_l and c > o:
+                return 0.80
+        # Supply Zone: base sempit + drop impulsif + belum jebol ke atas base_h
+        if -impulse > 1.0 * atr:
+            invalid = (k + 2 <= s.i - 1) and (float(s.h[k + 2:s.i].max()) > base_h)
+            if not invalid and h >= base_l and c <= base_h and c < o:
+                return -0.80
     return 0.0
 
 
-def fx_volume_spread_analysis(s):
-    """Volume Spread Analysis (VSA) Stopping Volume & Absorption."""
-    c, o, h, l, atr = s.c[s.i], s.o[s.i], s.h[s.i], s.l[s.i], s.atr14[s.i]
+def volume_spread_analysis(s):
+    """Volume Spread Analysis (VSA): Wide spread + Volume Spike + Absorption Close."""
+    i = s.i
+    c, o, h, l, atr, v, v_sma = s.c[i], s.o[i], s.h[i], s.l[i], s.atr14[i], s.v[i], s.vol_sma20[i]
     if not _ok(c, o, h, l, atr) or atr <= 0:
         return 0.0
     rng = h - l
-    if rng > 1.5 * atr:
-        # Ultra-wide spread down bar closing in the upper half -> Absorption of selling
+    vol_ok = True if (not _ok(v_sma) or v_sma <= 0) else (v > 1.15 * v_sma)
+    if rng > 1.5 * atr and vol_ok:
         if (c - l) / rng >= 0.55 and c > o:
             return 0.80
-        # Ultra-wide spread up bar closing in the lower half -> Buying climax / Absorption of buying
         if (h - c) / rng >= 0.55 and c < o:
             return -0.80
     return 0.0
@@ -1135,7 +1541,7 @@ STRATEGIES: list[tuple[str, str, str, Callable]] = [
     # id, nama, keluarga, fungsi sinyal
     ("ict_momentum", "ICT Momentum", "ICT", order_block),
     ("ict_fvg", "ICT Fair Value Gap", "ICT", fvg_ict),
-    ("ict_obs", "ICT Order Block Sweep", "ICT", fractal_break),
+    ("ict_obs", "ICT Order Block Sweep", "ICT", ict_orderblock_sweep),
     ("snr_bounce", "Support Resistance Bounce", "Price action", pivot_bounce),
     ("trend_stack", "EMA Stack 9/21/50", "Trend", trend_stack),
     ("donchian_55", "Donchian Turtle 55", "Breakout", donchian),
@@ -1157,7 +1563,7 @@ STRATEGIES: list[tuple[str, str, str, Callable]] = [
     ("fib_golden_pocket", "Fib Golden Pocket 61.8", "Fibonacci", fib_golden_pocket),
     ("fib_expansion_1618", "Fib Extension 1.618", "Fibonacci", fib_expansion_1618),
     ("vwap_band", "VWAP Deviation", "Statistik", vwap_band),
-    ("vwap_trend", "VWAP Trend Follow", "Statistik", lambda s: trend_stack(s) if s.c[s.i] > s.ema50[s.i] else -trend_stack(s) if _ok(s.ema50[s.i]) else 0.0),
+    ("vwap_trend", "VWAP Trend Follow", "Statistik", vwap_trend_follow),
     ("vol_breakout", "Volume Breakout", "Breakout", volume_breakout),
     ("vol_target", "Volatility Trend Filter", "Trend", volatility_target),
     ("adx_trend", "ADX Strong Trend", "Trend", adx_trend),
@@ -1165,12 +1571,12 @@ STRATEGIES: list[tuple[str, str, str, Callable]] = [
     ("hot_momentum", "Impulse Candle", "Momentum", hot_momentum),
     ("momentum_60", "Multi-Horizon Momentum", "Momentum", momentum_weeks),
     ("zscore_rev", "Z-Score Reversion", "Statistik", zscore_reversion),
-    ("mean_sd_band", "Mean Deviation Band", "Statistik", lambda s: -zscore_reversion(s) * 0.7),
+    ("mean_sd_band", "Mean Deviation Band", "Statistik", mean_sd_band_mad),
     ("time_session", "Timezone Session Bias", "Waktu", time_filter),
-    ("time_open", "Opening Hour Range", "Waktu", lambda s: trend_stack(s) if int((s.ts[s.i] // 3600000) % 24) in (0, 1, 2, 3) else 0.0),
+    ("time_open", "Opening Hour Range", "Waktu", opening_range_breakout),
     ("gap_fill", "Gap Fill Reversal", "Price action", gap_fill),
-    ("2b_rev", "2B Reversal", "Price action", price_action_2b),
-    ("engulfing", "Bullish/Bearish Engulfing", "Price action", paint_bar),
+    ("2b_rev", "2B Close Reversal", "Price action", two_b_close_reversal),
+    ("engulfing", "Bullish/Bearish Engulfing", "Price action", engulfing_pattern),
     ("inside_bar", "Inside Bar Breakout", "Price action", inner_bar),
     ("swing_break", "Swing Volume Break", "Price action", swing_break),
     ("vol_trend_sma", "SMA50/200 Regime", "Trend", vol_trend_sma),
@@ -1178,50 +1584,51 @@ STRATEGIES: list[tuple[str, str, str, Callable]] = [
     ("price_ema_dev", "EMA Deviation", "Statistik", lambda s: mean_ema(s, s.ema9, s.ema21)),
     ("price_ema_dev2", "EMA50 Deviation", "Statistik", lambda s: mean_ema(s, s.ema21, s.ema50)),
     ("rotation", "RSI+MACD Rotation", "Momentum", rotation),
-    ("value_area", "Value Area Auction", "Volume profile", lambda s: vwap_band(s)),
+    ("value_area", "Value Area Auction", "Volume profile", value_area_profile),
     ("tr_break", "Range Expansion Fade", "Volatility", tr_break),
     ("trend_pullback", "Trend Pullback EMA9", "Trend", lambda s: 0.6 if (s.c[s.i] > s.ema50[s.i] and s.c[s.i] < s.ema9[s.i] and s.rsi14[s.i] < 50) else (-0.6 if (_ok(s.ema50[s.i]) and s.c[s.i] < s.ema50[s.i] and s.c[s.i] > s.ema9[s.i] and s.rsi14[s.i] > 50) else 0.0)),
     ("mean_ma_cross", "MA Cross Mean", "Trend", lambda s: 0.5 if (_ok(s.sma20[s.i], s.sma50[s.i]) and s.sma20[s.i] > s.sma50[s.i] and s.c[s.i] > s.sma20[s.i]) else (-0.5 if (_ok(s.sma20[s.i], s.sma50[s.i]) and s.sma20[s.i] < s.sma50[s.i] and s.c[s.i] < s.sma20[s.i]) else 0.0)),
     ("rsi2_extreme", "RSI2 Extreme", "Mean reversion", lambda s: 0.7 if s.rsi2[s.i] < 10 else (-0.7 if s.rsi2[s.i] > 90 else 0.0)),
     ("turtle_soup", "Turtle Soup Sweep", "Struktur", lambda s: 0.65 if (s.l[s.i] < s.ll20[s.i - 1] and s.c[s.i] > s.ll20[s.i - 1]) else (-0.65 if (s.h[s.i] > s.hh20[s.i - 1] and s.c[s.i] < s.hh20[s.i - 1]) else 0.0)),
-    ("delta_flow", "Candle Imbalance", "Order flow", lambda s: (0.35 if (s.c[s.i] - s.l[s.i]) > 0.65 * max(s.h[s.i] - s.l[s.i], 1e-12) else (-0.35 if (s.h[s.i] - s.c[s.i]) > 0.65 * max(s.h[s.i] - s.l[s.i], 1e-12) else 0.0)) * (1 if s.c[s.i] > s.ema21[s.i] else -1)),
-    ("wicks_reject", "Wick Rejection", "Order flow", lambda s: (0.6 if (s.h[s.i] - s.c[s.i]) > 1.8 * abs(s.c[s.i] - s.o[s.i] + 1e-12) and s.h[s.i] > s.ema21[s.i] else (-0.6 if (s.c[s.i] - s.l[s.i]) > 1.8 * abs(s.c[s.i] - s.o[s.i] + 1e-12) and s.l[s.i] < s.ema21[s.i] else 0.0))),
+    ("delta_flow", "Candle Imbalance", "Order flow", candle_imbalance),
+    ("wicks_reject", "Wick Rejection", "Order flow", wick_rejection),
     ("paint_bar", "Paint Bar Pattern", "Price action", paint_bar),
     ("price_action_2b", "2B Reversal", "Price action", price_action_2b),
     ("fractal_break", "Fractal Breakout", "Breakout", fractal_break),
-    # ── 22 Strategi Kuantitatif Spesifik Forex ──
-    ("fx_lob_alpha", "London Open Breakout", "Breakout", fx_lob_alpha),
-    ("fx_tokyo_fader", "Asian Range Fader", "Mean reversion", fx_tokyo_fader),
-    ("fx_frankfurt_probe", "Frankfurt Liquidity Probe", "Order flow", fx_frankfurt_probe),
-    ("fx_ny_reversal", "New York Fixing Reversal", "Mean reversion", fx_ny_reversal),
-    ("fx_sunday_gap", "Sunday Gap Fill Engine", "Statistik", fx_sunday_gap),
-    ("fx_aud_nzd_arb", "Aussie-Kiwi Cointegration", "Statistik", fx_aud_nzd_arb),
-    ("fx_triangular_synth", "Triangular Arbitrage Synth", "Statistik", fx_triangular_synth),
-    ("fx_oil_cad_divergence", "Petro-CAD Divergence", "Trend", fx_oil_cad_divergence),
-    ("fx_gold_safehaven_relay", "Safe-Haven Gold Relay", "Trend", fx_gold_safehaven_relay),
-    ("fx_dragon_momentum", "The Dragon Momentum Rider", "Momentum", fx_dragon_momentum),
-    ("fx_bb_squeeze", "BB Squeeze Volatility", "Volatility", fx_bb_squeeze),
-    ("fx_atr_expansion", "ATR Expansion Breakout", "Breakout", fx_atr_expansion),
-    ("fx_gold_flash_spike", "Gold Flash-Spike Reversal", "Oscillator", fx_gold_flash_spike),
-    ("fx_ema_ribbon", "Multi-TF EMA Ribbon", "Trend", fx_ema_ribbon),
-    ("fx_supertrend_trailing", "SuperTrend Dynamic Trailing", "Trailing", fx_supertrend_trailing),
-    ("fx_ichimoku_quantum", "Ichimoku Kumo Quantum", "Trend", fx_ichimoku_quantum),
-    ("fx_heikin_ashi_smooth", "Heikin-Ashi Trend Continuum", "Trend", fx_heikin_ashi_smooth),
-    ("fx_hedging_grid", "Dynamic Hedging Grid", "Struktur", fx_hedging_grid),
-    ("fx_camarilla_fader", "Camarilla Multi-Confluence", "Struktur", fx_camarilla_fader),
-    ("fx_orderflow_sweep", "Order Flow Liquidity Sweep", "Order flow", fx_orderflow_sweep),
-    ("fx_carry_yield_momentum", "Synthetic Carry-Trade Yield", "Trend", fx_carry_yield_momentum),
-    ("fx_economic_straddle", "Economic Straddle Breakout", "Breakout", fx_economic_straddle),
-    ("fx_smc_orderblock", "SMC Order Block Mitigation", "ICT", fx_smc_orderblock),
-    ("fx_ict_fair_value_gap", "ICT Fair Value Gap (FVG)", "ICT", fx_ict_fair_value_gap),
-    ("fx_smc_liquidity_sweep", "SMC Liquidity Sweep & BOS", "Struktur", fx_smc_liquidity_sweep),
-    ("fx_ict_optimal_trade_entry", "ICT Optimal Trade Entry", "ICT", fx_ict_optimal_trade_entry),
-    ("fx_momentum_candle_burst", "Momentum Candle Expansion", "Momentum", fx_momentum_candle_burst),
-    ("fx_three_line_strike", "Three Line Strike Pattern", "Price action", fx_three_line_strike),
-    ("fx_pinbar_liquidity_reject", "Pin Bar Liquidity Rejection", "Price action", fx_pinbar_liquidity_reject),
-    ("fx_london_ny_overlap", "London-NY Overlap Scalper", "Breakout", fx_london_ny_overlap),
-    ("fx_supply_demand_zone", "Supply & Demand Zone", "Struktur", fx_supply_demand_zone),
-    ("fx_volume_spread_analysis", "Volume Spread Analysis (VSA)", "Order flow", fx_volume_spread_analysis),
+    # ── 33 Extended Universal Quantitative Models ──
+    ("lob_alpha", "London Open Breakout", "Breakout", lob_alpha),
+    ("tokyo_fader", "Asian Range Fader", "Mean reversion", tokyo_fader),
+    ("frankfurt_probe", "Frankfurt Liquidity Probe", "Order flow", frankfurt_probe),
+    ("ny_reversal", "New York Fixing Reversal", "Mean reversion", ny_reversal),
+    ("sunday_gap", "Sunday Gap Fill Engine", "Statistik", sunday_gap),
+    ("aud_nzd_arb", "Aussie-Kiwi Cointegration", "Statistik", aud_nzd_arb),
+    ("triangular_synth", "Triangular Arbitrage Synth", "Statistik", triangular_synth),
+    ("oil_cad_divergence", "Petro-CAD Divergence", "Trend", oil_cad_divergence),
+    ("gold_safehaven_relay", "Safe-Haven Gold Relay", "Trend", gold_safehaven_relay),
+    ("dragon_momentum", "The Dragon Momentum Rider", "Momentum", dragon_momentum),
+    ("bb_squeeze", "BB Squeeze Volatility", "Volatility", bb_squeeze),
+    ("atr_expansion", "ATR Expansion Breakout", "Breakout", atr_expansion),
+    ("gold_flash_spike", "Gold Flash-Spike Reversal", "Oscillator", gold_flash_spike),
+    ("ema_ribbon", "Multi-TF EMA Ribbon", "Trend", ema_ribbon),
+    ("supertrend_trailing", "SuperTrend Dynamic Trailing", "Trailing", supertrend_trailing),
+    ("ichimoku_quantum", "Ichimoku Kumo Quantum", "Trend", ichimoku_quantum),
+    ("heikin_ashi_smooth", "Heikin-Ashi Trend Continuum", "Trend", heikin_ashi_smooth),
+    ("hedging_grid", "Dynamic Hedging Grid", "Struktur", hedging_grid),
+    ("camarilla_fader", "Camarilla Multi-Confluence", "Struktur", camarilla_fader),
+    ("orderflow_sweep", "Order Flow Liquidity Sweep", "Order flow", orderflow_sweep),
+    ("carry_yield_momentum", "Synthetic Carry-Trade Yield", "Trend", carry_yield_momentum),
+    ("economic_straddle", "Economic Straddle Breakout", "Breakout", economic_straddle),
+    ("smc_orderblock", "SMC Order Block Mitigation", "ICT", smc_orderblock),
+    ("ict_fair_value_gap", "ICT Fair Value Gap (FVG)", "ICT", ict_fair_value_gap),
+    ("smc_liquidity_sweep", "SMC Liquidity Sweep & BOS", "Struktur", smc_liquidity_sweep),
+    ("ict_optimal_trade_entry", "ICT Optimal Trade Entry", "ICT", ict_optimal_trade_entry),
+    ("momentum_candle_burst", "Momentum Candle Expansion", "Momentum", momentum_candle_burst),
+    ("xauusd_mc_fibo", "XAUUSD MC-FIBO Retest", "Fibonacci", xauusd_mc_fibo),
+    ("three_line_strike", "Three Line Strike Pattern", "Price action", three_line_strike),
+    ("pinbar_liquidity_reject", "Pin Bar Liquidity Rejection", "Price action", pinbar_liquidity_reject),
+    ("london_ny_overlap", "London-NY Overlap Scalper", "Breakout", london_ny_overlap),
+    ("supply_demand_zone", "Supply & Demand Zone", "Struktur", supply_demand_zone),
+    ("volume_spread_analysis", "Volume Spread Analysis (VSA)", "Order flow", volume_spread_analysis),
 ]
 
 DEFAULT_SL = {"atr": 2.0}
@@ -1260,17 +1667,17 @@ _leverage_map = {
     # Statistical & Time (10-15x)
     "vwap_band": 12, "vwap_trend": 10, "price_ema_dev": 12, "price_ema_dev2": 15,
     "value_area": 10, "time_session": 10, "time_open": 12,
-    # ── Forex Specific (Akun MT5 Direct, Leverage 1x / Tanpa Leverage Kripto) ──
-    "fx_lob_alpha": 1, "fx_tokyo_fader": 1, "fx_frankfurt_probe": 1, "fx_ny_reversal": 1,
-    "fx_sunday_gap": 1, "fx_aud_nzd_arb": 1, "fx_triangular_synth": 1, "fx_oil_cad_divergence": 1,
-    "fx_gold_safehaven_relay": 1, "fx_dragon_momentum": 1, "fx_bb_squeeze": 1, "fx_atr_expansion": 1,
-    "fx_gold_flash_spike": 1, "fx_ema_ribbon": 1, "fx_supertrend_trailing": 1, "fx_ichimoku_quantum": 1,
-    "fx_heikin_ashi_smooth": 1, "fx_hedging_grid": 1, "fx_camarilla_fader": 1, "fx_orderflow_sweep": 1,
-    "fx_carry_yield_momentum": 1, "fx_economic_straddle": 1,
-    "fx_smc_orderblock": 1, "fx_ict_fair_value_gap": 1, "fx_smc_liquidity_sweep": 1,
-    "fx_ict_optimal_trade_entry": 1, "fx_momentum_candle_burst": 1, "fx_three_line_strike": 1,
-    "fx_pinbar_liquidity_reject": 1, "fx_london_ny_overlap": 1, "fx_supply_demand_zone": 1,
-    "fx_volume_spread_analysis": 1,
+    # Extended Universal Quant Suite (5-20x dalam mode Futures)
+    "lob_alpha": 12, "tokyo_fader": 15, "frankfurt_probe": 15, "ny_reversal": 15,
+    "sunday_gap": 15, "aud_nzd_arb": 15, "triangular_synth": 15, "oil_cad_divergence": 8,
+    "gold_safehaven_relay": 8, "dragon_momentum": 15, "bb_squeeze": 15, "atr_expansion": 12,
+    "gold_flash_spike": 15, "ema_ribbon": 8, "supertrend_trailing": 10, "ichimoku_quantum": 8,
+    "heikin_ashi_smooth": 8, "hedging_grid": 10, "camarilla_fader": 12, "orderflow_sweep": 15,
+    "carry_yield_momentum": 6, "economic_straddle": 15,
+    "smc_orderblock": 15, "ict_fair_value_gap": 12, "smc_liquidity_sweep": 15,
+    "ict_optimal_trade_entry": 12, "momentum_candle_burst": 15, "xauusd_mc_fibo": 10, "three_line_strike": 15,
+    "pinbar_liquidity_reject": 15, "london_ny_overlap": 12, "supply_demand_zone": 12,
+    "volume_spread_analysis": 15,
 }
 DEFAULT_LEVERAGE.update(_leverage_map)
 # Fallback: strategi tanpa mapping dapat 10x
@@ -1294,12 +1701,11 @@ def get_strategy_rr(sid: str) -> float:
         return 1.5
     return 1.8
 
-# ── Spot vs Futures strategy assignment ──────────────────────────────
-# ── Universal Multi-Market Strategy Suite (86 Models) ────────────────
-# Semua 86 model kuantitatif bersifat UNIVERSAL: dapat beroperasi di Spot, Futures, maupun Forex.
-# - Spot: 86 strategi (Long-only, 1x equity, fee 0.05%).
-# - Futures: 86 strategi (Long + Short, configurable leverage 5-20x, funding rate).
-# - Forex: 86 strategi (Long + Short, MT5 Direct lot sizing, spread broker riil, no funding fee).
+# ── Universal Multi-Market Strategy Suite (89 Models) ────────────────
+# Semua 89 model kuantitatif bersifat UNIVERSAL: dapat beroperasi di Spot, Futures, maupun Forex.
+# - Spot: 89 strategi (Long-only, 1x equity, fee 0.05%).
+# - Futures: 89 strategi (Long + Short, configurable leverage 5-20x, funding rate).
+# - Forex: 89 strategi (Long + Short, MT5 Direct lot sizing, spread broker riil, no funding fee).
 
 UNIVERSAL_STRATEGIES = list(STRATEGY_IDS)
 

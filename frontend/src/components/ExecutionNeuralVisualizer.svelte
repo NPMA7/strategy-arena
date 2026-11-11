@@ -107,7 +107,7 @@
     const cols = [
       all.slice(0, 30),  // 30
       all.slice(30, 59), // 29
-      all.slice(59, 88), // 29
+      all.slice(59), // 30
     ];
 
     const nodes = [];

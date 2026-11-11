@@ -436,7 +436,7 @@
               {#each positions as p (p.strategy + '_' + p.symbol)}
                 {@const currentMark = arena.prices[p.symbol] ?? p.mark ?? p.entry}
                 {@const sideSign = (p.side === 'LONG' || p.side === 1) ? 1 : -1}
-                {@const isPosForex = (arena.mode === 'forex' || p.mode === 'forex' || (p.strategy && p.strategy.startsWith('fx_'))) && !p.symbol.endsWith('USDT')}
+                {@const isPosForex = (arena.mode === 'forex' || p.mode === 'forex') && !p.symbol.endsWith('USDT')}
                 {@const liveUpnl = isPosForex
                   ? calculateForexPnl(p.symbol, p.entry, currentMark, p.side, p.lot || 0.10, arena.prices)
                   : (p.qty > 0 && currentMark > 0 ? (currentMark - p.entry) * p.qty * sideSign : (p.upnl ?? 0))}

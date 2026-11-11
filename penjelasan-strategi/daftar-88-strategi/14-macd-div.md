@@ -11,30 +11,30 @@ Dokumen ini memuat bedah arsitektur logika, spesifikasi matematis, mekanisme eks
 | **Nomor & ID Strategi** | `#14` · `macd_div` | Terdaftar di `server/strategies.py` |
 | **Kategori / Cluster** | **Momentum** | Menentukan profil rasio R:R otomatis |
 | **Target Pasar** | Universal (Forex MT5, Binance Futures, Spot) | Spot: Long-Only · Futures & Forex: Long + Short |
-| **Timeframe Evaluasi** | `M1` (1-Menit Bar Closed via `BarRing`) | Dieksekusi 1x setiap bar 1-menit selesai ditutup |
+| **Timeframe Evaluasi** | `M1` (`BarRing` kapasitas 1440 bar / 24 jam) | Dieksekusi 1x setiap bar 1-menit selesai ditutup |
 | **Ambang Pemicu Skor** | `score > +0.15` (LONG) / `score < -0.15` (SHORT) | Skala output sinyal `[-1.0 .. +1.0]` |
 | **Rasio Risk-to-Reward (R:R)** | **`1 : 2.0`** | Otomatis berdasarkan cluster `Momentum` |
 | **Leverage Default** | **`12x`** (Futures) · **`1x MT5 Direct`** (Forex) | Di Forex menggunakan lot sizing risiko 1.5% modal (~$15) |
-| **Stop Loss Engine** | $\max(2.0 \times \text{ATR}_{14}, \; 0.35\% \times \text{Harga})$ | Floor proteksi minimum 0.35% di `engine.py` |
+| **Stop Loss Engine** | $\max(2.0 \times \text{ATR}_{14}, \; 0.10\% \text{ Forex} / 0.35\% \text{ Crypto})$ | Floor proteksi adaptif di `engine.py` |
 
 ---
 
 ## 2. Filosofi Strategi & Konsep Pasar
 
-Mencari divergensi antara harga dan MACD: harga mencetak Lower Low tapi MACD mencetak Higher Low (Bullish Divergence) dengan pemicu harga close di atas EMA9.
+Mendeteksi divergensi klasik antara harga dan garis MACD pada dua jendela waktu yang **benar-benar terpisah (disjoint)**: membandingkan jendela awal `[i-30..i-15]` vs jendela terkini `[i-14..i]`, dikonfirmasi dengan penutupan harga menembus EMA9.
 
 ---
 
 ## 3. Kriteria Matematis & Logika Deteksi Sinyal
 
-1. Membandingkan min/max window `[i-25:i-5]` vs `[i-20:i+1]` pada Harga dan MACD.
-2. **BUY**: $\text{Low}_{now} < \text{Low}_{prev}$ dan $\text{MACD}_{low,now} > \text{MACD}_{low,prev}$ dan $C_i > \text{EMA}_9$
+1. Jendela Lama `prev = [i-30 : i-14]` (16 bar), Jendela Baru `now = [i-14 : i+1]` (15 bar).
+2. **Bullish Divergence (+0.65)**: $\min(L_{\text{now}}) < \min(L_{\text{prev}})$ dan $\min(\text{MACD}_{\text{now}}) > \min(\text{MACD}_{\text{prev}})$ serta $C_i > \text{EMA}_9$.
+3. **Bearish Divergence (-0.65)**: $\max(H_{\text{now}}) > \max(H_{\text{prev}})$ dan $\max(\text{MACD}_{\text{now}}) < \max(\text{MACD}_{\text{prev}})$ serta $C_i < \text{EMA}_9$.
 
 ### Visualisasi Alur Sinyal (Diagram Logika):
 ```text
-  Harga:  \___      / (Lower Low)
-              \____/
-  MACD :  \____/      (Higher Low) ===> BULLISH DIVERGENCE
+  [Prev Window i-30..i-15]  |  [Now Window i-14..i] (Disjoint 0-overlap)
+  Price Lower Low  +  MACD Higher Low  +  Close > EMA9 ===> BUY (+0.65)
 ```
 
 ---
@@ -50,7 +50,8 @@ Setiap kali bar M1 (`BarRing`) menutup dan indikator `Snap` selesai dihitung:
    - **Mode Forex MT5**: Risiko ditargetkan `1.5%` dari cash per posisi (`~$15` pada modal `$1,000`), dibatasi `0.01 - 0.10 Lot` (XAU/XTI) atau `0.01 - 0.20 Lot` (Forex mayor/cross).
    - **Mode Futures/Spot**: Risiko ditargetkan `2.0%` equity dengan margin maksimum per posisi `20%` equity (`SINGLE_POS_CAP`).
 3. **Stop Loss & Take Profit**:
-   - $\text{StopDist} = \max(2.0 \times \text{ATR}_{14}(M1), \; 0.0035 \times \text{Price})$
+   - **Mode Forex MT5**: $\text{StopDist} = \max(2.0 \times \text{ATR}_{14}(M1), \; 0.0010 \times \text{Price})$ *(floor adaptif 0.10%)*
+   - **Mode Spot & Futures**: $\text{StopDist} = \max(2.0 \times \text{ATR}_{14}(M1), \; 0.0035 \times \text{Price})$ *(floor 0.35%)*
    - $\text{TPDist} = 2.0 \times \text{StopDist}$
    - Jika muncul sinyal berlawanan arah (`pos.side != new_side`), posisi lama langsung ditutup (*reverse signal exit*) sebelum posisi baru dibuka.
 
@@ -60,8 +61,8 @@ Setiap kali bar M1 (`BarRing`) menutup dan indikator `Snap` selesai dihitung:
 
 Hasil pemeriksaan langsung terhadap kode sumber `server/strategies.py`, `server/engine.py`, dan `server/forex_feed.py` menemukan catatan audit spesifik berikut untuk strategi ini:
 
-* **🚨 CRITICAL BUG (Overlapping Slice Windows!)**: Window pembanding pertama `[i-25:i-5]` dan kedua `[i-20:i+1]` **BERTUMPUKAN (OVERLAP) SEBANYAK 15 BAR** (`i-20` s/d `i-5`)! Akibatnya jika nilai terendah berada di zona overlap, kedua variabel membaca bar yang persis sama. Selain itu fungsi ini tidak memverifikasi apakah puncak harga dan puncak MACD terjadi pada waktu yang sama.
-* **⚠️ Catatan Umum Mesin M1 (`0.35% Minimum SL Floor`)**: Karena sinyal dievaluasi pada bar **1-menit (`M1`)**, sedangkan `engine.py` memaksa jarak Stop Loss minimal `0.35%` (~143 pips pada XAUUSD atau ~39 pips pada EURUSD), strategi jangka pendek M1 harus menahan fluktuasi lebar yang kerap tidak sebanding dengan target scalping-nya.
+* **✅ FIXED (Bug Window Overlap 15-Bar Diperbaiki)**: Slice `[i-25:i-5]` vs `[i-20:i+1]` yang sebelumnya tumpang-tindih 15 bar kini diganti menjadi `[i-30:i-14]` vs `[i-14:i+1]` yang saling lepas sepenuhnya.
+* **ℹ️ Pembaruan Mesin M1 (`0.10% Forex SL Floor` & `1440-Bar History`)**: `engine.py` kini menurunkan batas SL minimum khusus mode **Forex MT5** dari `0.35%` menjadi **`0.10%`** (membuat target & stop jauh lebih proporsional pada pasangan Forex & XAUUSD), sementara mode Spot & Futures menjaga floor `0.35%`. Buffer data M1 diperbesar ke `1440 bar` (24 jam).
 
 ---
 
@@ -72,17 +73,18 @@ Berikut adalah implementasi kode aktual yang saat ini berjalan di produksi (`ser
 ```python
 # Sumber aktual dari server/strategies.py untuk 'macd_div':
 def macd_divergence(s):
+    """Deteksi divergensi MACD vs harga dengan dua jendela terpisah (disjoint)."""
     i = s.i
-    if i < 25:
+    if i < 30:
         return 0.0
-    px_low_prev = float(s.l[i - 25:i - 5].min())
-    px_low_now = float(s.l[i - 20:i + 1].min())
-    macd_low_prev = float(s.macd[i - 25:i - 5].min())
-    macd_low_now = float(s.macd[i - 20:i + 1].min())
-    px_hi_prev = float(s.h[i - 25:i - 5].max())
-    px_hi_now = float(s.h[i - 20:i + 1].max())
-    macd_hi_prev = float(s.macd[i - 25:i - 5].max())
-    macd_hi_now = float(s.macd[i - 20:i + 1].max())
+    px_low_prev = float(s.l[i - 30:i - 14].min())
+    px_low_now = float(s.l[i - 14:i + 1].min())
+    macd_low_prev = float(s.macd[i - 30:i - 14].min())
+    macd_low_now = float(s.macd[i - 14:i + 1].min())
+    px_hi_prev = float(s.h[i - 30:i - 14].max())
+    px_hi_now = float(s.h[i - 14:i + 1].max())
+    macd_hi_prev = float(s.macd[i - 30:i - 14].max())
+    macd_hi_now = float(s.macd[i - 14:i + 1].max())
     if px_low_now < px_low_prev and macd_low_now > macd_low_prev and s.c[i] > s.ema9[i]:
         return 0.65
     if px_hi_now > px_hi_prev and macd_hi_now < macd_hi_prev and s.c[i] < s.ema9[i]:

@@ -11,33 +11,31 @@ Dokumen ini memuat bedah arsitektur logika, spesifikasi matematis, mekanisme eks
 | **Nomor & ID Strategi** | `#4` · `snr_bounce` | Terdaftar di `server/strategies.py` |
 | **Kategori / Cluster** | **Price action** | Menentukan profil rasio R:R otomatis |
 | **Target Pasar** | Universal (Forex MT5, Binance Futures, Spot) | Spot: Long-Only · Futures & Forex: Long + Short |
-| **Timeframe Evaluasi** | `M1` (1-Menit Bar Closed via `BarRing`) | Dieksekusi 1x setiap bar 1-menit selesai ditutup |
+| **Timeframe Evaluasi** | `M1` (`BarRing` kapasitas 1440 bar / 24 jam) | Dieksekusi 1x setiap bar 1-menit selesai ditutup |
 | **Ambang Pemicu Skor** | `score > +0.15` (LONG) / `score < -0.15` (SHORT) | Skala output sinyal `[-1.0 .. +1.0]` |
 | **Rasio Risk-to-Reward (R:R)** | **`1 : 1.8`** | Otomatis berdasarkan cluster `Price action` |
 | **Leverage Default** | **`10x`** (Futures) · **`1x MT5 Direct`** (Forex) | Di Forex menggunakan lot sizing risiko 1.5% modal (~$15) |
-| **Stop Loss Engine** | $\max(2.0 \times \text{ATR}_{14}, \; 0.35\% \times \text{Harga})$ | Floor proteksi minimum 0.35% di `engine.py` |
+| **Stop Loss Engine** | $\max(2.0 \times \text{ATR}_{14}, \; 0.10\% \text{ Forex} / 0.35\% \text{ Crypto})$ | Floor proteksi adaptif di `engine.py` |
 
 ---
 
 ## 2. Filosofi Strategi & Konsep Pasar
 
-Menggunakan level Pivot Point Klasik (PP, R1, S1) dari candle sebelumnya untuk mendeteksi reaksi harga di area Support/Resistance.
+Pantulan Support & Resistance murni menggunakan Classic Pivot (P, R1, S1) dari bar sebelumnya: membeli saat harga menguji/menyentuh zona S1 namun menolak turun (ditutup hijau di atas S1), dan menjual saat harga menguji R1 lalu ditolak turun (ditutup merah di bawah R1).
 
 ---
 
 ## 3. Kriteria Matematis & Logika Deteksi Sinyal
 
-1. $PP = \frac{H_{i-1} + L_{i-1} + C_{i-1}}{3}$
-2. $R_1 = 2 \cdot PP - L_{i-1}$, $\quad S_1 = 2 \cdot PP - H_{i-1}$
-3. **BUY**: $C_i < S_1$ dan $C_{i-1} \ge S_1$
-4. **SELL**: $C_i > R_1$ dan $C_{i-1} \le R_1$
+1. $P = (H_{i-1} + L_{i-1} + C_{i-1}) / 3$, $\;R_1 = 2P - L_{i-1}$, $\;S_1 = 2P - H_{i-1}$.
+2. **BUY (+0.60)**: $(L_i \le S_1 \text{ atau } C_{i-1} \le S_1)$ dan $C_i > S_1$ dan $C_i > O_i$.
+3. **SELL (-0.60)**: $(H_i \ge R_1 \text{ atau } C_{i-1} \ge R_1)$ dan $C_i < R_1$ dan $C_i < O_i$.
 
 ### Visualisasi Alur Sinyal (Diagram Logika):
 ```text
-  R1 (Resistance) -----------------
-       ^  <-- Harga tembus ke atas R1 -> Malah OPEN SELL (Counter-Breakout!)
-  S1 (Support)   -----------------
-       v  <-- Harga jebol ke bawah S1 -> Malah OPEN BUY (Menangkap Pisau Jatuh!)
+  R1 ---/\--- Reject (Close < R1, Bear) => SELL (-0.60)
+  P  -------- Pivot
+  S1 ---\/--- Bounce (Close > S1, Bull) => BUY  (+0.60)
 ```
 
 ---
@@ -53,7 +51,8 @@ Setiap kali bar M1 (`BarRing`) menutup dan indikator `Snap` selesai dihitung:
    - **Mode Forex MT5**: Risiko ditargetkan `1.5%` dari cash per posisi (`~$15` pada modal `$1,000`), dibatasi `0.01 - 0.10 Lot` (XAU/XTI) atau `0.01 - 0.20 Lot` (Forex mayor/cross).
    - **Mode Futures/Spot**: Risiko ditargetkan `2.0%` equity dengan margin maksimum per posisi `20%` equity (`SINGLE_POS_CAP`).
 3. **Stop Loss & Take Profit**:
-   - $\text{StopDist} = \max(2.0 \times \text{ATR}_{14}(M1), \; 0.0035 \times \text{Price})$
+   - **Mode Forex MT5**: $\text{StopDist} = \max(2.0 \times \text{ATR}_{14}(M1), \; 0.0010 \times \text{Price})$ *(floor adaptif 0.10%)*
+   - **Mode Spot & Futures**: $\text{StopDist} = \max(2.0 \times \text{ATR}_{14}(M1), \; 0.0035 \times \text{Price})$ *(floor 0.35%)*
    - $\text{TPDist} = 1.8 \times \text{StopDist}$
    - Jika muncul sinyal berlawanan arah (`pos.side != new_side`), posisi lama langsung ditutup (*reverse signal exit*) sebelum posisi baru dibuka.
 
@@ -63,9 +62,9 @@ Setiap kali bar M1 (`BarRing`) menutup dan indikator `Snap` selesai dihitung:
 
 Hasil pemeriksaan langsung terhadap kode sumber `server/strategies.py`, `server/engine.py`, dan `server/forex_feed.py` menemukan catatan audit spesifik berikut untuk strategi ini:
 
-* **🚨 BUG LOGIKA REVERSAL**: Strategi bernama *Support Resistance Bounce*, namun kode justru entry BUY tepat saat candle close **MENJEBOL KE BAWAH** `S1` (`c < s1`), bukan menunggu konfirmasi pantulan naik kembali ke atas `S1`. Ini membuat bot sering menangkap pisau jatuh saat breakout bearish!
-* **⚠️ Pivot Dihitung dari 1 Candle M1 (`i-1`)**: Menghitung R1/S1 dari satu bar 1-menit membuat level sangat sempit dan bising.
-* **⚠️ Catatan Umum Mesin M1 (`0.35% Minimum SL Floor`)**: Karena sinyal dievaluasi pada bar **1-menit (`M1`)**, sedangkan `engine.py` memaksa jarak Stop Loss minimal `0.35%` (~143 pips pada XAUUSD atau ~39 pips pada EURUSD), strategi jangka pendek M1 harus menahan fluktuasi lebar yang kerap tidak sebanding dengan target scalping-nya.
+* **✅ FIXED (Bug Logika Reversal Terbalik Diperbaiki)**: Logika lama keliru entry BUY ketika `c < s1` (menangkap breakout jatuh). Kini `pivot_bounce` mewajibkan konfirmasi harga kembali memantul melewati S1/R1 dengan warna candle penolakan yang searah.
+* **⚠️ Catatan Pivot M1**: Level S1/R1 masih dihitung dari bar M1 `i-1`, sehingga cocok untuk mikro-rebound cepat.
+* **ℹ️ Pembaruan Mesin M1 (`0.10% Forex SL Floor` & `1440-Bar History`)**: `engine.py` kini menurunkan batas SL minimum khusus mode **Forex MT5** dari `0.35%` menjadi **`0.10%`** (membuat target & stop jauh lebih proporsional pada pasangan Forex & XAUUSD), sementara mode Spot & Futures menjaga floor `0.35%`. Buffer data M1 diperbesar ke `1440 bar` (24 jam).
 
 ---
 
@@ -76,14 +75,15 @@ Berikut adalah implementasi kode aktual yang saat ini berjalan di produksi (`ser
 ```python
 # Sumber aktual dari server/strategies.py untuk 'snr_bounce':
 def pivot_bounce(s):
+    """Support/Resistance Bounce: memantul naik dari S1 atau ditolak turun dari R1."""
     i = s.i
     piv = (s.h[i - 1] + s.l[i - 1] + s.c[i - 1]) / 3
     r1 = 2 * piv - s.l[i - 1]
     s1 = 2 * piv - s.h[i - 1]
     c = s.c[i]
-    if c < s1 and s.c[i - 1] >= s1:
+    if (s.l[i] <= s1 or s.c[i - 1] <= s1) and c > s1 and c > s.o[i]:
         return 0.6
-    if c > r1 and s.c[i - 1] <= r1:
+    if (s.h[i] >= r1 or s.c[i - 1] >= r1) and c < r1 and c < s.o[i]:
         return -0.6
     return 0.0
 ```

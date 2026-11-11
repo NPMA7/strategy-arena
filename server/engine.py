@@ -18,7 +18,7 @@ import time
 from typing import Iterable
 
 from .bars import BarRing
-from .indicators import compute
+from .indicators import compute, Snap
 from .config import START_EQUITY, RISK_PER_TRADE as RISK, SL_MULT, FOREX_TARGET_RISK, MAX_MC_LIMIT
 from .strategies import (
     LONG, MAX_POS, SHORT, SIGNAL_FN, STRATEGY_IDS, STRATEGY_META, THRESHOLD,
@@ -253,35 +253,41 @@ class Engine:
         }
 
     # ── feed ────────────────────────────────────────────────────────────
-    def on_bar_closed(self, symbol: str, views: dict, closed_bar_close: float) -> None:
+    def on_bar_closed(self, symbol: str, views: dict, closed_bar_close: float, snap: Optional[Snap] = None) -> None:
         ring = self.rings.get(symbol)
         if ring is None or ring.n < MIN_BARS:
             return
-        snap = compute(views)
+        if snap is None:
+            snap = compute(views)
+        snap.symbol = symbol
+        snap.market_mode = self.mode
+        snap.custom_sl_tp = None
         if snap.n < MIN_BARS:
             return
         self.bars_processed += 1
         ts = int(time.time() * 1000)
 
-        signals: list[tuple[float, str, str]] = []  # (score, sid, symbol)
+        signals: list[tuple[float, str, str, tuple[float, float] | None]] = []  # (score, sid, symbol, custom_stops)
         for sid in self.strategy_ids:
             acct = self.accounts[sid]
             if acct.get("disabled") or acct.get("mc_count", 0) >= MAX_MC_LIMIT:
                 continue
             fn = SIGNAL_FN[sid]
+            snap.custom_sl_tp = None
             try:
                 sc = fn(snap)
             except Exception:
                 sc = 0.0
+            cst = getattr(snap, "custom_sl_tp", None)
             if sc is None or sc != sc:
                 continue
             if sc >= THRESHOLD:
-                signals.append((float(sc), sid, symbol))
+                signals.append((float(sc), sid, symbol, cst))
             elif sc <= -THRESHOLD:
-                signals.append((float(sc), sid, symbol))
+                signals.append((float(sc), sid, symbol, cst))
 
-        for sc, sid, sym in signals:
-            self._handle_signal(self.accounts[sid], sc, sym, snap, ts)
+        for sc, sid, sym, cst in signals:
+            self._handle_signal(self.accounts[sid], sc, sym, snap, ts, custom_stops=cst)
 
         # Futures funding rate: apply every 8 hours
         if self.mode == "futures" and ts - self.last_funding_ts >= FUNDING_INTERVAL_SEC * 1000:
@@ -421,11 +427,44 @@ class Engine:
         tr = sum(p["risk_amount"] for p in acct["pos"].values())
         return tc, tr
 
-    def _handle_signal(self, acct: dict, score: float, symbol: str, snap, ts: int) -> None:
+    def _resolve_stops(
+        self,
+        sid: str,
+        side: int,
+        price: float,
+        atr: float,
+        custom_stops: tuple[float, float] | None = None,
+    ) -> tuple[float, float, float]:
+        """Hitung stop_dist, tp_dist, dan rr_ratio dengan floor SL per mode dan custom stops jika valid."""
+        min_floor_pct = 0.0010 if self.mode == "forex" else 0.0035
+        stop_dist = SL_MULT * atr if (atr and atr > 0) else price * 0.02
+        stop_dist = max(stop_dist, price * min_floor_pct)
+        rr_ratio = get_strategy_rr(sid)
+        tp_dist = stop_dist * rr_ratio
+
+        if custom_stops and isinstance(custom_stops, tuple) and len(custom_stops) == 2:
+            c_sl, c_tp = custom_stops
+            if (side == LONG and c_sl < price < c_tp) or (side == SHORT and c_tp < price < c_sl):
+                stop_dist = max(abs(price - c_sl), price * 0.0005)
+                tp_dist = abs(c_tp - price)
+                rr_ratio = round(tp_dist / stop_dist, 2)
+        return stop_dist, tp_dist, rr_ratio
+
+    def _handle_signal(
+        self,
+        acct: dict,
+        score: float,
+        symbol: str,
+        snap,
+        ts: int,
+        custom_stops: tuple[float, float] | None = None,
+    ) -> None:
         if acct.get("disabled") or acct.get("mc_count", 0) >= MAX_MC_LIMIT:
             return
         side = LONG if score > 0 else SHORT
         price = snap.c[snap.i]
+        if not (price > 0):
+            return
         atr = snap.atr14[snap.i]
         pos = acct["pos"].get(symbol)
 
@@ -438,8 +477,7 @@ class Engine:
         # Risk-based position limit: alokasi margin per posisi dibatasi SINGLE_POS_CAP (20% equity = $2.000)
         # sehingga tiap strategi dapat memegang hingga MAX_POS (5) pair berbeda secara simultan
         leverage = acct.get("leverage", 1) if self.mode == "futures" else 1
-        stop_dist = SL_MULT * atr if (atr and atr > 0) else price * 0.02
-        stop_dist = max(stop_dist, price * 0.0035)
+        stop_dist, _, _ = self._resolve_stops(acct["id"], side, price, atr, custom_stops)
 
         # Sizing berbasis risiko murni: loss saat SL terkena adalah ~2% equity ($20 dari modal $1.000)
         target_risk = acct["equity"] * RISK
@@ -476,9 +514,19 @@ class Engine:
             else:
                 return
 
-        self._open(acct, symbol, side, price, atr, ts, score)
+        self._open(acct, symbol, side, price, atr, ts, score, custom_stops=custom_stops)
 
-    def _open(self, acct: dict, symbol: str, side: int, price: float, atr: float, ts: int, score: float) -> None:
+    def _open(
+        self,
+        acct: dict,
+        symbol: str,
+        side: int,
+        price: float,
+        atr: float,
+        ts: int,
+        score: float,
+        custom_stops: tuple[float, float] | None = None,
+    ) -> None:
         if acct.get("disabled") or acct.get("mc_count", 0) >= MAX_MC_LIMIT:
             return
         # Spot mode: skip short signals
@@ -488,12 +536,7 @@ class Engine:
             return
         leverage = acct.get("leverage", 1)
         fee_rate = acct.get("fee_rate", SPOT_FEE)
-        stop_dist = SL_MULT * atr if (atr and atr > 0) else price * 0.02
-        stop_dist = max(stop_dist, price * 0.0035)
-
-        # Take profit berdasarkan Risk-to-Reward (R:R) per strategi
-        rr_ratio = get_strategy_rr(acct["id"])
-        tp_dist = stop_dist * rr_ratio
+        stop_dist, tp_dist, rr_ratio = self._resolve_stops(acct["id"], side, price, atr, custom_stops)
 
         # Sizing berbasis risiko murni: loss saat SL terkena adalah persis ~RISK
         # Margin yang dijaminkan dibatasi maks SINGLE_POS_CAP

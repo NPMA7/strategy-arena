@@ -24,7 +24,26 @@ from .binance import BinanceFeed
 from .db import DB
 from .engine import Engine, START_EQUITY, MIN_BARS, calculate_forex_pnl
 from .forex_feed import ForexFeed
-from .strategies import FOREX_PAIRS, FOREX_STRATEGIES
+from .indicators import compute
+from .strategies import FOREX_PAIRS, FOREX_STRATEGIES, SIGNAL_FN
+
+
+def _norm_strat_id(sid: str) -> str:
+    """Normalisasi backward-compat untuk ID strategi lama berawalan 'fx_'."""
+    if not sid or sid in ("all", "All"):
+        return sid
+    s = sid.strip()
+    if s not in SIGNAL_FN and s.startswith("fx_"):
+        stripped = s[3:]
+        if stripped in SIGNAL_FN:
+            return stripped
+    return s
+
+
+def _parse_strat_filter(strategy: str | None) -> set[str] | None:
+    if not strategy or strategy == "all":
+        return None
+    return {_norm_strat_id(s) for s in strategy.split(",") if s.strip()}
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-7s %(name)s | %(message)s")
 log = logging.getLogger("arena")
@@ -77,8 +96,8 @@ class SignalHub:
                 strat = opts.get("strategy")
                 mode = opts.get("mode")
                 if strat and strat != "all":
-                    allowed_strats = {s.strip() for s in strat.split(",")} if "," in strat else {strat}
-                    if sig.get("strategy") not in allowed_strats:
+                    allowed_strats = _parse_strat_filter(strat)
+                    if allowed_strats and sig.get("strategy") not in allowed_strats:
                         continue
                 if mode and mode != "all" and sig.get("mode") != mode:
                     continue
@@ -127,15 +146,17 @@ async def on_trade(symbol: str, price: float, qty: float, ts_ms: float) -> None:
         ring = rings[symbol] = BarRing(offset_ms=(abs(hash(symbol)) % 60) * 1000)
     bar_closed = ring.on_trade(ts_ms, price, qty)
     if bar_closed:
+        views = ring.views()
+        snap = compute(views) if ring.n >= MIN_BARS else None
         # Spot engine processes ALL crypto pairs
         if spot_engine is not None and symbol not in forex_symbols:
-            spot_engine.on_bar_closed(symbol, ring.views(), price)
+            spot_engine.on_bar_closed(symbol, views, price, snap=snap)
         # Futures engine only processes futures-eligible crypto pairs
         if futures_engine is not None and symbol in futures_symbols:
-            futures_engine.on_bar_closed(symbol, ring.views(), price)
+            futures_engine.on_bar_closed(symbol, views, price, snap=snap)
         # Forex engine processes forex pairs
         if forex_engine is not None and symbol in forex_symbols:
-            forex_engine.on_bar_closed(symbol, ring.views(), price)
+            forex_engine.on_bar_closed(symbol, views, price, snap=snap)
     # Check stops on engines every tick
     if spot_engine is not None and symbol not in forex_symbols:
         spot_engine.check_stops(symbol, price)
@@ -294,7 +315,7 @@ async def pair_refresh_loop() -> None:
                 unseeded = [s for s in feed.symbols if s not in rings or rings[s].n < MIN_BARS]
                 if unseeded:
                     log.info("seeding klines untuk pair baru (%d pair): %s", len(unseeded), unseeded)
-                    await feed.seed_klines(unseeded, rings, limit=250)
+                    await feed.seed_klines(unseeded, rings, limit=1440)
             except Exception as exc:
                 log.warning("upsert/seed pairs gagal: %s", exc)
 
@@ -359,7 +380,7 @@ async def lifespan(app: FastAPI):
         )
         log.info("Engine forex dipulihkan: %d akun, %d posisi", len(saved_state["forex_accounts"]), len(saved_state.get("forex_positions", [])))
 
-    # Start Forex Feed & seed 240 M1 bars into rings so indicators can run immediately
+    # Start Forex Feed & seed 1440 M1 bars (24h real MT5 history, fallback synthetic)
     forex_feed = ForexFeed(on_trade)
     init_ticks = None
     try:
@@ -371,7 +392,7 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         log.warning("Tidak dapat mengambil initial ticks dari MT5 bridge sebelum seeding: %s", exc)
 
-    forex_feed.seed_rings(rings, initial_ticks=init_ticks)
+    await forex_feed.seed_rings_from_mt5(rings, initial_ticks=init_ticks, num_bars=1440)
     for a in forex_engine.accounts.values():
         a["warmed"] = True
     await forex_feed.start()
@@ -382,8 +403,8 @@ async def lifespan(app: FastAPI):
     try:
         await feed.start()
         await db.upsert_pairs(feed.pairs())
-        # Seed historical 1m bars so MIN_BARS (210) is satisfied immediately
-        await feed.seed_klines(feed.symbols, rings, limit=250)
+        # Seed historical 1m bars (24h = 1440 bars) so M15/M30/H1 & MIN_BARS (210) are satisfied immediately
+        await feed.seed_klines(feed.symbols, rings, limit=1440)
 
         # Get futures-specific pairs (auto-filtered from spot by known futures bases)
         futures_pairs = feed.get_futures_pairs()
@@ -530,7 +551,7 @@ async def get_live_state():
 
 @app.get("/api/strategy/{sid}")
 async def strategy_detail(sid: str, mode: str = Query("spot"), hours: int = Query(24, ge=1, le=2160), limit: int = Query(50, ge=1, le=10000)):
-    return JSONResponse(await db.read_strategy_detail(sid, mode=mode, hours=hours, limit=limit))
+    return JSONResponse(await db.read_strategy_detail(_norm_strat_id(sid), mode=mode, hours=hours, limit=limit))
 
 
 @app.get("/api/strategy/{sid}/trades")
@@ -542,7 +563,7 @@ async def strategy_trades_endpoint(
     filter: str = Query("all"),
     search: str = Query(""),
 ):
-    return JSONResponse(await db.read_strategy_trades(sid, mode=mode, page=page, limit=limit, filter_type=filter, search=search))
+    return JSONResponse(await db.read_strategy_trades(_norm_strat_id(sid), mode=mode, page=page, limit=limit, filter_type=filter, search=search))
 
 
 @app.get("/api/symbol/{symbol}")
@@ -558,10 +579,11 @@ async def get_all_executions_endpoint(
     limit: int = Query(150, ge=1, le=500),
 ):
     """Feed terpadu seluruh eksekusi trade dari semua pasar (Spot, Futures, Forex), pairs, dan strategi."""
+    norm_strategy = _norm_strat_id(strategy) if strategy != "all" else "all"
     # 1. Closed historical trades dari database
     closed_trades = await db.read_all_executions(
         mode=mode,
-        strategy=strategy,
+        strategy=norm_strategy,
         symbol=symbol,
         limit=limit
     )
@@ -586,7 +608,7 @@ async def get_all_executions_endpoint(
     if mode in ("forex", "all") and forex_engine:
         engines.append(("forex", forex_engine))
 
-    allowed_strats = {s.strip() for s in strategy.split(",")} if strategy != "all" else None
+    allowed_strats = _parse_strat_filter(strategy)
     for m_label, eng in engines:
         for sid, acct in eng.accounts.items():
             if allowed_strats is not None and sid not in allowed_strats:
@@ -778,7 +800,7 @@ async def get_active_positions_api(
     if mode in ("forex", "all") and forex_engine:
         engines.append(("forex", forex_engine))
 
-    allowed_strats = {s.strip() for s in strategy.split(",")} if strategy != "all" else None
+    allowed_strats = _parse_strat_filter(strategy)
     for m_label, eng in engines:
         for sid, acct in eng.accounts.items():
             if allowed_strats is not None and sid not in allowed_strats:
@@ -830,9 +852,10 @@ async def get_signals_feed_api(
     api_key: str = Depends(get_validated_api_key)
 ):
     """Riwayat sinyal terstruktur (Open Long/Short, Close TP/SL) dari database."""
+    norm_strategy = _norm_strat_id(strategy) if strategy != "all" else None
     signals = await db.read_signals(
         mode=None if mode == "all" else mode,
-        strategy=None if strategy == "all" else strategy,
+        strategy=norm_strategy,
         action_type=None if action == "all" else action,
         limit=limit
     )
@@ -873,7 +896,7 @@ async def ws_signals_endpoint(
     if mode in ("forex", "all") and forex_engine:
         engines.append(("forex", forex_engine))
 
-    allowed_strats = {s.strip() for s in strategy.split(",")} if strategy != "all" else None
+    allowed_strats = _parse_strat_filter(strategy)
     for m_label, eng in engines:
         for sid, acct in eng.accounts.items():
             if allowed_strats is not None and sid not in allowed_strats:

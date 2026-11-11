@@ -11,28 +11,32 @@ Dokumen ini memuat bedah arsitektur logika, spesifikasi matematis, mekanisme eks
 | **Nomor & ID Strategi** | `#33` · `mean_sd_band` | Terdaftar di `server/strategies.py` |
 | **Kategori / Cluster** | **Statistik** | Menentukan profil rasio R:R otomatis |
 | **Target Pasar** | Universal (Forex MT5, Binance Futures, Spot) | Spot: Long-Only · Futures & Forex: Long + Short |
-| **Timeframe Evaluasi** | `M1` (1-Menit Bar Closed via `BarRing`) | Dieksekusi 1x setiap bar 1-menit selesai ditutup |
+| **Timeframe Evaluasi** | `M1` (`BarRing` kapasitas 1440 bar / 24 jam) | Dieksekusi 1x setiap bar 1-menit selesai ditutup |
 | **Ambang Pemicu Skor** | `score > +0.15` (LONG) / `score < -0.15` (SHORT) | Skala output sinyal `[-1.0 .. +1.0]` |
 | **Rasio Risk-to-Reward (R:R)** | **`1 : 1.5`** | Otomatis berdasarkan cluster `Statistik` |
 | **Leverage Default** | **`15x`** (Futures) · **`1x MT5 Direct`** (Forex) | Di Forex menggunakan lot sizing risiko 1.5% modal (~$15) |
-| **Stop Loss Engine** | $\max(2.0 \times \text{ATR}_{14}, \; 0.35\% \times \text{Harga})$ | Floor proteksi minimum 0.35% di `engine.py` |
+| **Stop Loss Engine** | $\max(2.0 \times \text{ATR}_{14}, \; 0.10\% \text{ Forex} / 0.35\% \text{ Crypto})$ | Floor proteksi adaptif di `engine.py` |
 
 ---
 
 ## 2. Filosofi Strategi & Konsep Pasar
 
-Merupakan kebalikan persis dari Z-Score Reversion (mengubah strategi mean reversion menjadi momentum breakout di atas ±2 SD).
+Mean reversion statistik berbasis **Median & MAD (Median Absolute Deviation)** 30-bar sebagai alternatif non-parametrik yang kebal terhadap *outlier spike* tunggal dibanding Mean & Standard Deviation biasa.
 
 ---
 
 ## 3. Kriteria Matematis & Logika Deteksi Sinyal
 
-`-zscore_reversion(s) * 0.7`
+1. Ambil jendela $W = C_{i-29..i}$, hitung $\text{Med} = \text{median}(W)$.
+2. Hitung $\text{MAD} = \text{median}(|W - \text{Med}|)$, $\text{Scale} = 1.4826 \times \text{MAD}$.
+3. $Z_{\text{MAD}} = \frac{C_i - \text{Med}}{\text{Scale}}$.
+4. **BUY (+0.72)** jika $Z_{\text{MAD}} \le -2.2$; **SELL (-0.72)** jika $Z_{\text{MAD}} \ge +2.2$.
 
 ### Visualisasi Alur Sinyal (Diagram Logika):
 ```text
-  Z >= +2.0  ===> BUY  (+0.56)
-  Z <= -2.0  ===> SELL (-0.56)
+  +2.2 MAD (Outlier High) ===> SELL (-0.72)
+  Median (30-bar Robust)  ---> Fair Price
+  -2.2 MAD (Outlier Low)  ===> BUY  (+0.72)
 ```
 
 ---
@@ -48,7 +52,8 @@ Setiap kali bar M1 (`BarRing`) menutup dan indikator `Snap` selesai dihitung:
    - **Mode Forex MT5**: Risiko ditargetkan `1.5%` dari cash per posisi (`~$15` pada modal `$1,000`), dibatasi `0.01 - 0.10 Lot` (XAU/XTI) atau `0.01 - 0.20 Lot` (Forex mayor/cross).
    - **Mode Futures/Spot**: Risiko ditargetkan `2.0%` equity dengan margin maksimum per posisi `20%` equity (`SINGLE_POS_CAP`).
 3. **Stop Loss & Take Profit**:
-   - $\text{StopDist} = \max(2.0 \times \text{ATR}_{14}(M1), \; 0.0035 \times \text{Price})$
+   - **Mode Forex MT5**: $\text{StopDist} = \max(2.0 \times \text{ATR}_{14}(M1), \; 0.0010 \times \text{Price})$ *(floor adaptif 0.10%)*
+   - **Mode Spot & Futures**: $\text{StopDist} = \max(2.0 \times \text{ATR}_{14}(M1), \; 0.0035 \times \text{Price})$ *(floor 0.35%)*
    - $\text{TPDist} = 1.5 \times \text{StopDist}$
    - Jika muncul sinyal berlawanan arah (`pos.side != new_side`), posisi lama langsung ditutup (*reverse signal exit*) sebelum posisi baru dibuka.
 
@@ -58,8 +63,8 @@ Setiap kali bar M1 (`BarRing`) menutup dan indikator `Snap` selesai dihitung:
 
 Hasil pemeriksaan langsung terhadap kode sumber `server/strategies.py`, `server/engine.py`, dan `server/forex_feed.py` menemukan catatan audit spesifik berikut untuk strategi ini:
 
-* **🚨 DUPLIKAT CERMIN (Mirror Strategy)**: Strategi ini hanyalah negatif (`-0.7x`) dari `zscore_rev`. Secara otomatis saat `zscore_rev` rugi (`-2.52%`), strategi ini untung (`+2.40%`). Tidak memiliki logika independen.
-* **⚠️ Catatan Umum Mesin M1 (`0.35% Minimum SL Floor`)**: Karena sinyal dievaluasi pada bar **1-menit (`M1`)**, sedangkan `engine.py` memaksa jarak Stop Loss minimal `0.35%` (~143 pips pada XAUUSD atau ~39 pips pada EURUSD), strategi jangka pendek M1 harus menahan fluktuasi lebar yang kerap tidak sebanding dengan target scalping-nya.
+* **✅ FIXED (Deduplikasi Dari Mirror `zscore_rev`)**: Implementasi lama hanyalah `-0.7 * zscore_rev(s)`. Kini berdiri sendiri menggunakan statistik **Median & MAD** (`mean_sd_band_mad`).
+* **ℹ️ Pembaruan Mesin M1 (`0.10% Forex SL Floor` & `1440-Bar History`)**: `engine.py` kini menurunkan batas SL minimum khusus mode **Forex MT5** dari `0.35%` menjadi **`0.10%`** (membuat target & stop jauh lebih proporsional pada pasangan Forex & XAUUSD), sementara mode Spot & Futures menjaga floor `0.35%`. Buffer data M1 diperbesar ke `1440 bar` (24 jam).
 
 ---
 
@@ -69,5 +74,22 @@ Berikut adalah implementasi kode aktual yang saat ini berjalan di produksi (`ser
 
 ```python
 # Sumber aktual dari server/strategies.py untuk 'mean_sd_band':
-("mean_sd_band", "Mean Deviation Band", "Statistik", lambda s: -zscore_reversion(s) * 0.7),
+def mean_sd_band_mad(s):
+    """Robust Median + MAD (Median Absolute Deviation) mean-reversion band."""
+    import numpy as np
+    i = s.i
+    if i < 30:
+        return 0.0
+    win = s.c[i - 29:i + 1]
+    med = float(np.median(win))
+    mad = float(np.median(np.abs(win - med)))
+    scale = 1.4826 * mad
+    if scale <= 0:
+        return 0.0
+    z = (s.c[i] - med) / scale
+    if z <= -2.2:
+        return 0.72
+    if z >= 2.2:
+        return -0.72
+    return 0.0
 ```

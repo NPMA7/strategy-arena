@@ -11,30 +11,31 @@ Dokumen ini memuat bedah arsitektur logika, spesifikasi matematis, mekanisme eks
 | **Nomor & ID Strategi** | `#18` · `supertrend` | Terdaftar di `server/strategies.py` |
 | **Kategori / Cluster** | **Volatility** | Menentukan profil rasio R:R otomatis |
 | **Target Pasar** | Universal (Forex MT5, Binance Futures, Spot) | Spot: Long-Only · Futures & Forex: Long + Short |
-| **Timeframe Evaluasi** | `M1` (1-Menit Bar Closed via `BarRing`) | Dieksekusi 1x setiap bar 1-menit selesai ditutup |
+| **Timeframe Evaluasi** | `M1` (`BarRing` kapasitas 1440 bar / 24 jam) | Dieksekusi 1x setiap bar 1-menit selesai ditutup |
 | **Ambang Pemicu Skor** | `score > +0.15` (LONG) / `score < -0.15` (SHORT) | Skala output sinyal `[-1.0 .. +1.0]` |
 | **Rasio Risk-to-Reward (R:R)** | **`1 : 1.8`** | Otomatis berdasarkan cluster `Volatility` |
 | **Leverage Default** | **`10x`** (Futures) · **`1x MT5 Direct`** (Forex) | Di Forex menggunakan lot sizing risiko 1.5% modal (~$15) |
-| **Stop Loss Engine** | $\max(2.0 \times \text{ATR}_{14}, \; 0.35\% \times \text{Harga})$ | Floor proteksi minimum 0.35% di `engine.py` |
+| **Stop Loss Engine** | $\max(2.0 \times \text{ATR}_{14}, \; 0.10\% \text{ Forex} / 0.35\% \text{ Crypto})$ | Floor proteksi adaptif di `engine.py` |
 
 ---
 
 ## 2. Filosofi Strategi & Konsep Pasar
 
-Diklaim sebagai SuperTrend berbasis 3x ATR untuk mendeteksi pembalikan arah tren dinamis.
+Menghitung pita SuperTrend `ATR(14) x 3.0` secara **stateful** (band mempertahankan level tinggi/rendah sebelumnya hingga ditembus close) selama jendela 60 bar, memicu sinyal kuat saat terjadi perubahan tren (flip) maupun entri sekunder saat harga pullback ke dekat garis trailing.
 
 ---
 
 ## 3. Kriteria Matematis & Logika Deteksi Sinyal
 
-1. $\text{up\_line} = \text{HL2}_i - 3 \cdot \text{ATR}_{14}$
-2. $\text{dn\_line} = \text{HL2}_i + 3 \cdot \text{ATR}_{14}$
-3. Mengecek posisi `c[i-1]` dan `c[i]` terhadap band.
+1. Untuk tiap bar $k \in [\max(1, i-59) \dots i]$: $\text{HL2}_k = \frac{H_k+L_k}{2}$, $\text{BasicUB} = \text{HL2}+3\cdot\text{ATR}_{14}$, $\text{BasicLB} = \text{HL2}-3\cdot\text{ATR}_{14}$.
+2. Band stateful: `final_ub` hanya boleh turun (`prev_c <= final_ub`), `final_lb` hanya boleh naik (`prev_c >= final_lb`).
+3. **Flip Signal (±0.80)**: Perubahan `prev_trend -> trend` (`c_k > final_ub` -> UP, `c_k < final_lb` -> DOWN).
+4. **Pullback Signal (±0.35)**: Dalam tren naik aktif (`trend == 1`) ketika $\text{final\_lb} < C_i < \text{EMA}_{21}$ (dan sebaliknya).
 
 ### Visualisasi Alur Sinyal (Diagram Logika):
 ```text
-  up_line = HL2 - 3*ATR
-  [BUG: Line 213 memblokir kondisi cross up!]
+  [Stateful Trailing Band 60-bar ATR14 x 3.0]
+  Breakout FinalUB (Flip -1 -> +1) ===> BUY (+0.80) | Pullback > FinalLB & < EMA21 ===> BUY (+0.35)
 ```
 
 ---
@@ -50,7 +51,8 @@ Setiap kali bar M1 (`BarRing`) menutup dan indikator `Snap` selesai dihitung:
    - **Mode Forex MT5**: Risiko ditargetkan `1.5%` dari cash per posisi (`~$15` pada modal `$1,000`), dibatasi `0.01 - 0.10 Lot` (XAU/XTI) atau `0.01 - 0.20 Lot` (Forex mayor/cross).
    - **Mode Futures/Spot**: Risiko ditargetkan `2.0%` equity dengan margin maksimum per posisi `20%` equity (`SINGLE_POS_CAP`).
 3. **Stop Loss & Take Profit**:
-   - $\text{StopDist} = \max(2.0 \times \text{ATR}_{14}(M1), \; 0.0035 \times \text{Price})$
+   - **Mode Forex MT5**: $\text{StopDist} = \max(2.0 \times \text{ATR}_{14}(M1), \; 0.0010 \times \text{Price})$ *(floor adaptif 0.10%)*
+   - **Mode Spot & Futures**: $\text{StopDist} = \max(2.0 \times \text{ATR}_{14}(M1), \; 0.0035 \times \text{Price})$ *(floor 0.35%)*
    - $\text{TPDist} = 1.8 \times \text{StopDist}$
    - Jika muncul sinyal berlawanan arah (`pos.side != new_side`), posisi lama langsung ditutup (*reverse signal exit*) sebelum posisi baru dibuka.
 
@@ -60,10 +62,8 @@ Setiap kali bar M1 (`BarRing`) menutup dan indikator `Snap` selesai dihitung:
 
 Hasil pemeriksaan langsung terhadap kode sumber `server/strategies.py`, `server/engine.py`, dan `server/forex_feed.py` menemukan catatan audit spesifik berikut untuk strategi ini:
 
-* **🚨 CRITICAL CODE BUG (Unreachable Dead Code & Non-Stateful Band!)**:
-   - Baris 213 menulis `if c0 <= up_line: return 0.0` tepat sebelum baris 215 `if c1 > up_line and c0 <= up_line: return 0.7`! Akibatnya **sinyal BUY utama (`return 0.7`) TIDAK PERNAH BISA DIEKSEKUSI (DEAD CODE)**!
-   - Selain itu, `up_line` dan `dn_line` tidak menyimpan status trailing kumulatif SuperTrend dari bar-bar sebelumnya melainkan dihitung ulang murni dari `hl2` bar saat ini. Itulah sebabnya strategi ini terpuruk di papan bawah (**#83 dengan -9.14%**)!
-* **⚠️ Catatan Umum Mesin M1 (`0.35% Minimum SL Floor`)**: Karena sinyal dievaluasi pada bar **1-menit (`M1`)**, sedangkan `engine.py` memaksa jarak Stop Loss minimal `0.35%` (~143 pips pada XAUUSD atau ~39 pips pada EURUSD), strategi jangka pendek M1 harus menahan fluktuasi lebar yang kerap tidak sebanding dengan target scalping-nya.
+* **✅ FIXED (Dead Code & Non-Stateful Band Diperbaiki)**: Bug lama berupa kondisi unreachable dan band statis telah diganti dengan loop SuperTrend stateful `14 x 3.0 ATR` yang akurat mengikuti logika TradingView.
+* **ℹ️ Pembaruan Mesin M1 (`0.10% Forex SL Floor` & `1440-Bar History`)**: `engine.py` kini menurunkan batas SL minimum khusus mode **Forex MT5** dari `0.35%` menjadi **`0.10%`** (membuat target & stop jauh lebih proporsional pada pasangan Forex & XAUUSD), sementara mode Spot & Futures menjaga floor `0.35%`. Buffer data M1 diperbesar ke `1440 bar` (24 jam).
 
 ---
 
@@ -74,25 +74,47 @@ Berikut adalah implementasi kode aktual yang saat ini berjalan di produksi (`ser
 ```python
 # Sumber aktual dari server/strategies.py untuk 'supertrend':
 def supertrend(s):
-    """SuperTrend 10 x 3 ATR sederhana (arah dari posisi close vs ATR band)."""
+    """SuperTrend 14 x 3.0 ATR stateful trailing band."""
     i = s.i
-    atr = s.atr14[i]
-    hl2 = (s.h[i] + s.l[i]) / 2
-    if not _ok(atr):
+    if i < 20 or not _ok(s.atr14[i]):
         return 0.0
-    up_line = hl2 - 3 * atr
-    dn_line = hl2 + 3 * atr
-    c0, c1 = s.c[i - 1], s.c[i]
-    if c0 <= up_line:
+    start = max(1, i - 59)
+    final_ub = None
+    final_lb = None
+    trend = 1
+    prev_trend = 1
+    for k in range(start, i + 1):
+        atr_k = s.atr14[k]
+        c_k = s.c[k]
+        if not _ok(atr_k, c_k, s.h[k], s.l[k]) or atr_k <= 0:
+            continue
+        hl2 = 0.5 * (s.h[k] + s.l[k])
+        basic_ub = hl2 + 3.0 * atr_k
+        basic_lb = hl2 - 3.0 * atr_k
+        prev_c = s.c[k - 1]
+        if final_ub is None:
+            final_ub = basic_ub
+            final_lb = basic_lb
+            trend = 1 if c_k >= hl2 else -1
+            prev_trend = trend
+            continue
+        prev_trend = trend
+        final_ub = basic_ub if (basic_ub < final_ub or prev_c > final_ub) else final_ub
+        final_lb = basic_lb if (basic_lb > final_lb or prev_c < final_lb) else final_lb
+        if c_k > final_ub:
+            trend = 1
+        elif c_k < final_lb:
+            trend = -1
+    if final_ub is None or final_lb is None:
         return 0.0
-    if c1 > up_line and c0 <= up_line:
-        return 0.7
-    if c1 < dn_line and c0 >= dn_line:
-        return -0.7
-    # sinyal lanjutan: harga jauh di luar band bertahan = momentum
-    if c1 > up_line and c1 < s.ema21[i]:
-        return 0.3
-    if c1 < dn_line and c1 > s.ema21[i]:
-        return -0.3
+    if prev_trend == -1 and trend == 1:
+        return 0.8
+    if prev_trend == 1 and trend == -1:
+        return -0.8
+    if _ok(s.ema21[i]):
+        if trend == 1 and s.c[i] > final_lb and s.c[i] < s.ema21[i]:
+            return 0.35
+        if trend == -1 and s.c[i] < final_ub and s.c[i] > s.ema21[i]:
+            return -0.35
     return 0.0
 ```

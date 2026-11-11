@@ -11,28 +11,30 @@ Dokumen ini memuat bedah arsitektur logika, spesifikasi matematis, mekanisme eks
 | **Nomor & ID Strategi** | `#25` · `vwap_trend` | Terdaftar di `server/strategies.py` |
 | **Kategori / Cluster** | **Statistik** | Menentukan profil rasio R:R otomatis |
 | **Target Pasar** | Universal (Forex MT5, Binance Futures, Spot) | Spot: Long-Only · Futures & Forex: Long + Short |
-| **Timeframe Evaluasi** | `M1` (1-Menit Bar Closed via `BarRing`) | Dieksekusi 1x setiap bar 1-menit selesai ditutup |
+| **Timeframe Evaluasi** | `M1` (`BarRing` kapasitas 1440 bar / 24 jam) | Dieksekusi 1x setiap bar 1-menit selesai ditutup |
 | **Ambang Pemicu Skor** | `score > +0.15` (LONG) / `score < -0.15` (SHORT) | Skala output sinyal `[-1.0 .. +1.0]` |
 | **Rasio Risk-to-Reward (R:R)** | **`1 : 1.5`** | Otomatis berdasarkan cluster `Statistik` |
 | **Leverage Default** | **`10x`** (Futures) · **`1x MT5 Direct`** (Forex) | Di Forex menggunakan lot sizing risiko 1.5% modal (~$15) |
-| **Stop Loss Engine** | $\max(2.0 \times \text{ATR}_{14}, \; 0.35\% \times \text{Harga})$ | Floor proteksi minimum 0.35% di `engine.py` |
+| **Stop Loss Engine** | $\max(2.0 \times \text{ATR}_{14}, \; 0.10\% \text{ Forex} / 0.35\% \text{ Crypto})$ | Floor proteksi adaptif di `engine.py` |
 
 ---
 
 ## 2. Filosofi Strategi & Konsep Pasar
 
-Dimaksudkan sebagai VWAP Trend Follow, namun menggunakan logika pembalikan terhadap `trend_stack` berdasarkan posisi `ema50`.
+Mengikuti tren institusional dengan memastikan posisi harga berada searah di atas/bawah VWAP 60-bar sekaligus selaras dengan susunan EMA21 & EMA50.
 
 ---
 
 ## 3. Kriteria Matematis & Logika Deteksi Sinyal
 
-`trend_stack(s) if c > ema50 else -trend_stack(s)`
+1. Hitung $\text{VWAP}_{60} = \frac{\sum_{k=i-59}^{i} C_k V_k}{\sum V_k}$.
+2. **BUY (+0.65)**: $C_i > \text{VWAP}_{60}$ dan $C_i > \text{EMA}_{21} > \text{EMA}_{50}$.
+3. **SELL (-0.65)**: $C_i < \text{VWAP}_{60}$ dan $C_i < \text{EMA}_{21} < \text{EMA}_{50}$.
 
 ### Visualisasi Alur Sinyal (Diagram Logika):
 ```text
-  [CRITICAL BUG]: Saat c < ema50, trend_stack bernilai NEGATIF (-0.6),
-  lalu dinegasikan menjadi POSITIF (+0.6) -> ENTRY BUY SAAT TREN TURUN!
+  Price > VWAP(60) AND Price > EMA21 > EMA50 ===> BUY (+0.65)
+  Price < VWAP(60) AND Price < EMA21 < EMA50 ===> SELL (-0.65)
 ```
 
 ---
@@ -48,7 +50,8 @@ Setiap kali bar M1 (`BarRing`) menutup dan indikator `Snap` selesai dihitung:
    - **Mode Forex MT5**: Risiko ditargetkan `1.5%` dari cash per posisi (`~$15` pada modal `$1,000`), dibatasi `0.01 - 0.10 Lot` (XAU/XTI) atau `0.01 - 0.20 Lot` (Forex mayor/cross).
    - **Mode Futures/Spot**: Risiko ditargetkan `2.0%` equity dengan margin maksimum per posisi `20%` equity (`SINGLE_POS_CAP`).
 3. **Stop Loss & Take Profit**:
-   - $\text{StopDist} = \max(2.0 \times \text{ATR}_{14}(M1), \; 0.0035 \times \text{Price})$
+   - **Mode Forex MT5**: $\text{StopDist} = \max(2.0 \times \text{ATR}_{14}(M1), \; 0.0010 \times \text{Price})$ *(floor adaptif 0.10%)*
+   - **Mode Spot & Futures**: $\text{StopDist} = \max(2.0 \times \text{ATR}_{14}(M1), \; 0.0035 \times \text{Price})$ *(floor 0.35%)*
    - $\text{TPDist} = 1.5 \times \text{StopDist}$
    - Jika muncul sinyal berlawanan arah (`pos.side != new_side`), posisi lama langsung ditutup (*reverse signal exit*) sebelum posisi baru dibuka.
 
@@ -58,8 +61,8 @@ Setiap kali bar M1 (`BarRing`) menutup dan indikator `Snap` selesai dihitung:
 
 Hasil pemeriksaan langsung terhadap kode sumber `server/strategies.py`, `server/engine.py`, dan `server/forex_feed.py` menemukan catatan audit spesifik berikut untuk strategi ini:
 
-* **🚨 CRITICAL BUG (Double Negation Sign Inversion!)**: Lihat baris 1160 `strategies.py`: Saat `c < ema50` dan tren turun rapi (`ema9 < ema21 < ema50`), fungsi `trend_stack(s)` mengembalikan nilai NEGATIF (misal `-0.6`). Namun cabang `else` melakukan **`-trend_stack(s)`** (minus ketemu minus = PLUS `+0.6`)! Akibatnya bot justru melakukan **BUY di tengah tren turun**! Ditambah lagi strategi ini sama sekali **tidak memakai VWAP**. Ini penyebab utama posisi merahnya di Leaderboard (**#81 dengan -7.58%**)!
-* **⚠️ Catatan Umum Mesin M1 (`0.35% Minimum SL Floor`)**: Karena sinyal dievaluasi pada bar **1-menit (`M1`)**, sedangkan `engine.py` memaksa jarak Stop Loss minimal `0.35%` (~143 pips pada XAUUSD atau ~39 pips pada EURUSD), strategi jangka pendek M1 harus menahan fluktuasi lebar yang kerap tidak sebanding dengan target scalping-nya.
+* **✅ FIXED (Bug Double Negation & Missing VWAP Diperbaiki)**: Bug kritis `-trend_stack(s)` yang dulunya membuat bot BUY saat downtrend telah diganti dengan kalkulasi VWAP 60-bar + penyelarasan EMA21/EMA50.
+* **ℹ️ Pembaruan Mesin M1 (`0.10% Forex SL Floor` & `1440-Bar History`)**: `engine.py` kini menurunkan batas SL minimum khusus mode **Forex MT5** dari `0.35%` menjadi **`0.10%`** (membuat target & stop jauh lebih proporsional pada pasangan Forex & XAUUSD), sementara mode Spot & Futures menjaga floor `0.35%`. Buffer data M1 diperbesar ke `1440 bar` (24 jam).
 
 ---
 
@@ -69,5 +72,21 @@ Berikut adalah implementasi kode aktual yang saat ini berjalan di produksi (`ser
 
 ```python
 # Sumber aktual dari server/strategies.py untuk 'vwap_trend':
-("vwap_trend", "VWAP Trend Follow", "Statistik", lambda s: trend_stack(s) if s.c[s.i] > s.ema50[s.i] else -trend_stack(s) if _ok(s.ema50[s.i]) else 0.0),
+def vwap_trend_follow(s):
+    """VWAP Trend Follow: searah VWAP 60-bar + EMA21/EMA50 stack."""
+    i = s.i
+    if i < 50:
+        return 0.0
+    a = max(0, i - 59)
+    vv = s.v[a:i + 1]
+    tot = float(vv.sum())
+    if tot <= 0 or not _ok(s.ema21[i], s.ema50[i]):
+        return 0.0
+    vwap = float((s.c[a:i + 1] * vv).sum() / tot)
+    c = s.c[i]
+    if c > vwap and c > s.ema21[i] > s.ema50[i]:
+        return 0.65
+    if c < vwap and c < s.ema21[i] < s.ema50[i]:
+        return -0.65
+    return 0.0
 ```

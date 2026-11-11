@@ -183,39 +183,50 @@ class BinanceFeed:
             except Exception as exc:  # jaringan bisa putus
                 log.warning("refresh ticker gagal: %s", exc)
 
-    async def seed_klines(self, symbols: list[str], rings: dict, limit: int = 250) -> int:
-        """Seed BarRings with historical 1m klines concurrently on startup."""
+    async def seed_klines(self, symbols: list[str], rings: dict, limit: int = 1440) -> int:
+        """Seed BarRings with historical 1m klines concurrently on startup (supports >1000 via 2 chunks)."""
         sem = asyncio.Semaphore(20)
         total_seeded = 0
 
         async def fetch_and_seed(sym: str):
             nonlocal total_seeded
-            url = f"{REST}/api/v3/klines?symbol={sym}&interval=1m&limit={limit}"
             async with sem:
                 try:
+                    chunks: list[list] = []
+                    first_limit = min(limit, 1000)
+                    url = f"{REST}/api/v3/klines?symbol={sym}&interval=1m&limit={first_limit}"
                     async with self.session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as r:
                         if r.status != 200:
                             return
                         data = await r.json()
                         if not isinstance(data, list) or not data:
                             return
-                        ring = rings.get(sym)
-                        if ring is None:
-                            from .bars import BarRing
-                            ring = rings[sym] = BarRing(offset_ms=(abs(hash(sym)) % 60) * 1000)
-                        for k in data:
-                            # k: [open_time, open, high, low, close, volume, ...]
-                            open_t = int(k[0])
-                            o = float(k[1])
-                            h = float(k[2])
-                            l = float(k[3])
-                            c = float(k[4])
-                            v = float(k[5])
-                            ring.seed(open_t, o, h, l, c, v)
-                        if data:
-                            ring.last_tick = float(data[-1][6])
-                            ring.price = float(data[-1][4])
-                        total_seeded += 1
+                        chunks.append(data)
+
+                    remaining = limit - len(data)
+                    if remaining > 0:
+                        end_t = int(data[0][0]) - 1
+                        url_older = f"{REST}/api/v3/klines?symbol={sym}&interval=1m&limit={min(remaining, 1000)}&endTime={end_t}"
+                        async with self.session.get(url_older, timeout=aiohttp.ClientTimeout(total=10)) as r2:
+                            if r2.status == 200:
+                                older = await r2.json()
+                                if isinstance(older, list) and older:
+                                    chunks.insert(0, older)
+
+                    all_klines = [k for ch in chunks for k in ch]
+                    if not all_klines:
+                        return
+                    ring = rings.get(sym)
+                    if ring is None:
+                        from .bars import BarRing
+                        ring = rings[sym] = BarRing(offset_ms=(abs(hash(sym)) % 60) * 1000)
+                    for k in all_klines:
+                        open_t = int(k[0])
+                        o, h, l, c, v = float(k[1]), float(k[2]), float(k[3]), float(k[4]), float(k[5])
+                        ring.seed(open_t, o, h, l, c, v)
+                    ring.last_tick = float(all_klines[-1][6])
+                    ring.price = float(all_klines[-1][4])
+                    total_seeded += 1
                 except Exception as exc:
                     log.warning("seed_klines %s gagal: %s", sym, exc)
 

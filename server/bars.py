@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-CAP = 720  # 12 jam candle 1 menit
+CAP = 1440  # 24 jam candle 1 menit
 
 
 class BarRing:

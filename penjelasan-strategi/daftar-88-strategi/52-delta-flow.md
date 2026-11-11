@@ -11,28 +11,30 @@ Dokumen ini memuat bedah arsitektur logika, spesifikasi matematis, mekanisme eks
 | **Nomor & ID Strategi** | `#52` · `delta_flow` | Terdaftar di `server/strategies.py` |
 | **Kategori / Cluster** | **Order flow** | Menentukan profil rasio R:R otomatis |
 | **Target Pasar** | Universal (Forex MT5, Binance Futures, Spot) | Spot: Long-Only · Futures & Forex: Long + Short |
-| **Timeframe Evaluasi** | `M1` (1-Menit Bar Closed via `BarRing`) | Dieksekusi 1x setiap bar 1-menit selesai ditutup |
+| **Timeframe Evaluasi** | `M1` (`BarRing` kapasitas 1440 bar / 24 jam) | Dieksekusi 1x setiap bar 1-menit selesai ditutup |
 | **Ambang Pemicu Skor** | `score > +0.15` (LONG) / `score < -0.15` (SHORT) | Skala output sinyal `[-1.0 .. +1.0]` |
 | **Rasio Risk-to-Reward (R:R)** | **`1 : 2.0`** | Otomatis berdasarkan cluster `Order flow` |
 | **Leverage Default** | **`20x`** (Futures) · **`1x MT5 Direct`** (Forex) | Di Forex menggunakan lot sizing risiko 1.5% modal (~$15) |
-| **Stop Loss Engine** | $\max(2.0 \times \text{ATR}_{14}, \; 0.35\% \times \text{Harga})$ | Floor proteksi minimum 0.35% di `engine.py` |
+| **Stop Loss Engine** | $\max(2.0 \times \text{ATR}_{14}, \; 0.10\% \text{ Forex} / 0.35\% \text{ Crypto})$ | Floor proteksi adaptif di `engine.py` |
 
 ---
 
 ## 2. Filosofi Strategi & Konsep Pasar
 
-Dimaksudkan membaca ketidakseimbangan dorongan buyer/seller dalam satu candle dan menggabungkannya dengan tren EMA21.
+Mengukur ketidakseimbangan dominasi buyer/seller di dalam bar (*Candle Imbalance / Close Location Value* `> 65%` dari range) dan mengizinkan entry hanya ketika selaras searah tren EMA21.
 
 ---
 
 ## 3. Kriteria Matematis & Logika Deteksi Sinyal
 
-`(+0.35 jika close dekat High | -0.35 jika close dekat Low) * (1 jika C > EMA21 else -1)`
+1. $\text{rng} = \max(H_i - L_i, 10^{-12})$.
+2. **BUY (+0.65)**: $(C_i - L_i) > 0.65 \times \text{rng}$ dan $C_i > \text{EMA}_{21}$ (dominasi tekanan beli searah uptrend).
+3. **SELL (-0.65)**: $(H_i - C_i) > 0.65 \times \text{rng}$ dan $C_i < \text{EMA}_{21}$ (dominasi tekanan jual searah downtrend).
 
 ### Visualisasi Alur Sinyal (Diagram Logika):
 ```text
-  [BUG PERKALIAN TANDA]: Jika C < EMA21 (-1) dan Candle Bearish Kuat (-0.35),
-  (-0.35) * (-1) = +0.35  ===> MALAH ENTRY BUY DI PENURUNAN TAJAM!
+  Close Near High (>65% Range) + Close > EMA21 ===> BUY  (+0.65)
+  Close Near Low  (>65% Range) + Close < EMA21 ===> SELL (-0.65)
 ```
 
 ---
@@ -48,7 +50,8 @@ Setiap kali bar M1 (`BarRing`) menutup dan indikator `Snap` selesai dihitung:
    - **Mode Forex MT5**: Risiko ditargetkan `1.5%` dari cash per posisi (`~$15` pada modal `$1,000`), dibatasi `0.01 - 0.10 Lot` (XAU/XTI) atau `0.01 - 0.20 Lot` (Forex mayor/cross).
    - **Mode Futures/Spot**: Risiko ditargetkan `2.0%` equity dengan margin maksimum per posisi `20%` equity (`SINGLE_POS_CAP`).
 3. **Stop Loss & Take Profit**:
-   - $\text{StopDist} = \max(2.0 \times \text{ATR}_{14}(M1), \; 0.0035 \times \text{Price})$
+   - **Mode Forex MT5**: $\text{StopDist} = \max(2.0 \times \text{ATR}_{14}(M1), \; 0.0010 \times \text{Price})$ *(floor adaptif 0.10%)*
+   - **Mode Spot & Futures**: $\text{StopDist} = \max(2.0 \times \text{ATR}_{14}(M1), \; 0.0035 \times \text{Price})$ *(floor 0.35%)*
    - $\text{TPDist} = 2.0 \times \text{StopDist}$
    - Jika muncul sinyal berlawanan arah (`pos.side != new_side`), posisi lama langsung ditutup (*reverse signal exit*) sebelum posisi baru dibuka.
 
@@ -58,8 +61,8 @@ Setiap kali bar M1 (`BarRing`) menutup dan indikator `Snap` selesai dihitung:
 
 Hasil pemeriksaan langsung terhadap kode sumber `server/strategies.py`, `server/engine.py`, dan `server/forex_feed.py` menemukan catatan audit spesifik berikut untuk strategi ini:
 
-* **🚨 CRITICAL BUG (Perkalian Tanda Minus Ketemu Minus = Plus!)**: Lihat baris 1187: Saat harga di bawah EMA21 (tren turun, faktor `-1`), lalu muncul candle bearish panjang yang ditutup tepat di dasar (`score = -0.35`), perkalian `(-0.35) * (-1)` menghasilkan **`+0.35` (ENTRY BUY!)**. Artinya strategi ini secara tidak sengaja membuka posisi **BUY pada setiap breakdown bearish di bawah EMA21**, dan membuka **SELL pada setiap breakout bullish di bawah EMA21**!
-* **⚠️ Catatan Umum Mesin M1 (`0.35% Minimum SL Floor`)**: Karena sinyal dievaluasi pada bar **1-menit (`M1`)**, sedangkan `engine.py` memaksa jarak Stop Loss minimal `0.35%` (~143 pips pada XAUUSD atau ~39 pips pada EURUSD), strategi jangka pendek M1 harus menahan fluktuasi lebar yang kerap tidak sebanding dengan target scalping-nya.
+* **✅ FIXED (Bug Perkalian Tanda Ganda Diperbaiki)**: Bug kritis `(-0.35) * (-1) = +0.35` yang sebelumnya memicu BUY saat downtrend telah diganti menjadi cabang if/elif eksplisit `c > e21` vs `c < e21`.
+* **ℹ️ Pembaruan Mesin M1 (`0.10% Forex SL Floor` & `1440-Bar History`)**: `engine.py` kini menurunkan batas SL minimum khusus mode **Forex MT5** dari `0.35%` menjadi **`0.10%`** (membuat target & stop jauh lebih proporsional pada pasangan Forex & XAUUSD), sementara mode Spot & Futures menjaga floor `0.35%`. Buffer data M1 diperbesar ke `1440 bar` (24 jam).
 
 ---
 
@@ -69,5 +72,16 @@ Berikut adalah implementasi kode aktual yang saat ini berjalan di produksi (`ser
 
 ```python
 # Sumber aktual dari server/strategies.py untuk 'delta_flow':
-("delta_flow", "Candle Imbalance", "Order flow", lambda s: (0.35 if (s.c[s.i] - s.l[s.i]) > 0.65 * max(s.h[s.i] - s.l[s.i], 1e-12) else (-0.35 if (s.h[s.i] - s.c[s.i]) > 0.65 * max(s.h[s.i] - s.l[s.i], 1e-12) else 0.0)) * (1 if s.c[s.i] > s.ema21[s.i] else -1)),
+def candle_imbalance(s):
+    """Candle Imbalance (Order Flow Delta Proxy) selaras EMA21."""
+    i = s.i
+    c, h, l, e21 = s.c[i], s.h[i], s.l[i], s.ema21[i]
+    if not _ok(c, h, l, e21):
+        return 0.0
+    rng = max(h - l, 1e-12)
+    if (c - l) > 0.65 * rng and c > e21:
+        return 0.65
+    if (h - c) > 0.65 * rng and c < e21:
+        return -0.65
+    return 0.0
 ```

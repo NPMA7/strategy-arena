@@ -105,7 +105,7 @@ export function getRuleText(strategy) {
   if (!strategy) return 'Pilih strategi di papan peringkat.';
   const fam = strategy.family || getStrategyCategory(strategy.id);
   const note = RULE_NOTES[fam] || RULE_NOTES[strategy.family] || 'Aturan kuantitatif otomatis berbasis sinyal teknikal.';
-  if (strategy.mode === 'forex' || (strategy.id && strategy.id.startsWith('fx_'))) {
+  if (strategy.mode === 'forex') {
     return `${note} Modal $1.000 · Alokasi maks 20% ($200) per pair · Hingga 5 pair simultan · Spread Riil MT5 · Tanpa Biaya Funding (Non-Crypto).`;
   }
   const lev = strategy.leverage || 1;

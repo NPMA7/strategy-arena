@@ -278,7 +278,7 @@ class ArenaStore {
     // Deteksi apakah posisi benar-benar Forex (MT5) atau Crypto (Spot/Futures)
     const isCrypto = sym.endsWith('USDT') || sym.endsWith('USDC') || sym.endsWith('BUSD');
     const targetMode = explicitMode || p.mode || (isCrypto ? (this.mode === 'spot' ? 'spot' : 'futures') : this.mode);
-    const isForex = (targetMode === 'forex' || (p.strategy && p.strategy.startsWith('fx_'))) && !isCrypto;
+    const isForex = targetMode === 'forex' && !isCrypto;
 
     let lot = null;
     let upnl = 0;

@@ -7,17 +7,24 @@ how long the ring has been filling.
 from __future__ import annotations
 
 import numpy as np
+from numpy.lib.stride_tricks import sliding_window_view
 
-W = 320  # window dipakai untuk indikator
+W = 1440  # window dipakai untuk indikator (hingga 24 jam M1 untuk konfirmasi M15/M30/H1)
 
 
 def _ema(x: np.ndarray, n: int) -> np.ndarray:
+    if x.size == 0:
+        return np.empty_like(x)
     a = 2.0 / (n + 1.0)
-    out = np.empty_like(x)
-    out[0] = x[0]
-    for i in range(1, x.size):
-        out[i] = x[i] * a + out[i - 1] * (1 - a)
-    return out
+    b = 1.0 - a
+    xs = x.tolist()
+    val = float(xs[0])
+    out = [val]
+    append = out.append
+    for v in xs[1:]:
+        val = v * a + val * b
+        append(val)
+    return np.asarray(out, dtype=x.dtype)
 
 
 
@@ -33,15 +40,15 @@ def _sma(x: np.ndarray, n: int) -> np.ndarray:
 
 def _rolling_max(x: np.ndarray, n: int) -> np.ndarray:
     out = np.full_like(x, np.nan)
-    for i in range(n - 1, x.size):
-        out[i] = x[i - n + 1:i + 1].max()
+    if x.size >= n:
+        out[n - 1:] = sliding_window_view(x, n).max(axis=1)
     return out
 
 
 def _rolling_min(x: np.ndarray, n: int) -> np.ndarray:
     out = np.full_like(x, np.nan)
-    for i in range(n - 1, x.size):
-        out[i] = x[i - n + 1:i + 1].min()
+    if x.size >= n:
+        out[n - 1:] = sliding_window_view(x, n).min(axis=1)
     return out
 
 
@@ -53,11 +60,21 @@ def _true_range(h, l, c) -> np.ndarray:
 
 def _wilder(x: np.ndarray, n: int) -> np.ndarray:
     out = np.full_like(x, np.nan)
-    if x.size >= n:
-        s = x[1:n + 1].mean() if x.size > n else x.mean()
-        out[n] = s if x.size > n else s
-        for i in range(n + 1, x.size):
-            out[i] = (out[i - 1] * (n - 1) + x[i]) / n
+    sz = x.size
+    if sz > n:
+        val = float(x[1:n + 1].mean())
+        out[n] = val
+        xs = x.tolist()
+        nm1 = n - 1.0
+        res = []
+        append = res.append
+        for v in xs[n + 1:]:
+            val = (val * nm1 + v) / n
+            append(val)
+        if res:
+            out[n + 1:] = res
+    elif sz == n and n > 0:
+        out[n - 1] = float(x.mean())
     return out
 
 
@@ -72,7 +89,7 @@ class Snap:
         "hh20", "ll20", "hh55", "ll55", "hh10", "ll10",
         "macd", "macd_sig", "macd_hist",
         "stoch_k", "stoch_d", "adx", "plus_di", "minus_di",
-        "vol_sma20", "ts",
+        "vol_sma20", "ts", "symbol", "market_mode", "custom_sl_tp",
     )
 
 
@@ -91,6 +108,7 @@ def compute(views: dict[str, np.ndarray]) -> Snap:
     s.n = n
     s.o, s.h, s.l, s.c, s.v, s.ts = o, h, l, c, v, ts
     s.i = n - 1
+    s.custom_sl_tp = None
 
     s.ema9 = _ema(c, 9)
     s.ema21 = _ema(c, 21)
@@ -137,7 +155,7 @@ def compute(views: dict[str, np.ndarray]) -> Snap:
     # ADX kasar (14): pakai TR sederhana, cukup akurat untuk sinyal
     plus_dm = np.where((h - np.roll(h, 1)) > (np.roll(l, 1) - l), np.maximum(h - np.roll(h, 1), 0.0), 0.0)
     minus_dm = np.where((np.roll(l, 1) - l) > (h - np.roll(h, 1)), np.maximum(np.roll(l, 1) - l, 0.0), 0.0)
-    atr = _wilder(tr, 14)
+    atr = s.atr14
     atr_safe = np.where(atr > 0, atr, 1e-12)
     s.plus_di = 100 * _wilder(plus_dm, 14) / atr_safe
     s.minus_di = 100 * _wilder(minus_dm, 14) / atr_safe
@@ -158,6 +176,6 @@ def _rsi(up: np.ndarray, dn: np.ndarray, n: int) -> np.ndarray:
 
 def _rolling_std(x: np.ndarray, n: int) -> np.ndarray:
     out = np.full_like(x, np.nan)
-    for i in range(n - 1, x.size):
-        out[i] = x[i - n + 1:i + 1].std()
+    if x.size >= n:
+        out[n - 1:] = sliding_window_view(x, n).std(axis=1)
     return out

@@ -113,20 +113,20 @@
     return nodes;
   });
 
-  // Layer 2: 88 Quantitative Strategies in 11 Columns (Z) x 8 Rows (Y)
-  // 11 Kolom ke samping (Z: -105 s/d +105 = lebar 210)
-  // 8 Baris ke bawah (Y: +105 s/d -105 = tinggi 210) -> Kotak 1:1 Presisi
+  // Layer 2: All Quantitative Strategies (up to 12 Columns (Z) x 8 Rows (Y))
   let strat3DNodes = $derived.by(() => {
     const all = STRATEGIES_88;
     const nodes = [];
+    const totalCols = Math.ceil(all.length / 8);
 
-    for (let col = 0; col < 11; col++) {
-      const z = -105 + (col / 10) * 210;
+    for (let col = 0; col < totalCols; col++) {
+      const z = -105 + (col / Math.max(1, totalCols - 1)) * 210;
 
       for (let row = 0; row < 8; row++) {
-        const y = 105 - (row / 7) * 210;
         const sIdx = col * 8 + row;
-        const s = all[sIdx] || { id: `strat_${sIdx}`, name: `Strategy ${sIdx}`, family: 'Quant', code: 'QNT' };
+        if (sIdx >= all.length) break;
+        const y = 105 - (row / 7) * 210;
+        const s = all[sIdx];
         const isMatched = activeStratId ? (s.id.toLowerCase() === activeStratId.toLowerCase()) : false;
 
         nodes.push({

@@ -11,29 +11,30 @@ Dokumen ini memuat bedah arsitektur logika, spesifikasi matematis, mekanisme eks
 | **Nomor & ID Strategi** | `#53` · `wicks_reject` | Terdaftar di `server/strategies.py` |
 | **Kategori / Cluster** | **Order flow** | Menentukan profil rasio R:R otomatis |
 | **Target Pasar** | Universal (Forex MT5, Binance Futures, Spot) | Spot: Long-Only · Futures & Forex: Long + Short |
-| **Timeframe Evaluasi** | `M1` (1-Menit Bar Closed via `BarRing`) | Dieksekusi 1x setiap bar 1-menit selesai ditutup |
+| **Timeframe Evaluasi** | `M1` (`BarRing` kapasitas 1440 bar / 24 jam) | Dieksekusi 1x setiap bar 1-menit selesai ditutup |
 | **Ambang Pemicu Skor** | `score > +0.15` (LONG) / `score < -0.15` (SHORT) | Skala output sinyal `[-1.0 .. +1.0]` |
 | **Rasio Risk-to-Reward (R:R)** | **`1 : 2.0`** | Otomatis berdasarkan cluster `Order flow` |
 | **Leverage Default** | **`15x`** (Futures) · **`1x MT5 Direct`** (Forex) | Di Forex menggunakan lot sizing risiko 1.5% modal (~$15) |
-| **Stop Loss Engine** | $\max(2.0 \times \text{ATR}_{14}, \; 0.35\% \times \text{Harga})$ | Floor proteksi minimum 0.35% di `engine.py` |
+| **Stop Loss Engine** | $\max(2.0 \times \text{ATR}_{14}, \; 0.10\% \text{ Forex} / 0.35\% \text{ Crypto})$ | Floor proteksi adaptif di `engine.py` |
 
 ---
 
 ## 2. Filosofi Strategi & Konsep Pasar
 
-Mendeteksi penolakan sumbu panjang (> 1.8x panjang body candle) terhadap garis EMA21.
+Mendeteksi pola penolakan sumbu (*Pinbar / Hammer & Shooting Star*) dengan ekor penolakan lebih dari `1.8x` ukuran body tepat ketika harga menguji level dinamis EMA21.
 
 ---
 
 ## 3. Kriteria Matematis & Logika Deteksi Sinyal
 
-1. Jika $(H_i - C_i) > 1.8 \cdot |C_i - O_i|$ dan $H_i > \text{EMA}_{21}$: return **`+0.6`**
-2. Jika $(C_i - L_i) > 1.8 \cdot |C_i - O_i|$ dan $L_i < \text{EMA}_{21}$: return **`-0.6`**
+1. $\text{body} = |C_i - O_i| + 10^{-12}$, $\;\text{lower} = \min(O_i, C_i) - L_i$, $\;\text{upper} = H_i - \max(O_i, C_i)$.
+2. **BUY (+0.65)**: $\text{lower} > 1.8 \times \text{body}$ dan $L_i < \text{EMA}_{21}$ dan $C_i \ge O_i$.
+3. **SELL (-0.65)**: $\text{upper} > 1.8 \times \text{body}$ dan $H_i > \text{EMA}_{21}$ dan $C_i \le O_i$.
 
 ### Visualisasi Alur Sinyal (Diagram Logika):
 ```text
-       |  (Sumbu Atas Panjang > 1.8x Body -> Shooting Star Reject EMA21)
-     [===]  ===> KODE MALAH ENTRY BUY (+0.6) BUKAN SELL!
+  Upper Wick > 1.8x Body menyentuh > EMA21 + Close Bear ===> SELL (-0.65)
+  Lower Wick > 1.8x Body menyentuh < EMA21 + Close Bull ===> BUY  (+0.65)
 ```
 
 ---
@@ -49,7 +50,8 @@ Setiap kali bar M1 (`BarRing`) menutup dan indikator `Snap` selesai dihitung:
    - **Mode Forex MT5**: Risiko ditargetkan `1.5%` dari cash per posisi (`~$15` pada modal `$1,000`), dibatasi `0.01 - 0.10 Lot` (XAU/XTI) atau `0.01 - 0.20 Lot` (Forex mayor/cross).
    - **Mode Futures/Spot**: Risiko ditargetkan `2.0%` equity dengan margin maksimum per posisi `20%` equity (`SINGLE_POS_CAP`).
 3. **Stop Loss & Take Profit**:
-   - $\text{StopDist} = \max(2.0 \times \text{ATR}_{14}(M1), \; 0.0035 \times \text{Price})$
+   - **Mode Forex MT5**: $\text{StopDist} = \max(2.0 \times \text{ATR}_{14}(M1), \; 0.0010 \times \text{Price})$ *(floor adaptif 0.10%)*
+   - **Mode Spot & Futures**: $\text{StopDist} = \max(2.0 \times \text{ATR}_{14}(M1), \; 0.0035 \times \text{Price})$ *(floor 0.35%)*
    - $\text{TPDist} = 2.0 \times \text{StopDist}$
    - Jika muncul sinyal berlawanan arah (`pos.side != new_side`), posisi lama langsung ditutup (*reverse signal exit*) sebelum posisi baru dibuka.
 
@@ -59,11 +61,8 @@ Setiap kali bar M1 (`BarRing`) menutup dan indikator `Snap` selesai dihitung:
 
 Hasil pemeriksaan langsung terhadap kode sumber `server/strategies.py`, `server/engine.py`, dan `server/forex_feed.py` menemukan catatan audit spesifik berikut untuk strategi ini:
 
-* **🚨 CRITICAL BUG (Sinyal Terbalik 100% / Inverted!)**: Lihat baris 1188:
-   - `(H - C)` adalah panjang **SUMBU ATAS** (penolakan resistance / *Bearish Shooting Star*). Seharusnya memicu **SELL (`-0.6`)**, tetapi kode mengembalikan **`+0.6` (BUY)**!
-   - `(C - L)` adalah panjang **SUMBU BAWAH** (*Bullish Hammer*). Seharusnya memicu **BUY**, tetapi kode mengembalikan **`-0.6` (SELL)**!
-   - Ditambah lagi jika candle merah (`c < o`), `(h - c)` menghitung sumbu atas + body, bukan sumbu atas murni `h - max(o, c)`!
-* **⚠️ Catatan Umum Mesin M1 (`0.35% Minimum SL Floor`)**: Karena sinyal dievaluasi pada bar **1-menit (`M1`)**, sedangkan `engine.py` memaksa jarak Stop Loss minimal `0.35%` (~143 pips pada XAUUSD atau ~39 pips pada EURUSD), strategi jangka pendek M1 harus menahan fluktuasi lebar yang kerap tidak sebanding dengan target scalping-nya.
+* **✅ FIXED (Bug Sinyal Terbalik 100% Diperbaiki)**: Bug lama di mana `wicks_reject` mengembalikan tanda negatif saat terjadi Bullish Hammer di bawah EMA21 kini telah diperbaiki penuh.
+* **ℹ️ Pembaruan Mesin M1 (`0.10% Forex SL Floor` & `1440-Bar History`)**: `engine.py` kini menurunkan batas SL minimum khusus mode **Forex MT5** dari `0.35%` menjadi **`0.10%`** (membuat target & stop jauh lebih proporsional pada pasangan Forex & XAUUSD), sementara mode Spot & Futures menjaga floor `0.35%`. Buffer data M1 diperbesar ke `1440 bar` (24 jam).
 
 ---
 
@@ -73,5 +72,18 @@ Berikut adalah implementasi kode aktual yang saat ini berjalan di produksi (`ser
 
 ```python
 # Sumber aktual dari server/strategies.py untuk 'wicks_reject':
-("wicks_reject", "Wick Rejection", "Order flow", lambda s: (0.6 if (s.h[s.i] - s.c[s.i]) > 1.8 * abs(s.c[s.i] - s.o[s.i] + 1e-12) and s.h[s.i] > s.ema21[s.i] else (-0.6 if (s.c[s.i] - s.l[s.i]) > 1.8 * abs(s.c[s.i] - s.o[s.i] + 1e-12) and s.l[s.i] < s.ema21[s.i] else 0.0))),
+def wick_rejection(s):
+    """Wick Rejection (Hammer & Shooting Star) pada level EMA21."""
+    i = s.i
+    o, h, l, c, e21 = s.o[i], s.h[i], s.l[i], s.c[i], s.ema21[i]
+    if not _ok(o, h, l, c, e21):
+        return 0.0
+    body = abs(c - o) + 1e-12
+    lower_wick = min(o, c) - l
+    upper_wick = h - max(o, c)
+    if lower_wick > 1.8 * body and l < e21 and c >= o:
+        return 0.65
+    if upper_wick > 1.8 * body and h > e21 and c <= o:
+        return -0.65
+    return 0.0
 ```

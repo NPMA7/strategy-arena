@@ -11,28 +11,30 @@ Dokumen ini memuat bedah arsitektur logika, spesifikasi matematis, mekanisme eks
 | **Nomor & ID Strategi** | `#27` · `vol_target` | Terdaftar di `server/strategies.py` |
 | **Kategori / Cluster** | **Trend** | Menentukan profil rasio R:R otomatis |
 | **Target Pasar** | Universal (Forex MT5, Binance Futures, Spot) | Spot: Long-Only · Futures & Forex: Long + Short |
-| **Timeframe Evaluasi** | `M1` (1-Menit Bar Closed via `BarRing`) | Dieksekusi 1x setiap bar 1-menit selesai ditutup |
+| **Timeframe Evaluasi** | `M1` (`BarRing` kapasitas 1440 bar / 24 jam) | Dieksekusi 1x setiap bar 1-menit selesai ditutup |
 | **Ambang Pemicu Skor** | `score > +0.15` (LONG) / `score < -0.15` (SHORT) | Skala output sinyal `[-1.0 .. +1.0]` |
 | **Rasio Risk-to-Reward (R:R)** | **`1 : 2.2`** | Otomatis berdasarkan cluster `Trend` |
 | **Leverage Default** | **`8x`** (Futures) · **`1x MT5 Direct`** (Forex) | Di Forex menggunakan lot sizing risiko 1.5% modal (~$15) |
-| **Stop Loss Engine** | $\max(2.0 \times \text{ATR}_{14}, \; 0.35\% \times \text{Harga})$ | Floor proteksi minimum 0.35% di `engine.py` |
+| **Stop Loss Engine** | $\max(2.0 \times \text{ATR}_{14}, \; 0.10\% \text{ Forex} / 0.35\% \text{ Crypto})$ | Floor proteksi adaptif di `engine.py` |
 
 ---
 
 ## 2. Filosofi Strategi & Konsep Pasar
 
-Hanya mengikuti sinyal `trend_stack` ketika rasio volatilitas (ATR / Harga) berada di zona moderat antara 0.15% hingga 1.2% per bar.
+Volatility Regime Filter yang hanya mengizinkan `trend_stack(s)` berjalan ketika rasio volatilitas ATR14 terhadap harga berada di zona sehat (`0.03% – 1.20%` per bar M1), menghindari pasar mati maupun lonjakan acak ekstrem.
 
 ---
 
 ## 3. Kriteria Matematis & Logika Deteksi Sinyal
 
-1. $\text{vol} = \frac{\text{ATR}_{14}}{C_i}$
-2. Jika $0.0015 \le \text{vol} \le 0.012$: kembalikan `trend_stack(s) * 0.8`.
+1. Hitung rasio volatilitas relatif: $\text{vol} = \frac{\text{ATR}_{14}[i]}{C_i}$.
+2. Filter aktif jika $0.0003 \le \text{vol} \le 0.012$ (`0.03% .. 1.20%`).
+3. Kembalikan skor `trend_stack(s) * 0.8`.
 
 ### Visualisasi Alur Sinyal (Diagram Logika):
 ```text
-  0.15% <= (ATR14 / Close) <= 1.2%  ===>  Aktifkan Trend Stack
+  [0.03% <= ATR14 / Price <= 1.20%] ===> trend_stack(s) * 0.8
+  Outside healthy range             ===> 0.0 (Wait / Stay Flat)
 ```
 
 ---
@@ -48,7 +50,8 @@ Setiap kali bar M1 (`BarRing`) menutup dan indikator `Snap` selesai dihitung:
    - **Mode Forex MT5**: Risiko ditargetkan `1.5%` dari cash per posisi (`~$15` pada modal `$1,000`), dibatasi `0.01 - 0.10 Lot` (XAU/XTI) atau `0.01 - 0.20 Lot` (Forex mayor/cross).
    - **Mode Futures/Spot**: Risiko ditargetkan `2.0%` equity dengan margin maksimum per posisi `20%` equity (`SINGLE_POS_CAP`).
 3. **Stop Loss & Take Profit**:
-   - $\text{StopDist} = \max(2.0 \times \text{ATR}_{14}(M1), \; 0.0035 \times \text{Price})$
+   - **Mode Forex MT5**: $\text{StopDist} = \max(2.0 \times \text{ATR}_{14}(M1), \; 0.0010 \times \text{Price})$ *(floor adaptif 0.10%)*
+   - **Mode Spot & Futures**: $\text{StopDist} = \max(2.0 \times \text{ATR}_{14}(M1), \; 0.0035 \times \text{Price})$ *(floor 0.35%)*
    - $\text{TPDist} = 2.2 \times \text{StopDist}$
    - Jika muncul sinyal berlawanan arah (`pos.side != new_side`), posisi lama langsung ditutup (*reverse signal exit*) sebelum posisi baru dibuka.
 
@@ -58,8 +61,8 @@ Setiap kali bar M1 (`BarRing`) menutup dan indikator `Snap` selesai dihitung:
 
 Hasil pemeriksaan langsung terhadap kode sumber `server/strategies.py`, `server/engine.py`, dan `server/forex_feed.py` menemukan catatan audit spesifik berikut untuk strategi ini:
 
-* **🚨 BUG SKALA TIMEFRAME (#88 Peringkat Terbawah di Leaderboard: -23.52%!)**: Batas `0.0015` (0.15% per bar) terlalu besar untuk candle M1 di Forex/Major pairs (rata-rata M1 ATR hanya ~0.02%–0.06%). Akibatnya di kondisi pasar tren sehat normal, bot ini **tidak pernah entry**, dan **HANYA aktif saat badai volatilitas kacau (`ATR >= 0.15%`)** di mana pergerakan acak menumbangkan `trend_stack` beruntun!
-* **⚠️ Catatan Umum Mesin M1 (`0.35% Minimum SL Floor`)**: Karena sinyal dievaluasi pada bar **1-menit (`M1`)**, sedangkan `engine.py` memaksa jarak Stop Loss minimal `0.35%` (~143 pips pada XAUUSD atau ~39 pips pada EURUSD), strategi jangka pendek M1 harus menahan fluktuasi lebar yang kerap tidak sebanding dengan target scalping-nya.
+* **✅ FIXED (Bug Threshold `0.0015` Terlalu Ketat Untuk Forex Diperbaiki)**: Ambang batas bawah diturunkan dari `0.15%` ke `0.03%` (`0.0003`) dan batas atas ditetapkan di `1.20%` (`0.012`) agar berfungsi normal baik di Forex maupun Kripto.
+* **ℹ️ Pembaruan Mesin M1 (`0.10% Forex SL Floor` & `1440-Bar History`)**: `engine.py` kini menurunkan batas SL minimum khusus mode **Forex MT5** dari `0.35%` menjadi **`0.10%`** (membuat target & stop jauh lebih proporsional pada pasangan Forex & XAUUSD), sementara mode Spot & Futures menjaga floor `0.35%`. Buffer data M1 diperbesar ke `1440 bar` (24 jam).
 
 ---
 
@@ -76,7 +79,7 @@ def volatility_target(s):
     if not _ok(atr, c) or c <= 0:
         return 0.0
     vol = atr / c
-    if not (0.0015 <= vol <= 0.012):
+    if not (0.0003 <= vol <= 0.012):
         return 0.0
     return trend_stack(s) * 0.8
 ```

@@ -11,28 +11,31 @@ Dokumen ini memuat bedah arsitektur logika, spesifikasi matematis, mekanisme eks
 | **Nomor & ID Strategi** | `#47` · `tr_break` | Terdaftar di `server/strategies.py` |
 | **Kategori / Cluster** | **Volatility** | Menentukan profil rasio R:R otomatis |
 | **Target Pasar** | Universal (Forex MT5, Binance Futures, Spot) | Spot: Long-Only · Futures & Forex: Long + Short |
-| **Timeframe Evaluasi** | `M1` (1-Menit Bar Closed via `BarRing`) | Dieksekusi 1x setiap bar 1-menit selesai ditutup |
+| **Timeframe Evaluasi** | `M1` (`BarRing` kapasitas 1440 bar / 24 jam) | Dieksekusi 1x setiap bar 1-menit selesai ditutup |
 | **Ambang Pemicu Skor** | `score > +0.15` (LONG) / `score < -0.15` (SHORT) | Skala output sinyal `[-1.0 .. +1.0]` |
 | **Rasio Risk-to-Reward (R:R)** | **`1 : 1.8`** | Otomatis berdasarkan cluster `Volatility` |
 | **Leverage Default** | **`15x`** (Futures) · **`1x MT5 Direct`** (Forex) | Di Forex menggunakan lot sizing risiko 1.5% modal (~$15) |
-| **Stop Loss Engine** | $\max(2.0 \times \text{ATR}_{14}, \; 0.35\% \times \text{Harga})$ | Floor proteksi minimum 0.35% di `engine.py` |
+| **Stop Loss Engine** | $\max(2.0 \times \text{ATR}_{14}, \; 0.10\% \text{ Forex} / 0.35\% \text{ Crypto})$ | Floor proteksi adaptif di `engine.py` |
 
 ---
 
 ## 2. Filosofi Strategi & Konsep Pasar
 
-Berdasarkan deskripsi dan namanya ('Range Expansion Fade'), strategi ini seharusnya MELAWAN lonjakan True Range ekstrem (>= 2.4x ATR).
+Range Expansion Fade sejati: mendeteksi bar dengan True Range ekstrem (`>= 2.4x ATR14`) lalu mengambil posisi berlawanan arah (*mean reversion fading*) karena lonjakan satu bar melebihi dua kali volatilitas normal cenderung mengalami kelelahan (*exhaustion*).
 
 ---
 
 ## 3. Kriteria Matematis & Logika Deteksi Sinyal
 
-1. $\text{TR} = \max(H_i - L_i, |H_i - C_{i-1}|, |L_i - C_{i-1}|)$
-2. Jika $\text{TR} \ge 2.4 \times \text{ATR}_{14}$: mengembalikan `-1 if c[i] < o[i] else 1`.
+1. $\text{TR}_i = \max(H_i - L_i, \; |H_i - C_{i-1}|, \; |L_i - C_{i-1}|)$.
+2. Syarat Ekspansi: $\text{TR}_i \ge 2.4 \times \text{ATR}_{14}$.
+3. **SELL (-0.80)**: Jika bar ekstrem ditutup hijau ($C_i > O_i$) -> fade lonjakan naik.
+4. **BUY (+0.80)**: Jika bar ekstrem ditutup merah ($C_i < O_i$) -> fade lonjakan turun.
 
 ### Visualisasi Alur Sinyal (Diagram Logika):
 ```text
-  [Docstring: LAWAN impuls]  vs  [Kode: -1 jika Bearish, +1 jika Bullish!]
+  [Bar Ekstrem TR >= 2.4 ATR Hijau] ===> FADE SELL (-0.80)
+  [Bar Ekstrem TR >= 2.4 ATR Merah] ===> FADE BUY  (+0.80)
 ```
 
 ---
@@ -48,7 +51,8 @@ Setiap kali bar M1 (`BarRing`) menutup dan indikator `Snap` selesai dihitung:
    - **Mode Forex MT5**: Risiko ditargetkan `1.5%` dari cash per posisi (`~$15` pada modal `$1,000`), dibatasi `0.01 - 0.10 Lot` (XAU/XTI) atau `0.01 - 0.20 Lot` (Forex mayor/cross).
    - **Mode Futures/Spot**: Risiko ditargetkan `2.0%` equity dengan margin maksimum per posisi `20%` equity (`SINGLE_POS_CAP`).
 3. **Stop Loss & Take Profit**:
-   - $\text{StopDist} = \max(2.0 \times \text{ATR}_{14}(M1), \; 0.0035 \times \text{Price})$
+   - **Mode Forex MT5**: $\text{StopDist} = \max(2.0 \times \text{ATR}_{14}(M1), \; 0.0010 \times \text{Price})$ *(floor adaptif 0.10%)*
+   - **Mode Spot & Futures**: $\text{StopDist} = \max(2.0 \times \text{ATR}_{14}(M1), \; 0.0035 \times \text{Price})$ *(floor 0.35%)*
    - $\text{TPDist} = 1.8 \times \text{StopDist}$
    - Jika muncul sinyal berlawanan arah (`pos.side != new_side`), posisi lama langsung ditutup (*reverse signal exit*) sebelum posisi baru dibuka.
 
@@ -58,8 +62,8 @@ Setiap kali bar M1 (`BarRing`) menutup dan indikator `Snap` selesai dihitung:
 
 Hasil pemeriksaan langsung terhadap kode sumber `server/strategies.py`, `server/engine.py`, dan `server/forex_feed.py` menemukan catatan audit spesifik berikut untuk strategi ini:
 
-* **🚨 CRITICAL CODE BUG (Kontradiksi Nama & Docstring vs Logika!)**: Docstring berbunyi *'True Range expansion: lawan impuls ekstrem sesaat'*. Namun baris 525 menulis **`return -1 if s.c[i] < s.o[i] else 1`**, yang artinya jika candle merah (`c < o`) bot malah **IKUT SHORT (`-1`)**, bukan melawannya (`+1`)! Alih-alih fade, ia malah **mengejar candle ekstrem** di ujung gerakan (`-3.39%`, #72).
-* **⚠️ Catatan Umum Mesin M1 (`0.35% Minimum SL Floor`)**: Karena sinyal dievaluasi pada bar **1-menit (`M1`)**, sedangkan `engine.py` memaksa jarak Stop Loss minimal `0.35%` (~143 pips pada XAUUSD atau ~39 pips pada EURUSD), strategi jangka pendek M1 harus menahan fluktuasi lebar yang kerap tidak sebanding dengan target scalping-nya.
+* **✅ FIXED (Bug Sinyal Terbalik Diperbaiki)**: Kesalahan tanda lama (`return -1 if c < o else 1`) telah dibalik ke arah fade yang semestinya (`-0.8` untuk candle ekstrem hijau, `+0.8` untuk candle ekstrem merah).
+* **ℹ️ Pembaruan Mesin M1 (`0.10% Forex SL Floor` & `1440-Bar History`)**: `engine.py` kini menurunkan batas SL minimum khusus mode **Forex MT5** dari `0.35%` menjadi **`0.10%`** (membuat target & stop jauh lebih proporsional pada pasangan Forex & XAUUSD), sementara mode Spot & Futures menjaga floor `0.35%`. Buffer data M1 diperbesar ke `1440 bar` (24 jam).
 
 ---
 
@@ -78,5 +82,9 @@ def tr_break(s):
     tr = max(s.h[i] - s.l[i], abs(s.h[i] - s.c[i - 1]), abs(s.l[i] - s.c[i - 1]))
     if tr < 2.4 * atr:
         return 0.0
-    return -1 if s.c[i] < s.o[i] else 1
+    if s.c[i] > s.o[i]:
+        return -0.8
+    if s.c[i] < s.o[i]:
+        return 0.8
+    return 0.0
 ```

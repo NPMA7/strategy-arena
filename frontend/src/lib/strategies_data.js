@@ -290,7 +290,7 @@ export const STRATEGIES_88 = [
   {
     "id": "2b_rev",
     "index": 36,
-    "name": "2B Reversal",
+    "name": "2B Close Reversal",
     "family": "Price action",
     "code": "2B",
     "is_forex": false
@@ -448,260 +448,268 @@ export const STRATEGIES_88 = [
     "is_forex": false
   },
   {
-    "id": "fx_lob_alpha",
+    "id": "lob_alpha",
     "index": 56,
     "name": "London Open Breakout",
     "family": "Breakout",
     "code": "LOB",
-    "is_forex": true
+    "is_forex": false
   },
   {
-    "id": "fx_tokyo_fader",
+    "id": "tokyo_fader",
     "index": 57,
     "name": "Asian Range Fader",
     "family": "Mean reversion",
     "code": "TOKY",
-    "is_forex": true
+    "is_forex": false
   },
   {
-    "id": "fx_frankfurt_probe",
+    "id": "frankfurt_probe",
     "index": 58,
     "name": "Frankfurt Liquidity Probe",
     "family": "Order flow",
     "code": "FRNK",
-    "is_forex": true
+    "is_forex": false
   },
   {
-    "id": "fx_ny_reversal",
+    "id": "ny_reversal",
     "index": 59,
     "name": "New York Fixing Reversal",
     "family": "Mean reversion",
     "code": "NYFX",
-    "is_forex": true
+    "is_forex": false
   },
   {
-    "id": "fx_sunday_gap",
+    "id": "sunday_gap",
     "index": 60,
     "name": "Sunday Gap Fill Engine",
     "family": "Statistik",
     "code": "SGAP",
-    "is_forex": true
+    "is_forex": false
   },
   {
-    "id": "fx_aud_nzd_arb",
+    "id": "aud_nzd_arb",
     "index": 61,
     "name": "Aussie-Kiwi Cointegration",
     "family": "Statistik",
     "code": "AUNZ",
-    "is_forex": true
+    "is_forex": false
   },
   {
-    "id": "fx_triangular_synth",
+    "id": "triangular_synth",
     "index": 62,
     "name": "Triangular Arbitrage Synth",
     "family": "Statistik",
     "code": "TRIA",
-    "is_forex": true
+    "is_forex": false
   },
   {
-    "id": "fx_oil_cad_divergence",
+    "id": "oil_cad_divergence",
     "index": 63,
     "name": "Petro-CAD Divergence",
     "family": "Trend",
     "code": "OCAD",
-    "is_forex": true
+    "is_forex": false
   },
   {
-    "id": "fx_gold_safehaven_relay",
+    "id": "gold_safehaven_relay",
     "index": 64,
     "name": "Safe-Haven Gold Relay",
     "family": "Trend",
     "code": "GREL",
-    "is_forex": true
+    "is_forex": false
   },
   {
-    "id": "fx_dragon_momentum",
+    "id": "dragon_momentum",
     "index": 65,
     "name": "The Dragon Momentum Rider",
     "family": "Momentum",
     "code": "DRGN",
-    "is_forex": true
+    "is_forex": false
   },
   {
-    "id": "fx_bb_squeeze",
+    "id": "bb_squeeze",
     "index": 66,
     "name": "BB Squeeze Volatility",
     "family": "Volatility",
     "code": "BBSQ",
-    "is_forex": true
+    "is_forex": false
   },
   {
-    "id": "fx_atr_expansion",
+    "id": "atr_expansion",
     "index": 67,
     "name": "ATR Expansion Breakout",
     "family": "Breakout",
     "code": "ATRX",
-    "is_forex": true
+    "is_forex": false
   },
   {
-    "id": "fx_gold_flash_spike",
+    "id": "gold_flash_spike",
     "index": 68,
     "name": "Gold Flash-Spike Reversal",
     "family": "Oscillator",
     "code": "GSPI",
-    "is_forex": true
+    "is_forex": false
   },
   {
-    "id": "fx_ema_ribbon",
+    "id": "ema_ribbon",
     "index": 69,
     "name": "Multi-TF EMA Ribbon",
     "family": "Trend",
     "code": "RIBB",
-    "is_forex": true
+    "is_forex": false
   },
   {
-    "id": "fx_supertrend_trailing",
+    "id": "supertrend_trailing",
     "index": 70,
     "name": "SuperTrend Dynamic Trailing",
     "family": "Trailing",
     "code": "STRT",
-    "is_forex": true
+    "is_forex": false
   },
   {
-    "id": "fx_ichimoku_quantum",
+    "id": "ichimoku_quantum",
     "index": 71,
     "name": "Ichimoku Kumo Quantum",
     "family": "Trend",
     "code": "ICQU",
-    "is_forex": true
+    "is_forex": false
   },
   {
-    "id": "fx_heikin_ashi_smooth",
+    "id": "heikin_ashi_smooth",
     "index": 72,
     "name": "Heikin-Ashi Trend Continuum",
     "family": "Trend",
     "code": "HEIK",
-    "is_forex": true
+    "is_forex": false
   },
   {
-    "id": "fx_hedging_grid",
+    "id": "hedging_grid",
     "index": 73,
     "name": "Dynamic Hedging Grid",
     "family": "Struktur",
     "code": "HEDG",
-    "is_forex": true
+    "is_forex": false
   },
   {
-    "id": "fx_camarilla_fader",
+    "id": "camarilla_fader",
     "index": 74,
     "name": "Camarilla Multi-Confluence",
     "family": "Struktur",
     "code": "CAMR",
-    "is_forex": true
+    "is_forex": false
   },
   {
-    "id": "fx_orderflow_sweep",
+    "id": "orderflow_sweep",
     "index": 75,
     "name": "Order Flow Liquidity Sweep",
     "family": "Order flow",
     "code": "OFSW",
-    "is_forex": true
+    "is_forex": false
   },
   {
-    "id": "fx_carry_yield_momentum",
+    "id": "carry_yield_momentum",
     "index": 76,
     "name": "Synthetic Carry-Trade Yield",
     "family": "Trend",
     "code": "CARY",
-    "is_forex": true
+    "is_forex": false
   },
   {
-    "id": "fx_economic_straddle",
+    "id": "economic_straddle",
     "index": 77,
     "name": "Economic Straddle Breakout",
     "family": "Breakout",
     "code": "STRD",
-    "is_forex": true
+    "is_forex": false
   },
   {
-    "id": "fx_smc_orderblock",
+    "id": "smc_orderblock",
     "index": 78,
     "name": "SMC Order Block Mitigation",
     "family": "ICT",
     "code": "SMC",
-    "is_forex": true
+    "is_forex": false
   },
   {
-    "id": "fx_ict_fair_value_gap",
+    "id": "ict_fair_value_gap",
     "index": 79,
     "name": "ICT Fair Value Gap (FVG)",
     "family": "ICT",
     "code": "FVG",
-    "is_forex": true
+    "is_forex": false
   },
   {
-    "id": "fx_smc_liquidity_sweep",
+    "id": "smc_liquidity_sweep",
     "index": 80,
     "name": "SMC Liquidity Sweep & BOS",
     "family": "Struktur",
     "code": "SWP",
-    "is_forex": true
+    "is_forex": false
   },
   {
-    "id": "fx_ict_optimal_trade_entry",
+    "id": "ict_optimal_trade_entry",
     "index": 81,
     "name": "ICT Optimal Trade Entry",
     "family": "ICT",
     "code": "OTE",
-    "is_forex": true
+    "is_forex": false
   },
   {
-    "id": "fx_momentum_candle_burst",
+    "id": "momentum_candle_burst",
     "index": 82,
     "name": "Momentum Candle Expansion",
     "family": "Momentum",
     "code": "BURS",
-    "is_forex": true
+    "is_forex": false
   },
   {
-    "id": "fx_three_line_strike",
+    "id": "three_line_strike",
     "index": 83,
     "name": "Three Line Strike Pattern",
     "family": "Price action",
     "code": "3LST",
-    "is_forex": true
+    "is_forex": false
   },
   {
-    "id": "fx_pinbar_liquidity_reject",
+    "id": "pinbar_liquidity_reject",
     "index": 84,
     "name": "Pin Bar Liquidity Rejection",
     "family": "Price action",
     "code": "PINB",
-    "is_forex": true
+    "is_forex": false
   },
   {
-    "id": "fx_london_ny_overlap",
+    "id": "london_ny_overlap",
     "index": 85,
     "name": "London-NY Overlap Scalper",
     "family": "Breakout",
     "code": "LONY",
-    "is_forex": true
+    "is_forex": false
   },
   {
-    "id": "fx_supply_demand_zone",
+    "id": "supply_demand_zone",
     "index": 86,
     "name": "Supply & Demand Zone",
     "family": "Struktur",
     "code": "SNDZ",
-    "is_forex": true
+    "is_forex": false
   },
   {
-    "id": "fx_volume_spread_analysis",
+    "id": "volume_spread_analysis",
     "index": 87,
     "name": "Volume Spread Analysis (VSA)",
     "family": "Order flow",
     "code": "VSA",
-    "is_forex": true
+    "is_forex": false
+  },
+  {
+    "id": "xauusd_mc_fibo",
+    "index": 88,
+    "name": "XAUUSD MC-FIBO Retest",
+    "family": "Fibonacci",
+    "code": "MCF",
+    "is_forex": false
   }
 ];
 

@@ -5,6 +5,7 @@ Menyediakan REST API di port 5000 untuk 22 pair Forex & Commodities dengan data 
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import time
@@ -68,6 +69,14 @@ cached_account_info: dict = {
 
 _rpyc_conn = None
 _last_conn_attempt = 0.0
+_rpyc_lock: asyncio.Lock | None = None
+
+
+def _get_rpyc_lock() -> asyncio.Lock:
+    global _rpyc_lock
+    if _rpyc_lock is None:
+        _rpyc_lock = asyncio.Lock()
+    return _rpyc_lock
 
 
 def _sync_connect_rpyc():
@@ -102,6 +111,7 @@ def _sync_connect_rpyc():
             # Initialize MT5 and remote batch routines
             conn.execute("""
 import sys
+import json
 if 'C:\\\\mt5libs' not in sys.path:
     sys.path.append('C:\\\\mt5libs')
 import MetaTrader5 as mt5
@@ -181,6 +191,9 @@ def _arena_get_bars(broker_sym, num_bars):
             "spread": int(r["spread"]),
         })
     return out
+
+def _arena_get_bars_json(broker_sym, num_bars):
+    return json.dumps(_arena_get_bars(broker_sym, num_bars))
 """)
 
             init_ok = conn.eval(f"_arena_init({MT5_LOGIN}, {repr(MT5_PASSWORD)}, {repr(MT5_SERVER)}, {repr(MT5_IP_SERVER)})")
@@ -230,10 +243,11 @@ async def tick_updater_loop():
         try:
             now_sec = time.time()
             now_ms = int(now_sec * 1000)
-            conn = await asyncio.to_thread(_sync_connect_rpyc)
+            async with _get_rpyc_lock():
+                conn = await asyncio.to_thread(_sync_connect_rpyc)
+                ticks_raw = await asyncio.to_thread(_sync_fetch_ticks, conn) if conn is not None else None
 
             if conn is not None:
-                ticks_raw = await asyncio.to_thread(_sync_fetch_ticks, conn)
                 if ticks_raw and isinstance(ticks_raw, dict):
                     for sym, tick_info in ticks_raw.items():
                         if len(tick_info) >= 7:
@@ -332,17 +346,21 @@ async def handle_fetch_data_pos(request):
     """Mengembalikan bar candle M1 riil langsung dari MT5 terminal jika terhubung."""
     sym = request.query.get("symbol", "EURUSD").upper()
     num_bars = int(request.query.get("num_bars", "100"))
-    num_bars = min(max(num_bars, 10), 500)
+    num_bars = min(max(num_bars, 10), 1500)
     broker_sym = BROKER_MAP.get(sym, sym)
 
-    conn = get_rpyc_connection()
-    if conn:
-        try:
-            bars = conn.eval(f"_arena_get_bars('{broker_sym}', {num_bars})")
-            if bars and isinstance(bars, list) and len(bars) > 0:
-                return web.json_response(bars)
-        except Exception as exc:
-            log.warning("Gagal fetch bars dari MT5 untuk %s: %s", sym, exc)
+    async with _get_rpyc_lock():
+        conn = await asyncio.to_thread(_sync_connect_rpyc)
+        if conn:
+            try:
+                raw_json = await asyncio.to_thread(
+                    conn.eval, f"_arena_get_bars_json({broker_sym!r}, {num_bars})"
+                )
+                bars = json.loads(str(raw_json)) if raw_json else []
+                if isinstance(bars, list) and len(bars) > 0:
+                    return web.json_response(bars)
+            except Exception as exc:
+                log.warning("Gagal fetch bars dari MT5 untuk %s: %s", sym, exc)
 
     return web.json_response([], status=503)
 

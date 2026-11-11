@@ -66,6 +66,7 @@ class ForexFeed:
         self.open_prices_24h: dict[str, float] = {m["symbol"]: m["base_price"] for m in FOREX_METAS}
         self.volumes_24h: dict[str, float] = {m["symbol"]: 50000.0 for m in FOREX_METAS}
         self.latest_ticks: dict[str, dict] = {}
+        self._last_quote: dict[str, tuple] = {}
         self.connected = True
         self.is_mt5_live = False
         self.ticks_count = 0
@@ -74,17 +75,20 @@ class ForexFeed:
         self._task: asyncio.Task | None = None
         self.session: aiohttp.ClientSession | None = None
 
-    def seed_rings(self, rings: dict, initial_ticks: dict | None = None) -> None:
-        """Seed 240 bars (4 jam candle M1) untuk setiap pair Forex agar indikator langsung aktif."""
+    def seed_rings(self, rings: dict, initial_ticks: dict | None = None, symbols_only: list[str] | None = None) -> None:
+        """Fallback: Seed historical 1m bars jika MT5 historical bars tidak tersedia."""
         from .bars import BarRing
         now_ms = int(time.time() * 1000)
         start_ms = now_ms - (240 * 60 * 1000)
+        target_syms = set(symbols_only) if symbols_only is not None else None
 
         for meta in FOREX_METAS:
             sym = meta["symbol"]
+            if target_syms is not None and sym not in target_syms:
+                continue
             ring = rings.get(sym)
             if ring is None:
-                ring = rings[sym] = BarRing(offset_ms=(abs(hash(sym)) % 60) * 1000)
+                ring = rings[sym] = BarRing(offset_ms=0)
 
             base = meta["base_price"]
             if initial_ticks and sym in initial_ticks:
@@ -110,13 +114,62 @@ class ForexFeed:
                     c = round(o + drift, meta["digits"])
                     h = round(max(o, c) + abs(random.gauss(0, vol * 0.3)), meta["digits"])
                     l = round(min(o, c) - abs(random.gauss(0, vol * 0.3)), meta["digits"])
-                v = round(random.uniform(50, 450), 2)
+                v = round(random.uniform(5, 45), 2)
                 ring.seed(b_ts, o, h, l, c, v)
                 p = c
 
             self.current_prices[sym] = base
             ring.price = base
             ring.last_tick = now_ms
+
+    async def seed_rings_from_mt5(self, rings: dict, initial_ticks: dict | None = None, num_bars: int = 1440) -> int:
+        """Seed hingga 1440 bar M1 (24 jam) riil dari MT5 Bridge beserta tick_volume asli."""
+        from .bars import BarRing
+        sem = asyncio.Semaphore(6)
+        now_sec = time.time()
+        now_ms = int(now_sec * 1000)
+        mt5_seeded: set[str] = set()
+
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=8)) as session:
+            async def fetch_sym(meta: dict):
+                sym = meta["symbol"]
+                url = f"{MT5_BRIDGE_URL}/fetch_data_pos?symbol={sym}&num_bars={num_bars}"
+                async with sem:
+                    try:
+                        async with session.get(url) as resp:
+                            if resp.status != 200:
+                                return
+                            bars = await resp.json()
+                            if not isinstance(bars, list) or len(bars) < 10:
+                                return
+                            # Selaraskan jam server broker MT5 (mis. UTC+2/UTC+3) ke UTC epoch ms
+                            last_bar_sec = int(bars[-1]["time"])
+                            raw_diff = last_bar_sec - now_sec
+                            offset_sec = round(raw_diff / 3600.0) * 3600 if abs(raw_diff) > 600 else 0
+                            ring = rings.get(sym)
+                            if ring is None:
+                                ring = rings[sym] = BarRing(offset_ms=0)
+                            for b in bars:
+                                b_ts = (int(b["time"]) - offset_sec) * 1000
+                                tv = float(b.get("tick_volume") or 0)
+                                ring.seed(b_ts, float(b["open"]), float(b["high"]), float(b["low"]), float(b["close"]), tv)
+                            last_close = float(bars[-1]["close"])
+                            self.current_prices[sym] = last_close
+                            self.open_prices_24h[sym] = float(bars[0]["open"])
+                            ring.price = last_close
+                            ring.last_tick = now_ms
+                            mt5_seeded.add(sym)
+                    except Exception as exc:
+                        log.warning("Gagal seed M1 riil MT5 untuk %s: %s", sym, exc)
+
+            await asyncio.gather(*(fetch_sym(m) for m in FOREX_METAS), return_exceptions=True)
+
+        missing = [m["symbol"] for m in FOREX_METAS if m["symbol"] not in mt5_seeded]
+        if missing:
+            log.warning("Fallback synthetic seed untuk %d pair Forex yang belum siap di MT5: %s", len(missing), missing)
+            self.seed_rings(rings, initial_ticks=initial_ticks, symbols_only=missing)
+        log.info("Forex M1 history seeded: %d/%d pair riil MT5 (%d bars target)", len(mt5_seeded), len(FOREX_METAS), num_bars)
+        return len(mt5_seeded)
 
     async def start(self) -> None:
         self._running = True
@@ -202,9 +255,15 @@ class ForexFeed:
                         continue
 
                     self.current_prices[sym] = new_price
-                    qty = round(random.uniform(0.1, 5.0), 2)
-                    self.volumes_24h[sym] += qty
-                    self.ticks_count += 1
+                    quote_sig = (t_data.get("bid"), t_data.get("ask"), t_data.get("last"), t_data.get("time_msc"))
+                    prev_sig = self._last_quote.get(sym)
+                    if prev_sig != quote_sig:
+                        self._last_quote[sym] = quote_sig
+                        qty = 1.0  # Hitung tick riil hanya saat kuotasi MT5 benar-benar berubah
+                        self.volumes_24h[sym] += qty
+                        self.ticks_count += 1
+                    else:
+                        qty = 0.0
 
                     # Panggil callback on_trade HANYA jika berasal dari tick riil MT5
                     await self.on_trade(sym, new_price, qty, float(now_ms))

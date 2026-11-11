@@ -29,10 +29,13 @@ from .strategies import FOREX_PAIRS, FOREX_STRATEGIES, SIGNAL_FN
 
 
 def _norm_strat_id(sid: str) -> str:
-    """Normalisasi backward-compat untuk ID strategi lama berawalan 'fx_'."""
+    """Normalisasi backward-compat untuk ID strategi lama berawalan 'fx_' dan rename xauusd_mc_fibo."""
     if not sid or sid in ("all", "All"):
         return sid
     s = sid.strip()
+    # Backward compat: xauusd_mc_fibo -> mc_fibo_retest
+    if s == "xauusd_mc_fibo" or s == "fx_xauusd_mc_fibo":
+        return "mc_fibo_retest"
     if s not in SIGNAL_FN and s.startswith("fx_"):
         stripped = s[3:]
         if stripped in SIGNAL_FN:

@@ -5,7 +5,7 @@ Direktori ini berisi **spesifikasi lengkap seluruh 89 strategi** yang berjalan s
 ---
 
 ## Dokumen Spesial Strategi Baru (#84)
-* [**XAUUSD Momentum Candle + Fibonacci Retest (MC-FIBO `M15` + `M30/H1`)**](./daftar-88-strategi/84-xauusd-mc-fibo.md) — Spesifikasi multi-timeframe *Body/Wick Anchor Fibonacci* (`1.0` SL ke `-0.27` TP via `custom_sl_tp`, strictly `XAUUSD` di mode Forex pada sesi Asia `00–07 UTC` & NY `12–21 UTC`, dan universal di Spot/Futures).
+* [**XAUUSD Momentum Candle + Fibonacci Retest (MC-FIBO `M15` + `M30/H1`)**](./daftar-88-strategi/84-mc-fibo-retest.md) — Spesifikasi multi-timeframe *Body/Wick Anchor Fibonacci* (`1.0` SL ke `-0.27` TP via `custom_sl_tp`, strictly `XAUUSD` di mode Forex pada sesi Asia `00–07 UTC` & NY `12–21 UTC`, dan universal di Spot/Futures).
 
 ---
 
@@ -118,7 +118,7 @@ Seluruh temuan bug kritis dari audit awal telah diperbaiki pada kode produksi (`
 | `#81` | [`smc_liquidity_sweep`](./daftar-88-strategi/81-smc-liquidity-sweep.md) | **SMC Liquidity Sweep & BOS** | `Struktur` | `1.8R` | `15x` | ✅ Universal (Ex-FX + Leverage Unlocked) |
 | `#82` | [`ict_optimal_trade_entry`](./daftar-88-strategi/82-ict-optimal-trade-entry.md) | **ICT Optimal Trade Entry** | `ICT` | `1.8R` | `12x` | ✅ Universal (Ex-FX + Leverage Unlocked) |
 | `#83` | [`momentum_candle_burst`](./daftar-88-strategi/83-momentum-candle-burst.md) | **Momentum Candle Expansion** | `Momentum` | `2.0R` | `15x` | ✅ Universal (Ex-FX + Leverage Unlocked) |
-| `#84` | [`xauusd_mc_fibo`](./daftar-88-strategi/84-xauusd-mc-fibo.md) | **XAUUSD MC-FIBO Retest** | `Fibonacci` | `1.8R` | `10x` | ✅ Aktif (`XAUUSD` Forex / Universal Crypto) |
+| `#84` | [`mc_fibo_retest`](./daftar-88-strategi/84-mc-fibo-retest.md) | **Momentum-Fibo Retest** | `Momentum` | `1.8R` | `10x` | ✅ Aktif (`XAUUSD` Forex / Universal Crypto) |
 | `#85` | [`three_line_strike`](./daftar-88-strategi/85-three-line-strike.md) | **Three Line Strike Pattern** | `Price action` | `1.8R` | `15x` | ✅ Diperbaiki & Aktif |
 | `#86` | [`pinbar_liquidity_reject`](./daftar-88-strategi/86-pinbar-liquidity-reject.md) | **Pin Bar Liquidity Rejection** | `Price action` | `1.8R` | `15x` | ✅ Universal (Ex-FX + Leverage Unlocked) |
 | `#87` | [`london_ny_overlap`](./daftar-88-strategi/87-london-ny-overlap.md) | **London-NY Overlap Scalper** | `Breakout` | `2.2R` | `12x` | ✅ Universal (Ex-FX + Leverage Unlocked) |

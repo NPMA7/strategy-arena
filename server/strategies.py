@@ -1318,7 +1318,7 @@ def momentum_candle_burst(s):
     return 0.0
 
 
-def xauusd_mc_fibo(s):
+def mc_fibo_retest(s):
     """M15 Momentum Candle + M30/H1 alignment + Fibonacci [0.236..0.786] retest zones.
 
     Strict specs:
@@ -1623,7 +1623,7 @@ STRATEGIES: list[tuple[str, str, str, Callable]] = [
     ("smc_liquidity_sweep", "SMC Liquidity Sweep & BOS", "Struktur", smc_liquidity_sweep),
     ("ict_optimal_trade_entry", "ICT Optimal Trade Entry", "ICT", ict_optimal_trade_entry),
     ("momentum_candle_burst", "Momentum Candle Expansion", "Momentum", momentum_candle_burst),
-    ("xauusd_mc_fibo", "XAUUSD MC-FIBO Retest", "Fibonacci", xauusd_mc_fibo),
+    ("mc_fibo_retest", "Momentum-Fibo Retest", "Momentum", mc_fibo_retest),
     ("three_line_strike", "Three Line Strike Pattern", "Price action", three_line_strike),
     ("pinbar_liquidity_reject", "Pin Bar Liquidity Rejection", "Price action", pinbar_liquidity_reject),
     ("london_ny_overlap", "London-NY Overlap Scalper", "Breakout", london_ny_overlap),
@@ -1675,7 +1675,7 @@ _leverage_map = {
     "heikin_ashi_smooth": 8, "hedging_grid": 10, "camarilla_fader": 12, "orderflow_sweep": 15,
     "carry_yield_momentum": 6, "economic_straddle": 15,
     "smc_orderblock": 15, "ict_fair_value_gap": 12, "smc_liquidity_sweep": 15,
-    "ict_optimal_trade_entry": 12, "momentum_candle_burst": 15, "xauusd_mc_fibo": 10, "three_line_strike": 15,
+    "ict_optimal_trade_entry": 12, "momentum_candle_burst": 15, "mc_fibo_retest": 10, "three_line_strike": 15,
     "pinbar_liquidity_reject": 15, "london_ny_overlap": 12, "supply_demand_zone": 12,
     "volume_spread_analysis": 15,
 }

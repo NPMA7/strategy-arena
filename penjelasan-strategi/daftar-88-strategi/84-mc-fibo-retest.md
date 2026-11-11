@@ -1,4 +1,4 @@
-# Spesifikasi Strategi #84: XAUUSD MC-FIBO Retest (`xauusd_mc_fibo`)
+# Spesifikasi Strategi #84: Momentum-Fibo Retest (`mc_fibo_retest`)
 
 Dokumen ini memuat blueprint arsitektur logika dan spesifikasi algoritmik dari strategi **Momentum Candle Fibonacci Retest**. Dokumen ini diformat secara presisi agar dapat dibaca, dianalisis, dan dikembangkan lebih lanjut oleh agent AI (seperti Claude, atau GPT) serta diimplementasikan ke dalam bot trading / backend Strategy Arena.
 
@@ -254,8 +254,8 @@ def evaluate_mc_fibo_strategy(symbol, current_utc_hour, m15_bars, m30_bars, h1_b
 Berikut adalah implementasi kode aktual yang saat ini berjalan di produksi (`server/strategies.py`):
 
 ```python
-# Sumber aktual dari server/strategies.py untuk 'xauusd_mc_fibo':
-def xauusd_mc_fibo(s):
+# Sumber aktual dari server/strategies.py untuk 'mc_fibo_retest':
+def mc_fibo_retest(s):
     """M15 Momentum Candle + M30/H1 alignment + Fibonacci [0.236..0.786] retest zones.
 
     Strict specs:

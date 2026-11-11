@@ -704,11 +704,11 @@ export const STRATEGIES_88 = [
     "is_forex": false
   },
   {
-    "id": "xauusd_mc_fibo",
+    "id": "mc_fibo_retest",
     "index": 88,
-    "name": "XAUUSD MC-FIBO Retest",
-    "family": "Fibonacci",
-    "code": "MCF",
+    "name": "Momentum-Fibo Retest",
+    "family": "Momentum",
+    "code": "MFR",
     "is_forex": false
   }
 ];

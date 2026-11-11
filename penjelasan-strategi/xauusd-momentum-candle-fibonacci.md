@@ -1,6 +1,6 @@
 # Spesifikasi Strategi: Momentum Candle Fibonacci Retest (MC-FIBO)
 
-Dokumen ini memuat blueprint arsitektur logika dan spesifikasi algoritmik dari strategi **Momentum Candle Fibonacci Retest**. Dokumen ini diformat secara presisi agar dapat dibaca, dianalisis, dan dikembangkan lebih lanjut oleh agent AI (seperti Claude, GPT) serta diimplementasikan ke dalam bot trading / backend Strategy Arena.
+Dokumen ini memuat blueprint arsitektur logika dan spesifikasi algoritmik dari strategi **Momentum Candle Fibonacci Retest**. Dokumen ini diformat secara presisi agar dapat dibaca, dianalisis, dan dikembangkan lebih lanjut oleh agent AI (seperti Claude, atau GPT) serta diimplementasikan ke dalam bot trading / backend Strategy Arena.
 
 ---
 

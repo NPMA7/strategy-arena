@@ -1072,6 +1072,7 @@
     padding: 20px 24px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     background: #0b111e;
+    flex-shrink: 0;
   }
 
   .title-row {
@@ -1212,6 +1213,7 @@
     background: #080c14;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     padding: 0 16px;
+    flex-shrink: 0;
   }
 
   .tab-btn {
@@ -1257,8 +1259,10 @@
   /* Tab Pane Content */
   .tab-pane {
     padding: 20px 24px;
+    flex: 1 1 auto;
+    min-height: 0;
     overflow-y: auto;
-    max-height: calc(90vh - 150px);
+    -webkit-overflow-scrolling: touch;
     display: flex;
     flex-direction: column;
     gap: 16px;
@@ -1273,12 +1277,15 @@
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 8px;
     padding: 8px 12px;
+    flex-shrink: 0;
   }
 
   .tf-left {
     display: flex;
     align-items: center;
     gap: 12px;
+    flex-wrap: wrap;
+    width: 100%;
   }
 
   .tf-label {
@@ -1290,6 +1297,7 @@
   .tf-buttons {
     display: flex;
     gap: 6px;
+    flex-wrap: wrap;
   }
 
   .tf-btn {
@@ -1321,6 +1329,8 @@
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 10px;
     height: 340px;
+    min-height: 240px;
+    flex-shrink: 0;
     position: relative;
     overflow: hidden;
   }
@@ -1459,8 +1469,11 @@
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 8px;
     overflow-x: auto;
+    min-height: 240px;
     max-height: 480px;
+    flex-shrink: 0;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     scrollbar-gutter: stable;
   }
 
@@ -1477,6 +1490,7 @@
     font-size: 11px;
     color: #94a3b8;
     margin-top: 4px;
+    flex-shrink: 0;
   }
 
   .pg-info {
@@ -1699,6 +1713,93 @@
   @media (max-width: 900px) {
     .stats-bento {
       grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (max-width: 640px) {
+    .modal-backdrop {
+      padding: 8px;
+    }
+    .modal-dialog {
+      max-height: 94vh;
+      max-height: 94dvh;
+      border-radius: 10px;
+    }
+    .modal-header {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+      padding: 14px 38px 12px 14px;
+      position: relative;
+    }
+    .title-row h2 {
+      font-size: 16px;
+    }
+    .rule-text {
+      font-size: 11px;
+      line-height: 1.45;
+    }
+    .m-right {
+      justify-content: flex-start;
+    }
+    .eq-badge {
+      text-align: left;
+    }
+    .eq-val {
+      font-size: 19px;
+    }
+    .m-close {
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      padding: 4px 8px;
+    }
+    .modal-tabs {
+      padding: 0 8px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .tab-btn {
+      padding: 10px 11px;
+      font-size: 10px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .tab-pane {
+      padding: 12px 14px;
+      gap: 12px;
+    }
+    .tf-btn {
+      padding: 4px 9px;
+      font-size: 10px;
+    }
+    .large-chart-wrapper {
+      height: 240px;
+      min-height: 220px;
+    }
+    .trades-toolbar {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+    }
+    .filter-group {
+      flex-wrap: wrap;
+    }
+    .search-box,
+    .search-box input {
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .trades-table-wrap {
+      min-height: 260px;
+      max-height: 55vh;
+    }
+    .pagination-bar {
+      padding: 8px 10px;
+      gap: 8px;
+    }
+    .pg-controls {
+      flex-wrap: wrap;
     }
   }
 

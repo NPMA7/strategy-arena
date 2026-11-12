@@ -3,7 +3,6 @@
   import { arena } from "../lib/store.svelte.js";
   import { formatUSD, formatPercent, formatUptime } from "../lib/formatters.js";
   import { getStrategyCategory } from "../lib/constants.js";
-  import NeuralNetworkVisualizer3D from "./NeuralNetworkVisualizer3D.svelte";
 
   // Tab & Filter State for Executive Leaderboard
   let activeMarketTab = $state('universal'); // 'universal', 'forex', 'futures', 'spot'
@@ -107,17 +106,11 @@
     return curve;
   }
 
-  // Interval real-time auto-update setiap 1 detik
-  let pollInterval;
+  // State sudah otomatis disinkronkan via arena WebSocket + fallback polling store
   onMount(() => {
-    arena.pollLiveState();
-    pollInterval = setInterval(() => {
+    if (!arena.connected) {
       arena.pollLiveState();
-    }, 1000);
-  });
-
-  onDestroy(() => {
-    if (pollInterval) clearInterval(pollInterval);
+    }
   });
 
   // 1. Universal Combined 88 Strategies (Aggregated Performance across Spot + Futures + Forex)
@@ -679,7 +672,9 @@
   <section class="hero-section">
     <!-- Interactive 3D Cyber Neural Background Mesh -->
     <div class="hero-bg-3d">
-      <NeuralNetworkVisualizer3D isBackground={true} />
+      {#await import("./NeuralNetworkVisualizer3D.svelte") then { default: Visualizer3D }}
+        <Visualizer3D isBackground={true} />
+      {/await}
       <div class="hero-vignette-overlay"></div>
     </div>
 

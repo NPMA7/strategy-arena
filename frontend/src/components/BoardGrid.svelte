@@ -118,15 +118,26 @@
     return list;
   });
 
+  // Cache sparkline path per strategy when raw array + balance haven't changed
+  const sparkMemo = new Map();
+
   // Calculate SVG sparkline path from curve numbers with a precise 24-hour range
   function calculateSpark(id, curBal) {
     const raw = curves[id] || [];
+    const baseEq = arena.startEquity || 1000;
+    const liveBal = typeof curBal === 'number' ? curBal : baseEq;
+    const lastEntry = Array.isArray(raw) && raw.length > 0 ? raw[raw.length - 1] : null;
+    const lastKey = Array.isArray(lastEntry) ? `${lastEntry[0]}_${lastEntry[1]}` : (lastEntry?.ts ?? raw.length);
+    const cacheKey = `${raw.length}|${lastKey}|${liveBal.toFixed(2)}`;
+    const cached = sparkMemo.get(id);
+    if (cached && cached.key === cacheKey) {
+      return cached.val;
+    }
+
     const width = 180;
     const height = 22;
     const now = Date.now();
     const windowMs = 24 * 3600 * 1000;
-    const baseEq = arena.startEquity || 1000;
-    const liveBal = typeof curBal === 'number' ? curBal : baseEq;
 
     // Normalize points array
     let pts = [];
@@ -196,7 +207,9 @@
     const [lx, ly] = coords[coords.length - 1];
     const area = `${path} L ${width},${height} L 0,${height} Z`;
 
-    return { path, area, lastX: lx, lastY: ly };
+    const res = { path, area, lastX: lx, lastY: ly };
+    sparkMemo.set(id, { key: cacheKey, val: res });
+    return res;
   }
 </script>
 
@@ -637,6 +650,7 @@
     cursor: pointer;
     transition: background 0.15s, border-color 0.15s;
     user-select: none;
+    contain: layout style;
   }
 
   .row:hover {

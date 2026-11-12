@@ -94,15 +94,25 @@ class ArenaStore {
   pingInterval = null;
 
   constructor() {
+    this._pollInFlight = false;
     this.initModeFromUrl();
     this.startUptimeClock();
     this.fetchInitialMeta();
     this.pollLiveState();
     this.connectWs();
 
-    // Polling interval 1 detik untuk menjamin state selalu update di semua halaman tanpa reload
+    // Fallback polling 3 detik HANYA saat WebSocket terputus dan tab aktif
     if (typeof window !== 'undefined') {
-      setInterval(() => this.pollLiveState(), 1000);
+      setInterval(() => {
+        if (!this.connected && !document.hidden) {
+          this.pollLiveState();
+        }
+      }, 3000);
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && !this.connected) {
+          this.pollLiveState();
+        }
+      });
       window.addEventListener('popstate', () => {
         this.initModeFromUrl();
       });
@@ -110,6 +120,8 @@ class ArenaStore {
   }
 
   async pollLiveState() {
+    if (this._pollInFlight) return;
+    this._pollInFlight = true;
     try {
       const res = await fetch('/api/state');
       if (res.ok) {
@@ -118,6 +130,8 @@ class ArenaStore {
       }
     } catch {
       // offline fallback
+    } finally {
+      this._pollInFlight = false;
     }
   }
 
@@ -351,9 +365,13 @@ class ArenaStore {
     if (msg.prices) {
       this.updatePrices(msg.prices);
     }
-    const inPairs = msg.pairs || msg.spot?.pairs || msg.futures?.pairs || msg.forex?.pairs;
-    if (inPairs && Array.isArray(inPairs) && inPairs.length > 0) {
-      this.pairs = inPairs;
+    if (msg.pairs && Array.isArray(msg.pairs) && msg.pairs.length > 0) {
+      this.pairs = msg.pairs;
+    } else if ((!this.pairs || this.pairs.length === 0)) {
+      const fallbackPairs = msg.spot?.pairs || msg.futures?.pairs || msg.forex?.pairs;
+      if (fallbackPairs && Array.isArray(fallbackPairs) && fallbackPairs.length > 0) {
+        this.pairs = fallbackPairs;
+      }
     }
 
     if (msg.config) {

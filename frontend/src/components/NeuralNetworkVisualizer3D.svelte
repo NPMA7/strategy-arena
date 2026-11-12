@@ -27,6 +27,11 @@
   let activePulses = [];
   let pulsePointsGeometry, pulsePointsMaterial, pulsePointsMesh;
   let resizeObserver = null;
+  let intersectionObserver = null;
+  let isRenderActive = true;
+  let isElementVisible = true;
+  let lastRenderMs = 0;
+  const _tmpVec = new THREE.Vector3();
 
   // Deduplication state for live realtime detection
   let knownPositionKeys = new Set();
@@ -184,9 +189,9 @@
     camera = new THREE.PerspectiveCamera(fov, width / height, 1, 4000);
 
     // Renderer
-    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+    renderer = new THREE.WebGLRenderer({ antialias: !isBackground, alpha: true, powerPreference: 'high-performance' });
     renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isBackground ? 1.25 : 1.5));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     if (isBackground) {
       renderer.setClearColor(0x000000, 0);
@@ -246,8 +251,36 @@
     });
     resizeObserver.observe(containerElem);
 
-    // Start 60-120 FPS Loop
-    renderLoop();
+    // Pause WebGL loop automatically when scrolled out of viewport or tab hidden
+    if (typeof IntersectionObserver !== 'undefined') {
+      intersectionObserver = new IntersectionObserver(
+        (entries) => {
+          isElementVisible = Boolean(entries[0]?.isIntersecting);
+          syncRenderState();
+        },
+        { threshold: 0.02 }
+      );
+      intersectionObserver.observe(containerElem);
+    }
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', syncRenderState);
+    }
+
+    // Start throttled FPS Loop
+    syncRenderState();
+  }
+
+  function syncRenderState() {
+    const shouldRun = isElementVisible && (typeof document === 'undefined' || !document.hidden);
+    if (shouldRun && !animFrameId) {
+      isRenderActive = true;
+      lastRenderMs = 0;
+      animFrameId = requestAnimationFrame(renderLoop);
+    } else if (!shouldRun && animFrameId) {
+      isRenderActive = false;
+      cancelAnimationFrame(animFrameId);
+      animFrameId = null;
+    }
   }
 
   // -------------------------------------------------------------
@@ -688,8 +721,19 @@
   // -------------------------------------------------------------
   // 9. ANIMATION LOOP (60 - 120 FPS)
   // -------------------------------------------------------------
-  function renderLoop() {
+  function renderLoop(nowMs = 0) {
+    if (!isRenderActive) {
+      animFrameId = null;
+      return;
+    }
     animFrameId = requestAnimationFrame(renderLoop);
+
+    // Cap background 3D visualizer at ~30 FPS to keep page silky smooth
+    const minFrameMs = isBackground ? 33 : 16;
+    if (lastRenderMs && (nowMs - lastRenderMs) < minFrameMs) {
+      return;
+    }
+    lastRenderMs = nowMs;
 
     if (controls) controls.update();
 
@@ -700,20 +744,19 @@
 
       for (let i = 0; i < activePulses.length; i++) {
         const p = activePulses[i];
-        p.t += 0.024;
+        p.t += isBackground ? 0.04 : 0.024;
         if (p.t >= 1) {
           p.t = 0;
           p.step += 1;
         }
 
-        let curPos = new THREE.Vector3();
         if (p.step === 0) {
-          curPos.lerpVectors(p.p1, p.p2, p.t);
+          _tmpVec.lerpVectors(p.p1, p.p2, p.t);
         } else if (p.step === 1) {
-          curPos.lerpVectors(p.p2, p.p3, p.t);
+          _tmpVec.lerpVectors(p.p2, p.p3, p.t);
         }
 
-        posAttr.setXYZ(i, curPos.x, curPos.y, curPos.z);
+        posAttr.setXYZ(i, _tmpVec.x, _tmpVec.y, _tmpVec.z);
         colAttr.setXYZ(i, p.color.r, p.color.g, p.color.b);
       }
 
@@ -831,8 +874,13 @@
   });
 
   onDestroy(() => {
+    isRenderActive = false;
     if (animFrameId) cancelAnimationFrame(animFrameId);
     if (resizeObserver) resizeObserver.disconnect();
+    if (intersectionObserver) intersectionObserver.disconnect();
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', syncRenderState);
+    }
     if (renderer) {
       renderer.dispose();
       renderer.domElement.remove();

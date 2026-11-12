@@ -147,6 +147,7 @@ class Engine:
             if sid in self.strategy_ids:
                 self.accounts[sid] = _new_account(i, mode)
         self.events: list[dict] = []
+        self.new_events: list[dict] = []
         self.new_trades: list[dict] = []
         self.signals: list[dict] = []
         self.new_signals: list[dict] = []
@@ -769,43 +770,46 @@ class Engine:
     # ── stops & take profit (dipanggil saat tick harga, eksekusi instan) ─
     def check_stops(self, symbol: str, price: float) -> None:
         now_ts = int(time.time() * 1000)
+        fx_px = None
         for sid, acct in self.accounts.items():
             p = acct["pos"].get(symbol)
-            if p:
-                # 1. Cek Take Profit
-                tp_price = p.get("target")
-                tp_hit = False
-                if tp_price is not None:
-                    tp_hit = (p["side"] == LONG and price >= tp_price) or (p["side"] == SHORT and price <= tp_price)
+            if p is None:
+                continue
 
-                # 2. Cek Stop Loss
-                sl_price = p.get("stop")
-                sl_hit = False
-                if sl_price is not None:
-                    sl_hit = (p["side"] == LONG and price <= sl_price) or (p["side"] == SHORT and price >= sl_price)
+            # 1. Cek Take Profit
+            tp_price = p.get("target")
+            tp_hit = False
+            if tp_price is not None:
+                tp_hit = (p["side"] == LONG and price >= tp_price) or (p["side"] == SHORT and price <= tp_price)
 
-                if tp_hit:
-                    side_label = "LONG" if p["side"] == LONG else "SHORT"
-                    self._close(acct, symbol, tp_price, now_ts, "Take Profit", None)
-                    self._push_event([sid], symbol, "tp", f"🎯 TP {side_label} {symbol} @ {tp_price:.6g} (target tercapai)")
-                elif sl_hit:
-                    side_label = "LONG" if p["side"] == LONG else "SHORT"
-                    self._close(acct, symbol, sl_price, now_ts, "Stop Loss", None)
-                    self._push_event([sid], symbol, "stop", f"🛑 SL {side_label} {symbol} @ {sl_price:.6g} (batas risiko)")
+            # 2. Cek Stop Loss
+            sl_price = p.get("stop")
+            sl_hit = False
+            if sl_price is not None:
+                sl_hit = (p["side"] == LONG and price <= sl_price) or (p["side"] == SHORT and price >= sl_price)
 
-            # Cek MC setelah pergerakan tick
+            if tp_hit:
+                side_label = "LONG" if p["side"] == LONG else "SHORT"
+                self._close(acct, symbol, tp_price, now_ts, "Take Profit", None)
+                self._push_event([sid], symbol, "tp", f"🎯 TP {side_label} {symbol} @ {tp_price:.6g} (target tercapai)")
+            elif sl_hit:
+                side_label = "LONG" if p["side"] == LONG else "SHORT"
+                self._close(acct, symbol, sl_price, now_ts, "Stop Loss", None)
+                self._push_event([sid], symbol, "stop", f"🛑 SL {side_label} {symbol} @ {sl_price:.6g} (batas risiko)")
+
+            # Cek MC hanya untuk akun yang posisinya memang terkena pergerakan tick ini
             if acct["pos"]:
+                if self.mode == "forex" and fx_px is None:
+                    fx_px = self._forex_prices()
                 eq = acct["cash"]
                 for sym, pos_item in acct["pos"].items():
                     px = self._get_price(sym, pos_item["entry"])
                     if self.mode == "forex":
-                        eq += calculate_forex_pnl(sym, pos_item["entry"], px, pos_item["side"], pos_item.get("lot", 0.10), self._forex_prices())
+                        eq += calculate_forex_pnl(sym, pos_item["entry"], px, pos_item["side"], pos_item.get("lot", 0.10), fx_px)
                     else:
                         eq += (px - pos_item["entry"]) * pos_item["qty"] * pos_item["side"]
                 if self.is_mc_breached(acct, eq):
                     self._handle_mc(acct, now_ts)
-            elif self.is_mc_breached(acct):
-                self._handle_mc(acct, now_ts)
 
     # ── snapshot untuk UI/DB ────────────────────────────────────────────
     def snapshot(self) -> dict:
@@ -909,24 +913,29 @@ class Engine:
         }
 
     def _push_event(self, strats: list[str], symbol: str | None, kind: str, message: str) -> None:
-        self.events.append({"ts": int(time.time() * 1000), "strats": strats, "symbol": symbol, "kind": kind, "message": message})
+        ev = {"ts": int(time.time() * 1000), "strats": strats, "symbol": symbol, "kind": kind, "message": message}
+        self.events.append(ev)
+        self.new_events.append(ev)
         if len(self.events) > 400:
             del self.events[:100]
+        if len(self.new_events) > 200:
+            del self.new_events[:len(self.new_events) - 200]
 
-    def drain(self) -> dict:
+    def drain(self, include_curve_pts: bool = True) -> dict:
         trades, self.new_trades = self.new_trades, []
         signals, self.new_signals = self.new_signals, []
+        events, self.new_events = self.new_events, []
         pruned, self.disabled_strats_to_prune = self.disabled_strats_to_prune, []
-        # events TIDAK dikosongkan — UI butuh history tetap ada.
-        # Hanya trim kalau terlalu panjang (sudah dilakukan di _push_event).
+        # events di self.events TIDAK dikosongkan — UI butuh history tetap ada.
         pts = []
-        now = int(time.time() * 1000) // 10000 * 10000
-        for sid, a in self.accounts.items():
-            pts.append((sid, now, round(a["cash"], 2)))
+        if include_curve_pts:
+            now = int(time.time() * 1000) // 60000 * 60000
+            for sid, a in self.accounts.items():
+                pts.append((sid, now, round(a["cash"], 2)))
         return {
             "new_trades": trades,
             "new_signals": signals,
-            "new_events": list(self.events[-60:]),
+            "new_events": events,
             "equity_points": pts,
             "pruned_strategies": pruned,
         }

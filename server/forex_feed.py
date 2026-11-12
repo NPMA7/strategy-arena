@@ -67,6 +67,7 @@ class ForexFeed:
         self.volumes_24h: dict[str, float] = {m["symbol"]: 50000.0 for m in FOREX_METAS}
         self.latest_ticks: dict[str, dict] = {}
         self._last_quote: dict[str, tuple] = {}
+        self._last_bar_min: dict[str, int] = {}
         self.connected = True
         self.is_mt5_live = False
         self.ticks_count = 0
@@ -257,7 +258,9 @@ class ForexFeed:
                     self.current_prices[sym] = new_price
                     quote_sig = (t_data.get("bid"), t_data.get("ask"), t_data.get("last"), t_data.get("time_msc"))
                     prev_sig = self._last_quote.get(sym)
-                    if prev_sig != quote_sig:
+                    now_min = now_ms // 60000
+                    quote_changed = prev_sig != quote_sig
+                    if quote_changed:
                         self._last_quote[sym] = quote_sig
                         qty = 1.0  # Hitung tick riil hanya saat kuotasi MT5 benar-benar berubah
                         self.volumes_24h[sym] += qty
@@ -265,8 +268,9 @@ class ForexFeed:
                     else:
                         qty = 0.0
 
-                    # Panggil callback on_trade HANYA jika berasal dari tick riil MT5
-                    await self.on_trade(sym, new_price, qty, float(now_ms))
+                    if quote_changed or self._last_bar_min.get(sym) != now_min:
+                        self._last_bar_min[sym] = now_min
+                        await self.on_trade(sym, new_price, qty, float(now_ms))
 
                 await asyncio.sleep(0.5)
             except asyncio.CancelledError:

@@ -582,7 +582,7 @@ class DB:
             return [dict(r) for r in rows]
 
     # ── baca data umum ──────────────────────────────────────────────────
-    async def read_bootstrap(self) -> dict[str, Any]:
+    async def read_bootstrap(self, include_curves: bool = True) -> dict[str, Any]:
         async with self.pool.acquire() as con:
             pairs = await con.fetch(
                 "SELECT symbol, base, quote, rank, quote_volume, last_close FROM pairs ORDER BY rank, symbol"
@@ -600,19 +600,21 @@ class DB:
             events = await con.fetch(
                 "SELECT ts, strats, symbol, kind, message FROM events ORDER BY ts DESC LIMIT 60"
             )
-            cutoff_24h = int(time.time() * 1000) - 24 * 3600 * 1000
-            curves = await con.fetch(
-                """SELECT strategy, mode, ts, equity
-                   FROM (
-                       SELECT strategy, mode, ts, equity,
-                              ROW_NUMBER() OVER (PARTITION BY strategy, mode, ts / 1800000 ORDER BY ts ASC) as rn
-                       FROM equity_curve
-                       WHERE ts >= $1
-                   ) s
-                   WHERE rn = 1
-                   ORDER BY strategy, mode, ts ASC""",
-                cutoff_24h,
-            )
+            curves = []
+            if include_curves:
+                cutoff_24h = int(time.time() * 1000) - 24 * 3600 * 1000
+                curves = await con.fetch(
+                    """SELECT strategy, mode, ts, equity
+                       FROM (
+                           SELECT strategy, mode, ts, equity,
+                                  ROW_NUMBER() OVER (PARTITION BY strategy, mode, ts / 1800000 ORDER BY ts ASC) as rn
+                           FROM equity_curve
+                           WHERE ts >= $1
+                       ) s
+                       WHERE rn = 1
+                       ORDER BY strategy, mode, ts ASC""",
+                    cutoff_24h,
+                )
         return {
             "pairs": [dict(r) for r in pairs],
             "accounts": [dict(r) for r in accounts],
@@ -882,6 +884,7 @@ CREATE TABLE IF NOT EXISTS equity_curve (
     equity     DOUBLE PRECISION NOT NULL,
     PRIMARY KEY (strategy, mode, ts)
 );
+CREATE INDEX IF NOT EXISTS idx_equity_curve_ts ON equity_curve (ts DESC);
 
 CREATE TABLE IF NOT EXISTS events (
     id          BIGSERIAL PRIMARY KEY,

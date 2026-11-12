@@ -15,8 +15,9 @@ import os
 import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, HTTPException, Depends, Header
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, HTTPException, Depends, Header, Request
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from .bars import BarRing
@@ -55,7 +56,7 @@ ROOT_DIR = os.path.dirname(os.path.dirname(__file__))
 FRONTEND_DIR = os.path.join(ROOT_DIR, "frontend")
 DIST_DIR = os.path.join(FRONTEND_DIR, "dist")
 from .config import START_EQUITY, SNAPSHOT_SEC, ADMIN_RESET_KEY, get_client_config, MT5_BRIDGE_URL, MAX_MC_LIMIT
-PRICE_TICK_SEC = 0.5
+PRICE_TICK_SEC = 1.0
 
 db = DB()
 rings: dict[str, BarRing] = {}
@@ -93,23 +94,26 @@ class SignalHub:
         async with self.lock:
             if not self.clients:
                 return
-            dead = []
-            msg = _dumps({"type": "signal", "signal": sig})
-            for ws, opts in list(self.clients.items()):
-                strat = opts.get("strategy")
-                mode = opts.get("mode")
-                if strat and strat != "all":
-                    allowed_strats = _parse_strat_filter(strat)
-                    if allowed_strats and sig.get("strategy") not in allowed_strats:
-                        continue
-                if mode and mode != "all" and sig.get("mode") != mode:
+            snapshot_clients = list(self.clients.items())
+        dead = []
+        msg = _dumps({"type": "signal", "signal": sig})
+        for ws, opts in snapshot_clients:
+            strat = opts.get("strategy")
+            mode = opts.get("mode")
+            if strat and strat != "all":
+                allowed_strats = _parse_strat_filter(strat)
+                if allowed_strats and sig.get("strategy") not in allowed_strats:
                     continue
-                try:
-                    await ws.send_text(msg)
-                except Exception:
-                    dead.append(ws)
-            for ws in dead:
-                self.clients.pop(ws, None)
+            if mode and mode != "all" and sig.get("mode") != mode:
+                continue
+            try:
+                await asyncio.wait_for(ws.send_text(msg), timeout=2.0)
+            except Exception:
+                dead.append(ws)
+        if dead:
+            async with self.lock:
+                for ws in dead:
+                    self.clients.pop(ws, None)
 
 
 signal_hub = SignalHub()
@@ -130,14 +134,19 @@ class Hub:
 
     async def broadcast(self, payload: str) -> None:
         async with self.lock:
-            dead = []
-            for ws in self.clients:
-                try:
-                    await ws.send_text(payload)
-                except Exception:
-                    dead.append(ws)
-            for ws in dead:
-                self.clients.discard(ws)
+            if not self.clients:
+                return
+            snapshot_clients = list(self.clients)
+        dead = []
+        for ws in snapshot_clients:
+            try:
+                await asyncio.wait_for(ws.send_text(payload), timeout=2.0)
+            except Exception:
+                dead.append(ws)
+        if dead:
+            async with self.lock:
+                for ws in dead:
+                    self.clients.discard(ws)
 
 
 hub = Hub()
@@ -201,26 +210,68 @@ def get_all_prices() -> dict[str, float]:
 
 
 _cached_db_size = "166.7 MB"
+_cached_db_size_mb = 0.0
+_cached_state_bytes: bytes = b""
+_cached_state_at: float = 0.0
+_cached_bootstrap_bytes: bytes = b""
+_cached_bootstrap_at: float = 0.0
 
 
-def build_live_state_payload() -> dict:
+def _finalize_accounts(accounts: list[dict]) -> None:
+    for a in accounts:
+        a["balance"] = round(a.get("cash", a["equity"]), 2)
+        a["ret"] = a["balance"] / START_EQUITY - 1.0
+
+
+def build_live_state_payload(
+    include_curves: bool = True,
+    include_crypto_pairs: bool = True,
+    snaps: tuple[dict, dict, dict] | None = None,
+) -> dict:
     if spot_engine is None or futures_engine is None:
         return {"type": "state", "spot": None, "futures": None, "forex": None}
     now = time.time()
-    spot_snap = spot_engine.snapshot()
-    fut_snap = futures_engine.snapshot()
-    forex_snap = forex_engine.snapshot() if forex_engine else {"accounts": [], "positions": [], "curves": {}}
+    if snaps is not None:
+        spot_snap, fut_snap, forex_snap = snaps
+    else:
+        spot_snap = spot_engine.snapshot()
+        fut_snap = futures_engine.snapshot()
+        forex_snap = forex_engine.snapshot() if forex_engine else {"accounts": [], "positions": [], "curves": {}}
     prices = get_all_prices()
-    for a in spot_snap["accounts"]:
-        a["balance"] = round(a.get("cash", a["equity"]), 2)
-        a["ret"] = a["balance"] / START_EQUITY - 1.0
-    for a in fut_snap["accounts"]:
-        a["balance"] = round(a.get("cash", a["equity"]), 2)
-        a["ret"] = a["balance"] / START_EQUITY - 1.0
-    for a in forex_snap["accounts"]:
-        a["balance"] = round(a.get("cash", a["equity"]), 2)
-        a["ret"] = a["balance"] / START_EQUITY - 1.0
-    return {
+    _finalize_accounts(spot_snap["accounts"])
+    _finalize_accounts(fut_snap["accounts"])
+    _finalize_accounts(forex_snap["accounts"])
+
+    fx_pairs = forex_feed.pairs() if forex_feed else []
+    spot_pairs = feed.pairs() if (include_crypto_pairs and feed) else None
+    fut_pairs = feed.get_futures_pairs() if (include_crypto_pairs and feed) else None
+
+    spot_out = {
+        "accounts": spot_snap["accounts"],
+        "positions": spot_snap["positions"],
+        "events": spot_engine.events[-40:],
+    }
+    fut_out = {
+        "accounts": fut_snap["accounts"],
+        "positions": fut_snap["positions"],
+        "events": futures_engine.events[-40:],
+    }
+    forex_out = {
+        "accounts": forex_snap["accounts"],
+        "positions": forex_snap["positions"],
+        "events": forex_engine.events[-40:] if forex_engine else [],
+        "pairs": fx_pairs,
+    }
+    if include_curves:
+        spot_out["curves"] = spot_snap.get("curves", {})
+        fut_out["curves"] = fut_snap.get("curves", {})
+        forex_out["curves"] = forex_snap.get("curves", {})
+    if spot_pairs is not None:
+        spot_out["pairs"] = spot_pairs
+    if fut_pairs is not None:
+        fut_out["pairs"] = fut_pairs
+
+    out = {
         "type": "state",
         "t": int(now * 1000),
         "uptime": int(now - state["started"]),
@@ -241,35 +292,69 @@ def build_live_state_payload() -> dict:
             "db_size": _cached_db_size,
         },
         "prices": prices,
-        "pairs": (feed.pairs() if feed else []) + (forex_feed.pairs() if forex_feed else []),
-        "spot": {"accounts": spot_snap["accounts"], "positions": spot_snap["positions"], "curves": spot_snap.get("curves", {}), "events": spot_engine.events[-40:], "pairs": feed.pairs() if feed else []},
-        "futures": {"accounts": fut_snap["accounts"], "positions": fut_snap["positions"], "curves": fut_snap.get("curves", {}), "events": futures_engine.events[-40:], "pairs": feed.get_futures_pairs() if feed else []},
-        "forex": {"accounts": forex_snap["accounts"], "positions": forex_snap["positions"], "curves": forex_snap.get("curves", {}), "events": forex_engine.events[-40:] if forex_engine else [], "pairs": forex_feed.pairs() if forex_feed else []},
+        "spot": spot_out,
+        "futures": fut_out,
+        "forex": forex_out,
     }
+    if include_crypto_pairs:
+        out["pairs"] = (spot_pairs or []) + fx_pairs
+    return out
 
 
 async def publisher() -> None:
     """Kirim state semua mode ke UI dan persist snapshot semua engine ke Postgres."""
-    global _cached_db_size
+    global _cached_db_size, _cached_db_size_mb, _cached_state_bytes, _cached_state_at
     last_trade_flush = 0.0
+    last_curve_flush = 0.0
+    last_db_size_check = 0.0
+    tick_idx = 0
     while True:
         try:
             await asyncio.sleep(PRICE_TICK_SEC)
             if spot_engine is None or futures_engine is None:
                 continue
             now = time.time()
-            payload = build_live_state_payload()
-            await hub.broadcast(_dumps(payload))
+            tick_idx += 1
+            need_flush = (now - last_trade_flush >= max(SNAPSHOT_SEC, 2.0))
+            need_http_cache = (now - _cached_state_at >= 2.0) or not _cached_state_bytes
+            has_clients = bool(hub.clients)
+
+            if not (has_clients or need_flush or need_http_cache):
+                continue
+
+            spot_snap = spot_engine.snapshot()
+            fut_snap = futures_engine.snapshot()
+            forex_snap = forex_engine.snapshot() if forex_engine else {"accounts": [], "positions": [], "curves": {}}
+            snaps = (spot_snap, fut_snap, forex_snap)
+
+            if has_clients:
+                # Kirim full curves + crypto pairs tiap 15 detik; tick reguler cukup kirim data delta ringan
+                include_heavy = (tick_idx % 15 == 0)
+                ws_payload = build_live_state_payload(
+                    include_curves=include_heavy,
+                    include_crypto_pairs=include_heavy,
+                    snaps=snaps,
+                )
+                await hub.broadcast(_dumps(ws_payload))
+
+            if need_http_cache:
+                full_payload = build_live_state_payload(
+                    include_curves=True,
+                    include_crypto_pairs=True,
+                    snaps=snaps,
+                )
+                _cached_state_bytes = _dumps(full_payload).encode("utf-8")
+                _cached_state_at = now
 
             # Persist snapshot periodik ketiga engine (spot, futures, forex) dan sinyal copy-trade
-            if now - last_trade_flush >= SNAPSHOT_SEC:
+            if need_flush:
                 last_trade_flush = now
-                spot_snap = spot_engine.snapshot()
-                fut_snap = futures_engine.snapshot()
-                forex_snap = forex_engine.snapshot() if forex_engine else {"accounts": [], "positions": [], "curves": {}}
-                spot_flushed = spot_engine.drain()
-                fut_flushed = futures_engine.drain()
-                forex_flushed = forex_engine.drain() if forex_engine else {}
+                include_curves_db = (now - last_curve_flush >= 60.0)
+                if include_curves_db:
+                    last_curve_flush = now
+                spot_flushed = spot_engine.drain(include_curve_pts=include_curves_db)
+                fut_flushed = futures_engine.drain(include_curve_pts=include_curves_db)
+                forex_flushed = forex_engine.drain(include_curve_pts=include_curves_db) if forex_engine else {}
 
                 # Siarkan sinyal baru ke WebSocket /ws/signals
                 all_signals = spot_flushed.get("new_signals", []) + fut_flushed.get("new_signals", []) + forex_flushed.get("new_signals", [])
@@ -292,11 +377,21 @@ async def publisher() -> None:
                         "positions": forex_snap["positions"],
                         **forex_flushed,
                     },
-                    "new_events": spot_engine.events[-10:] + futures_engine.events[-10:] + (forex_engine.events[-10:] if forex_engine else []),
+                    "new_events": (
+                        spot_flushed.get("new_events", [])
+                        + fut_flushed.get("new_events", [])
+                        + forex_flushed.get("new_events", [])
+                    ),
                 }
                 try:
                     await db.persist_snapshots(snap_data)
-                    _cached_db_size = await db.get_db_size_str()
+                    if now - last_db_size_check >= 60.0:
+                        last_db_size_check = now
+                        _cached_db_size = await db.get_db_size_str()
+                        try:
+                            _cached_db_size_mb = float(_cached_db_size.split()[0])
+                        except Exception:
+                            pass
                 except Exception as exc:
                     log.warning("persist gagal: %s", exc)
         except asyncio.CancelledError:
@@ -443,6 +538,18 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Strategy Arena", lifespan=lifespan)
+app.add_middleware(GZipMiddleware, minimum_size=500)
+
+
+@app.middleware("http")
+async def add_cache_headers(request: Request, call_next):
+    response = await call_next(request)
+    path = request.url.path
+    if path.startswith("/assets/"):
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    elif path in ("/", "/crypto-spot", "/crypto-futures", "/forex", "/neural-execution", "/executions"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
 
 
 @app.get("/health")
@@ -514,23 +621,30 @@ async def resources():
         cpu_pct = 0.0
         ram_mb = 0.0
 
-    # DB size
-    db_mb = 0.0
-    try:
-        async with db.pool.acquire() as con:
-            row = await con.fetchrow(
-                "SELECT pg_database_size('arena') / (1024*1024)::float AS mb"
-            )
-            db_mb = round(row["mb"], 1) if row else 0.0
-    except Exception:
-        pass
+    # DB size (gunakan cache bila baru diperbarui oleh publisher, hemat query pg_ls_waldir)
+    db_mb = _cached_db_size_mb
+    if db_mb <= 0:
+        try:
+            async with db.pool.acquire() as con:
+                row = await con.fetchrow(
+                    "SELECT pg_database_size('arena') / (1024*1024)::float AS mb"
+                )
+                db_mb = round(row["mb"], 1) if row else 0.0
+        except Exception:
+            pass
 
     return {"cpu": cpu_pct, "ram_mb": ram_mb, "db_mb": db_mb}
 
 
 @app.get("/api/bootstrap")
 async def bootstrap():
-    data = await db.read_bootstrap()
+    global _cached_bootstrap_bytes, _cached_bootstrap_at
+    now = time.time()
+    if _cached_bootstrap_bytes and (now - _cached_bootstrap_at < 15.0):
+        return Response(content=_cached_bootstrap_bytes, media_type="application/json")
+
+    live_engines_ready = bool(spot_engine and futures_engine and forex_engine)
+    data = await db.read_bootstrap(include_curves=not live_engines_ready)
     for a in data.get("accounts", []):
         a["balance"] = round(a.get("cash", a.get("equity", START_EQUITY)), 2)
         a["ret"] = a["balance"] / START_EQUITY - 1.0
@@ -545,15 +659,34 @@ async def bootstrap():
         {"id": a["id"], "name": a["name"], "family": a["family"], "color": a["color"]}
         for a in all_strats
     ]
-    data["stats"] = await db.stats()
+    if live_engines_ready:
+        inmem_curves = []
+        for m_name, eng in (("spot", spot_engine), ("futures", futures_engine), ("forex", forex_engine)):
+            for sid, pts in eng.sparklines.items():
+                for pt in pts:
+                    inmem_curves.append({"strategy": sid, "mode": m_name, "ts": pt[0], "equity": pt[1]})
+        data["curves"] = inmem_curves
+
+    data["stats"] = {
+        "bars": spot_engine.bars_processed + (forex_engine.bars_processed if forex_engine else 0) if spot_engine else 0,
+        "db_size": _cached_db_size,
+        "db_size_mb": _cached_db_size_mb,
+    }
     data["feed"] = {"connected": (feed.connected if feed else False) or (forex_feed.connected if forex_feed else False), "symbols": (len(feed.symbols) if feed else 0) + (len(forex_symbols) if forex_feed else 0)}
-    return JSONResponse(data)
+    _cached_bootstrap_bytes = _dumps(data).encode("utf-8")
+    _cached_bootstrap_at = now
+    return Response(content=_cached_bootstrap_bytes, media_type="application/json")
 
 
 @app.get("/api/state")
 async def get_live_state():
     """Endpoint HTTP polling real-time untuk menjamin web selalu terupdate tanpa refresh."""
-    return JSONResponse(build_live_state_payload())
+    global _cached_state_bytes, _cached_state_at
+    now = time.time()
+    if not _cached_state_bytes or (now - _cached_state_at > 5.0):
+        _cached_state_bytes = _dumps(build_live_state_payload(include_curves=True, include_crypto_pairs=True)).encode("utf-8")
+        _cached_state_at = now
+    return Response(content=_cached_state_bytes, media_type="application/json")
 
 
 @app.get("/api/strategy/{sid}")

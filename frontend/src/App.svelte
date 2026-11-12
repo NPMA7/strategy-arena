@@ -8,8 +8,6 @@
   import RealtimeLogs from './components/RealtimeLogs.svelte';
   import CopyTradeModal from './components/CopyTradeModal.svelte';
   import TradingViewChartModal from './components/TradingViewChartModal.svelte';
-  import LandingPage from './components/LandingPage.svelte';
-  import NeuralExecutionPage from './components/NeuralExecutionPage.svelte';
   import { arena } from './lib/store.svelte.js';
 
   let totalTrades = $derived(arena.totalTrades);
@@ -17,12 +15,16 @@
 </script>
 
 {#if arena.currentRoute === 'landing'}
-  <LandingPage />
+  {#await import('./components/LandingPage.svelte') then { default: LandingPage }}
+    <LandingPage />
+  {/await}
 {:else if arena.currentRoute === 'executions'}
   <div class="app-shell">
     <Header />
     <TickerBar />
-    <NeuralExecutionPage />
+    {#await import('./components/NeuralExecutionPage.svelte') then { default: NeuralExecutionPage }}
+      <NeuralExecutionPage />
+    {/await}
   </div>
 {:else}
   <div class="app-shell">

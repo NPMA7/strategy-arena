@@ -72,26 +72,27 @@ Berikut adalah implementasi kode aktual yang saat ini berjalan di produksi (`ser
 ```python
 # Sumber aktual dari server/strategies.py untuk 'supply_demand_zone':
 def supply_demand_zone(s):
-    """Institutional Supply & Demand Imbalance Retest (scan 2..10 bar terakhir)."""
-    if s.i < 12:
+    """Institutional Supply & Demand Imbalance Retest (scan zona segar 2..30 bar terakhir)."""
+    if s.i < 32:
         return 0.0
     c, o, h, l, atr = s.c[s.i], s.o[s.i], s.h[s.i], s.l[s.i], s.atr14[s.i]
     if not _ok(c, o, h, l, atr) or atr <= 0:
         return 0.0
-    for k in range(s.i - 2, max(s.i - 10, 1), -1):
+    rng = max(h - l, 1e-12)
+    for k in range(s.i - 2, max(s.i - 30, 1), -1):
         base_h, base_l = s.h[k], s.l[k]
-        if (base_h - base_l) >= 0.9 * atr:
+        if (base_h - base_l) >= 1.0 * atr:
             continue
         impulse = s.c[k + 1] - s.o[k + 1]
         # Demand Zone: base sempit + rally impulsif + belum jebol ke bawah base_l
-        if impulse > 1.0 * atr:
+        if impulse > 0.95 * atr:
             invalid = (k + 2 <= s.i - 1) and (float(s.l[k + 2:s.i].min()) < base_l)
-            if not invalid and l <= base_h and c >= base_l and c > o:
+            if not invalid and l <= base_h and c >= base_l and (c > o or (c - l) / rng >= 0.60):
                 return 0.80
         # Supply Zone: base sempit + drop impulsif + belum jebol ke atas base_h
-        if -impulse > 1.0 * atr:
+        if -impulse > 0.95 * atr:
             invalid = (k + 2 <= s.i - 1) and (float(s.h[k + 2:s.i].max()) > base_h)
-            if not invalid and h >= base_l and c <= base_h and c < o:
+            if not invalid and h >= base_l and c <= base_h and (c < o or (h - c) / rng >= 0.60):
                 return -0.80
     return 0.0
 ```

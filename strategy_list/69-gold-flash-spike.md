@@ -72,13 +72,13 @@ Berikut adalah implementasi kode aktual yang saat ini berjalan di produksi (`ser
 ```python
 # Sumber aktual dari server/strategies.py untuk 'gold_flash_spike':
 def gold_flash_spike(s):
-    """Flash-Spike Mean Reversion: Fade lonjakan > 1.8x ATR pada RSI ekstrem."""
+    """Flash-Spike Mean Reversion: Fade lonjakan > 1.6x ATR pada RSI ekstrem."""
     h, l, c, atr, rsi = s.h[s.i], s.l[s.i], s.c[s.i], s.atr14[s.i], s.rsi14[s.i]
     if not _ok(h, l, c, atr, rsi) or atr <= 0:
         return 0.0
-    if (h - l) > 1.8 * atr and c < (h + l) / 2 and rsi > 68:
+    if (h - l) > 1.6 * atr and c < (h + l) / 2 and rsi > 64:
         return -0.85
-    if (h - l) > 1.8 * atr and c > (h + l) / 2 and rsi < 32:
+    if (h - l) > 1.6 * atr and c > (h + l) / 2 and rsi < 36:
         return 0.85
     return 0.0
 ```

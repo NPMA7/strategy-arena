@@ -72,25 +72,26 @@ Berikut adalah implementasi kode aktual yang saat ini berjalan di produksi (`ser
 ```python
 # Sumber aktual dari server/strategies.py untuk 'smc_orderblock':
 def smc_orderblock(s):
-    """Institutional Order Block Mitigation (SMC)."""
-    if s.i < 15:
+    """Institutional Order Block Mitigation (SMC, scan zona unmitigated 2..30 bar terakhir)."""
+    if s.i < 32:
         return 0.0
     c, o, h, l, atr = s.c[s.i], s.o[s.i], s.h[s.i], s.l[s.i], s.atr14[s.i]
     if not _ok(c, o, h, l, atr) or atr <= 0:
         return 0.0
-    for k in range(s.i - 2, max(s.i - 12, 1), -1):
-        if s.c[k] < s.o[k] and (s.c[k + 1] - s.c[k]) > 1.1 * atr:
+    rng = max(h - l, 1e-12)
+    for k in range(s.i - 2, max(s.i - 30, 1), -1):
+        if s.c[k] < s.o[k] and (s.c[k + 1] - s.c[k]) > 1.0 * atr:
             ob_high, ob_low = s.h[k], s.l[k]
             if float(s.l[k + 1:s.i].min()) < ob_low:
                 continue
-            if l <= ob_high and c >= ob_low and c > o:
+            if l <= ob_high and c >= ob_low and (c > o or (c - l) / rng >= 0.60):
                 return 0.80
-    for k in range(s.i - 2, max(s.i - 12, 1), -1):
-        if s.c[k] > s.o[k] and (s.c[k] - s.c[k + 1]) > 1.1 * atr:
+    for k in range(s.i - 2, max(s.i - 30, 1), -1):
+        if s.c[k] > s.o[k] and (s.c[k] - s.c[k + 1]) > 1.0 * atr:
             ob_high, ob_low = s.h[k], s.l[k]
             if float(s.h[k + 1:s.i].max()) > ob_high:
                 continue
-            if h >= ob_low and c <= ob_high and c < o:
+            if h >= ob_low and c <= ob_high and (c < o or (h - c) / rng >= 0.60):
                 return -0.80
     return 0.0
 ```

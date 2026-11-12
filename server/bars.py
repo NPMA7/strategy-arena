@@ -69,13 +69,15 @@ class BarRing:
         if self.n < len(self.ts):
             self.n += 1
 
-    def views(self) -> dict[str, np.ndarray]:
-        """Chronological contiguous copies (oldest → newest)."""
+    def views(self, closed_only: bool = False) -> dict[str, np.ndarray]:
+        """Chronological contiguous copies (oldest → newest). If closed_only, drop the trailing forming bar."""
         cap = len(self.ts)
         if self.n < cap:
-            sl = slice(0, self.n)
+            end = max(0, self.n - 1) if closed_only else self.n
+            sl = slice(0, end)
             return {"ts": self.ts[sl], "o": self.o[sl], "h": self.h[sl], "l": self.l[sl], "c": self.c[sl], "v": self.v[sl]}
-        idx = np.arange(self.head, self.head + cap) % cap
+        end = self.head + cap - (1 if closed_only else 0)
+        idx = np.arange(self.head, end) % cap
         return {"ts": self.ts[idx], "o": self.o[idx], "h": self.h[idx], "l": self.l[idx], "c": self.c[idx], "v": self.v[idx]}
 
     @property

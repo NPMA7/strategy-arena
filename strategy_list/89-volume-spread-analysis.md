@@ -73,17 +73,28 @@ Berikut adalah implementasi kode aktual yang saat ini berjalan di produksi (`ser
 ```python
 # Sumber aktual dari server/strategies.py untuk 'volume_spread_analysis':
 def volume_spread_analysis(s):
-    """Volume Spread Analysis (VSA): Wide spread + Volume Spike + Absorption Close."""
+    """Volume Spread Analysis (VSA): Wide Spread Momentum + Stopping Volume Climax."""
     i = s.i
-    c, o, h, l, atr, v, v_sma = s.c[i], s.o[i], s.h[i], s.l[i], s.atr14[i], s.v[i], s.vol_sma20[i]
+    c, o, h, l, atr, v, v_sma, e21 = (
+        s.c[i], s.o[i], s.h[i], s.l[i], s.atr14[i], s.v[i], s.vol_sma20[i], s.ema21[i]
+    )
     if not _ok(c, o, h, l, atr) or atr <= 0:
         return 0.0
     rng = h - l
-    vol_ok = True if (not _ok(v_sma) or v_sma <= 0) else (v > 1.15 * v_sma)
-    if rng > 1.5 * atr and vol_ok:
+    if rng <= 0:
+        return 0.0
+    has_vol = bool(_ok(v_sma) and v_sma > 0)
+    vol_ok = True if not has_vol else (v > 1.15 * v_sma)
+    if rng > 1.35 * atr and vol_ok:
         if (c - l) / rng >= 0.55 and c > o:
             return 0.80
         if (h - c) / rng >= 0.55 and c < o:
             return -0.80
+    # Stopping Volume Climax (volume spike tinggi + penolakan ekor kuat di sisi bawah/atas EMA21)
+    if has_vol and v > 1.45 * v_sma and _ok(e21):
+        if (c - l) / rng >= 0.62 and c <= e21:
+            return 0.78
+        if (h - c) / rng >= 0.62 and c >= e21:
+            return -0.78
     return 0.0
 ```

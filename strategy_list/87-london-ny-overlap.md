@@ -77,9 +77,9 @@ def london_ny_overlap(s):
         return 0.0
     hr = int((s.ts[s.i] // 3600000) % 24)
     if 12 <= hr <= 17:
-        if c > e9 > e21 and adx > 20 and c > o:
+        if c > e9 > e21 and adx > 18 and c > o:
             return 0.75
-        if c < e9 < e21 and adx > 20 and c < o:
+        if c < e9 < e21 and adx > 18 and c < o:
             return -0.75
     return 0.0
 ```

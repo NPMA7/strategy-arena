@@ -71,17 +71,22 @@ Berikut adalah implementasi kode aktual yang saat ini berjalan di produksi (`ser
 ```python
 # Sumber aktual dari server/strategies.py untuk 'pinbar_liquidity_reject':
 def pinbar_liquidity_reject(s):
-    """Pin Bar Rejection of Dynamic S/R (EMA21/50)."""
-    c, o, h, l, e21 = s.c[s.i], s.o[s.i], s.h[s.i], s.l[s.i], s.ema21[s.i]
-    if not _ok(c, o, h, l, e21):
+    """Pin Bar Liquidity Rejection pada EMA21 atau Swing High/Low (HH20/LL20)."""
+    i = s.i
+    if i < 22:
+        return 0.0
+    c, o, h, l, e21, ll, hh = s.c[i], s.o[i], s.h[i], s.l[i], s.ema21[i], s.ll20[i - 1], s.hh20[i - 1]
+    if not _ok(c, o, h, l, e21, ll, hh):
         return 0.0
     rng = max(h - l, 1e-9)
     body = abs(c - o)
-    if (min(o, c) - l) / rng >= 0.60 and body / rng <= 0.32:
-        if l < e21 and c >= e21 * 0.999:
+    lower_wick = min(o, c) - l
+    upper_wick = h - max(o, c)
+    if lower_wick / rng >= 0.55 and body / rng <= 0.35:
+        if (l <= e21 and c >= e21 * 0.999) or (l <= ll and c > ll):
             return 0.80
-    if (h - max(o, c)) / rng >= 0.60 and body / rng <= 0.32:
-        if h > e21 and c <= e21 * 1.001:
+    if upper_wick / rng >= 0.55 and body / rng <= 0.35:
+        if (h >= e21 and c <= e21 * 1.001) or (h >= hh and c < hh):
             return -0.80
     return 0.0
 ```

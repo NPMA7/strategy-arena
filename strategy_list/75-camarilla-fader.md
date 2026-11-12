@@ -74,13 +74,13 @@ Berikut adalah implementasi kode aktual yang saat ini berjalan di produksi (`ser
 ```python
 # Sumber aktual dari server/strategies.py untuk 'camarilla_fader':
 def camarilla_fader(s):
-    """Camarilla Pivot Points Multi-Confluence (H3/H4/L3/L4 dari blok 60-bar sebelumnya)."""
+    """Camarilla Pivot Points Multi-Confluence (L3/H3 Fade & L4/H4 Breakout dari blok 60-bar)."""
     i = s.i
     if i < 62 or not _ok(s.c[i], s.h[i], s.l[i], s.o[i]):
         return 0.0
-    prev_h = float(s.h[i - 61:i - 1].max())
-    prev_l = float(s.l[i - 61:i - 1].min())
-    prev_c = float(s.c[i - 2])
+    prev_h = float(s.h[i - 60:i].max())
+    prev_l = float(s.l[i - 60:i].min())
+    prev_c = float(s.c[i - 1])
     rng = prev_h - prev_l
     if rng <= 0:
         return 0.0
@@ -89,9 +89,19 @@ def camarilla_fader(s):
     l3 = prev_c - rng * 1.1 / 4.0
     l4 = prev_c - rng * 1.1 / 2.0
     c, o, h, l = s.c[i], s.o[i], s.h[i], s.l[i]
-    if l <= l3 and c > l3 and c > o and c > l4:
+    low2 = min(l, float(s.l[i - 1]))
+    high2 = max(h, float(s.h[i - 1]))
+    # Mean-reversion bounce L3/H3 (1 atau 2 bar retest & reclaim)
+    if low2 <= l3 and c > l3 and c > o and c > l4:
         return 0.75
-    if h >= h3 and c < h3 and c < o and c < h4:
+    if high2 >= h3 and c < h3 and c < o and c < h4:
         return -0.75
+    # Breakout H4/L4 dengan konfirmasi penutupan & EMA21
+    e21 = s.ema21[i]
+    if _ok(e21):
+        if prev_c <= h4 and c > h4 and c > o and c > e21:
+            return 0.80
+        if prev_c >= l4 and c < l4 and c < o and c < e21:
+            return -0.80
     return 0.0
 ```

@@ -71,13 +71,13 @@ Berikut adalah implementasi kode aktual yang saat ini berjalan di produksi (`ser
 ```python
 # Sumber aktual dari server/strategies.py untuk 'momentum_candle_burst':
 def momentum_candle_burst(s):
-    """Momentum Candle (Marubozu / Full-Body Range Expansion)."""
+    """Momentum Candle Expansion (Full-Body Range Expansion selaras EMA9)."""
     c, o, h, l, atr, e9 = s.c[s.i], s.o[s.i], s.h[s.i], s.l[s.i], s.atr14[s.i], s.ema9[s.i]
     if not _ok(c, o, h, l, atr, e9) or atr <= 0:
         return 0.0
     rng = h - l
     body = abs(c - o)
-    if rng > 1.5 * atr and body >= 0.75 * rng:
+    if rng > 1.35 * atr and body >= 0.68 * rng:
         if c > o and c > e9:
             return 0.85
         if c < o and c < e9:

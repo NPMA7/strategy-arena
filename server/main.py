@@ -149,17 +149,21 @@ async def on_trade(symbol: str, price: float, qty: float, ts_ms: float) -> None:
         ring = rings[symbol] = BarRing(offset_ms=(abs(hash(symbol)) % 60) * 1000)
     bar_closed = ring.on_trade(ts_ms, price, qty)
     if bar_closed:
-        views = ring.views()
-        snap = compute(views) if ring.n >= MIN_BARS else None
-        # Spot engine processes ALL crypto pairs
-        if spot_engine is not None and symbol not in forex_symbols:
-            spot_engine.on_bar_closed(symbol, views, price, snap=snap)
-        # Futures engine only processes futures-eligible crypto pairs
-        if futures_engine is not None and symbol in futures_symbols:
-            futures_engine.on_bar_closed(symbol, views, price, snap=snap)
-        # Forex engine processes forex pairs
-        if forex_engine is not None and symbol in forex_symbols:
-            forex_engine.on_bar_closed(symbol, views, price, snap=snap)
+        # Exclude the brand-new 1-tick forming bar so strategies inspect the completed candle OHLCV
+        views = ring.views(closed_only=True)
+        n_closed = len(views["c"])
+        snap = compute(views) if n_closed >= MIN_BARS else None
+        if snap is not None:
+            closed_close = float(views["c"][-1])
+            # Spot engine processes ALL crypto pairs
+            if spot_engine is not None and symbol not in forex_symbols:
+                spot_engine.on_bar_closed(symbol, views, closed_close, snap=snap)
+            # Futures engine only processes futures-eligible crypto pairs
+            if futures_engine is not None and symbol in futures_symbols:
+                futures_engine.on_bar_closed(symbol, views, closed_close, snap=snap)
+            # Forex engine processes forex pairs
+            if forex_engine is not None and symbol in forex_symbols:
+                forex_engine.on_bar_closed(symbol, views, closed_close, snap=snap)
     # Check stops on engines every tick
     if spot_engine is not None and symbol not in forex_symbols:
         spot_engine.check_stops(symbol, price)

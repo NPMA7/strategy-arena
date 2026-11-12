@@ -72,14 +72,23 @@ Berikut adalah implementasi kode aktual yang saat ini berjalan di produksi (`ser
 ```python
 # Sumber aktual dari server/strategies.py untuk 'economic_straddle':
 def economic_straddle(s):
-    """Economic Event Straddle & Volatility Rider."""
-    h, l, c, o, atr = s.h[s.i], s.l[s.i], s.c[s.i], s.o[s.i], s.atr14[s.i]
+    """Economic Event Straddle Breakout (konsolidasi sempit + ekspansi breakout atau news spike)."""
+    i = s.i
+    if i < 14:
+        return 0.0
+    h, l, c, o, atr = s.h[i], s.l[i], s.c[i], s.o[i], s.atr14[i]
     rng = h - l
     if not _ok(h, l, c, o, atr) or atr <= 0 or rng <= 0:
         return 0.0
-    if rng > 1.8 * atr and c > o + 0.5 * rng:
-        return 0.85
-    if rng > 1.8 * atr and c < o - 0.5 * rng:
-        return -0.85
+    box_h = float(s.h[i - 12:i].max())
+    box_l = float(s.l[i - 12:i].min())
+    box_tight = (box_h - box_l) <= 5.0 * atr
+    if box_tight and rng > 1.30 * atr and abs(c - o) >= 0.45 * rng:
+        if c > box_h and c > o:
+            return 0.85
+        if c < box_l and c < o:
+            return -0.85
+    if rng > 1.85 * atr and abs(c - o) >= 0.50 * rng:
+        return 0.85 if c > o else -0.85
     return 0.0
 ```

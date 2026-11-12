@@ -72,14 +72,21 @@ Berikut adalah implementasi kode aktual yang saat ini berjalan di produksi (`ser
 ```python
 # Sumber aktual dari server/strategies.py untuk 'smc_liquidity_sweep':
 def smc_liquidity_sweep(s):
-    """SMC Liquidity Sweep & Market Structure Shift (MSS)."""
-    c, o, h, l, hh, ll = s.c[s.i], s.o[s.i], s.h[s.i], s.l[s.i], s.hh20[s.i - 1], s.ll20[s.i - 1]
+    """SMC Liquidity Sweep & Market Structure Shift (MSS, 1-2 bar sweep)."""
+    i = s.i
+    if i < 22:
+        return 0.0
+    c, o, h, l, hh, ll = s.c[i], s.o[i], s.h[i], s.l[i], s.hh20[i - 1], s.ll20[i - 1]
     if not _ok(c, o, h, l, hh, ll):
         return 0.0
     rng = max(h - l, 1e-9)
-    if l < ll and c > ll and (min(o, c) - l) / rng >= 0.45:
+    if (l < ll and c > ll and (min(o, c) - l) / rng >= 0.40) or (
+        s.l[i - 1] < s.ll20[i - 2] and c > ll and c > o and c > s.h[i - 1]
+    ):
         return 0.85
-    if h > hh and c < hh and (h - max(o, c)) / rng >= 0.45:
+    if (h > hh and c < hh and (h - max(o, c)) / rng >= 0.40) or (
+        s.h[i - 1] > s.hh20[i - 2] and c < hh and c < o and c < s.l[i - 1]
+    ):
         return -0.85
     return 0.0
 ```

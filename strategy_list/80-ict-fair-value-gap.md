@@ -72,24 +72,23 @@ Berikut adalah implementasi kode aktual yang saat ini berjalan di produksi (`ser
 ```python
 # Sumber aktual dari server/strategies.py untuk 'ict_fair_value_gap':
 def ict_fair_value_gap(s):
-    """ICT Fair Value Gap (FVG) Imbalance 3-Candle Mitigation."""
+    """ICT Fair Value Gap (FVG) Imbalance 3-Candle Mitigation (scan 2..24 bar terakhir)."""
     i = s.i
     if i < 6:
         return 0.0
     c, o, h, l, atr = s.c[i], s.o[i], s.h[i], s.l[i], s.atr14[i]
     if not _ok(c, o, h, l, atr) or atr <= 0:
         return 0.0
-    for k in range(i - 1, max(i - 12, 2), -1):
+    for k in range(i - 1, max(i - 24, 2), -1):
         # Bullish 3-candle FVG: low[k] > high[k-2]
         gap_low, gap_high = s.h[k - 2], s.l[k]
-        if gap_high - gap_low >= 0.2 * atr:
-            # Pastikan gap belum terisi penuh sebelumnya
+        if gap_high - gap_low >= 0.15 * atr:
             filled = (k + 1 < i) and (float(s.l[k + 1:i].min()) <= gap_low)
             if not filled and l <= gap_high and c >= gap_low and c > o:
                 return 0.80
         # Bearish 3-candle FVG: high[k] < low[k-2]
         bgap_low, bgap_high = s.h[k], s.l[k - 2]
-        if bgap_high - bgap_low >= 0.2 * atr:
+        if bgap_high - bgap_low >= 0.15 * atr:
             filled = (k + 1 < i) and (float(s.h[k + 1:i].max()) >= bgap_high)
             if not filled and h >= bgap_low and c <= bgap_high and c < o:
                 return -0.80

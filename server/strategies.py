@@ -1049,13 +1049,13 @@ def atr_expansion(s):
 
 
 def gold_flash_spike(s):
-    """Flash-Spike Mean Reversion: Fade lonjakan > 1.8x ATR pada RSI ekstrem."""
+    """Flash-Spike Mean Reversion: Fade lonjakan > 1.6x ATR pada RSI ekstrem."""
     h, l, c, atr, rsi = s.h[s.i], s.l[s.i], s.c[s.i], s.atr14[s.i], s.rsi14[s.i]
     if not _ok(h, l, c, atr, rsi) or atr <= 0:
         return 0.0
-    if (h - l) > 1.8 * atr and c < (h + l) / 2 and rsi > 68:
+    if (h - l) > 1.6 * atr and c < (h + l) / 2 and rsi > 64:
         return -0.85
-    if (h - l) > 1.8 * atr and c > (h + l) / 2 and rsi < 32:
+    if (h - l) > 1.6 * atr and c > (h + l) / 2 and rsi < 36:
         return 0.85
     return 0.0
 
@@ -1163,13 +1163,13 @@ def hedging_grid(s):
 
 
 def camarilla_fader(s):
-    """Camarilla Pivot Points Multi-Confluence (H3/H4/L3/L4 dari blok 60-bar sebelumnya)."""
+    """Camarilla Pivot Points Multi-Confluence (L3/H3 Fade & L4/H4 Breakout dari blok 60-bar)."""
     i = s.i
     if i < 62 or not _ok(s.c[i], s.h[i], s.l[i], s.o[i]):
         return 0.0
-    prev_h = float(s.h[i - 61:i - 1].max())
-    prev_l = float(s.l[i - 61:i - 1].min())
-    prev_c = float(s.c[i - 2])
+    prev_h = float(s.h[i - 60:i].max())
+    prev_l = float(s.l[i - 60:i].min())
+    prev_c = float(s.c[i - 1])
     rng = prev_h - prev_l
     if rng <= 0:
         return 0.0
@@ -1178,22 +1178,40 @@ def camarilla_fader(s):
     l3 = prev_c - rng * 1.1 / 4.0
     l4 = prev_c - rng * 1.1 / 2.0
     c, o, h, l = s.c[i], s.o[i], s.h[i], s.l[i]
-    if l <= l3 and c > l3 and c > o and c > l4:
+    low2 = min(l, float(s.l[i - 1]))
+    high2 = max(h, float(s.h[i - 1]))
+    # Mean-reversion bounce L3/H3 (1 atau 2 bar retest & reclaim)
+    if low2 <= l3 and c > l3 and c > o and c > l4:
         return 0.75
-    if h >= h3 and c < h3 and c < o and c < h4:
+    if high2 >= h3 and c < h3 and c < o and c < h4:
         return -0.75
+    # Breakout H4/L4 dengan konfirmasi penutupan & EMA21
+    e21 = s.ema21[i]
+    if _ok(e21):
+        if prev_c <= h4 and c > h4 and c > o and c > e21:
+            return 0.80
+        if prev_c >= l4 and c < l4 and c < o and c < e21:
+            return -0.80
     return 0.0
 
 
 def orderflow_sweep(s):
-    """Support/Resistance Order Flow Imbalance."""
-    c, o, l, h, ll, hh, e9 = s.c[s.i], s.o[s.i], s.l[s.i], s.h[s.i], s.ll20[s.i - 1], s.hh20[s.i - 1], s.ema9[s.i]
+    """Order Flow Liquidity Sweep (1-2 bar sweep + reclaim + volume/wick absorption)."""
+    i = s.i
+    if i < 22:
+        return 0.0
+    c, o, l, h, ll, hh, e9 = s.c[i], s.o[i], s.l[i], s.h[i], s.ll20[i - 1], s.hh20[i - 1], s.ema9[i]
     if not _ok(c, o, l, h, ll, hh, e9):
         return 0.0
-    if l < ll and c > o and c > e9:
-        return 0.8
-    if h > hh and c < o and c < e9:
-        return -0.8
+    rng = max(h - l, 1e-12)
+    v, v_sma = s.v[i], s.vol_sma20[i]
+    vol_boost = True if (not _ok(v_sma) or v_sma <= 0) else (v >= 1.05 * v_sma)
+    swept_low = (l < ll) or (s.l[i - 1] < s.ll20[i - 2])
+    swept_high = (h > hh) or (s.h[i - 1] > s.hh20[i - 2])
+    if swept_low and c > ll and c > o and (c > e9 or vol_boost or (min(o, c) - l) / rng >= 0.35):
+        return 0.80
+    if swept_high and c < hh and c < o and (c < e9 or vol_boost or (h - max(o, c)) / rng >= 0.35):
+        return -0.80
     return 0.0
 
 
@@ -1210,61 +1228,70 @@ def carry_yield_momentum(s):
 
 
 def economic_straddle(s):
-    """Economic Event Straddle & Volatility Rider."""
-    h, l, c, o, atr = s.h[s.i], s.l[s.i], s.c[s.i], s.o[s.i], s.atr14[s.i]
+    """Economic Event Straddle Breakout (konsolidasi sempit + ekspansi breakout atau news spike)."""
+    i = s.i
+    if i < 14:
+        return 0.0
+    h, l, c, o, atr = s.h[i], s.l[i], s.c[i], s.o[i], s.atr14[i]
     rng = h - l
     if not _ok(h, l, c, o, atr) or atr <= 0 or rng <= 0:
         return 0.0
-    if rng > 1.8 * atr and c > o + 0.5 * rng:
-        return 0.85
-    if rng > 1.8 * atr and c < o - 0.5 * rng:
-        return -0.85
+    box_h = float(s.h[i - 12:i].max())
+    box_l = float(s.l[i - 12:i].min())
+    box_tight = (box_h - box_l) <= 5.0 * atr
+    if box_tight and rng > 1.30 * atr and abs(c - o) >= 0.45 * rng:
+        if c > box_h and c > o:
+            return 0.85
+        if c < box_l and c < o:
+            return -0.85
+    if rng > 1.85 * atr and abs(c - o) >= 0.50 * rng:
+        return 0.85 if c > o else -0.85
     return 0.0
 
 
 def smc_orderblock(s):
-    """Institutional Order Block Mitigation (SMC)."""
-    if s.i < 15:
+    """Institutional Order Block Mitigation (SMC, scan zona unmitigated 2..30 bar terakhir)."""
+    if s.i < 32:
         return 0.0
     c, o, h, l, atr = s.c[s.i], s.o[s.i], s.h[s.i], s.l[s.i], s.atr14[s.i]
     if not _ok(c, o, h, l, atr) or atr <= 0:
         return 0.0
-    for k in range(s.i - 2, max(s.i - 12, 1), -1):
-        if s.c[k] < s.o[k] and (s.c[k + 1] - s.c[k]) > 1.1 * atr:
+    rng = max(h - l, 1e-12)
+    for k in range(s.i - 2, max(s.i - 30, 1), -1):
+        if s.c[k] < s.o[k] and (s.c[k + 1] - s.c[k]) > 1.0 * atr:
             ob_high, ob_low = s.h[k], s.l[k]
             if float(s.l[k + 1:s.i].min()) < ob_low:
                 continue
-            if l <= ob_high and c >= ob_low and c > o:
+            if l <= ob_high and c >= ob_low and (c > o or (c - l) / rng >= 0.60):
                 return 0.80
-    for k in range(s.i - 2, max(s.i - 12, 1), -1):
-        if s.c[k] > s.o[k] and (s.c[k] - s.c[k + 1]) > 1.1 * atr:
+    for k in range(s.i - 2, max(s.i - 30, 1), -1):
+        if s.c[k] > s.o[k] and (s.c[k] - s.c[k + 1]) > 1.0 * atr:
             ob_high, ob_low = s.h[k], s.l[k]
             if float(s.h[k + 1:s.i].max()) > ob_high:
                 continue
-            if h >= ob_low and c <= ob_high and c < o:
+            if h >= ob_low and c <= ob_high and (c < o or (h - c) / rng >= 0.60):
                 return -0.80
     return 0.0
 
 
 def ict_fair_value_gap(s):
-    """ICT Fair Value Gap (FVG) Imbalance 3-Candle Mitigation."""
+    """ICT Fair Value Gap (FVG) Imbalance 3-Candle Mitigation (scan 2..24 bar terakhir)."""
     i = s.i
     if i < 6:
         return 0.0
     c, o, h, l, atr = s.c[i], s.o[i], s.h[i], s.l[i], s.atr14[i]
     if not _ok(c, o, h, l, atr) or atr <= 0:
         return 0.0
-    for k in range(i - 1, max(i - 12, 2), -1):
+    for k in range(i - 1, max(i - 24, 2), -1):
         # Bullish 3-candle FVG: low[k] > high[k-2]
         gap_low, gap_high = s.h[k - 2], s.l[k]
-        if gap_high - gap_low >= 0.2 * atr:
-            # Pastikan gap belum terisi penuh sebelumnya
+        if gap_high - gap_low >= 0.15 * atr:
             filled = (k + 1 < i) and (float(s.l[k + 1:i].min()) <= gap_low)
             if not filled and l <= gap_high and c >= gap_low and c > o:
                 return 0.80
         # Bearish 3-candle FVG: high[k] < low[k-2]
         bgap_low, bgap_high = s.h[k], s.l[k - 2]
-        if bgap_high - bgap_low >= 0.2 * atr:
+        if bgap_high - bgap_low >= 0.15 * atr:
             filled = (k + 1 < i) and (float(s.h[k + 1:i].max()) >= bgap_high)
             if not filled and h >= bgap_low and c <= bgap_high and c < o:
                 return -0.80
@@ -1272,25 +1299,32 @@ def ict_fair_value_gap(s):
 
 
 def smc_liquidity_sweep(s):
-    """SMC Liquidity Sweep & Market Structure Shift (MSS)."""
-    c, o, h, l, hh, ll = s.c[s.i], s.o[s.i], s.h[s.i], s.l[s.i], s.hh20[s.i - 1], s.ll20[s.i - 1]
+    """SMC Liquidity Sweep & Market Structure Shift (MSS, 1-2 bar sweep)."""
+    i = s.i
+    if i < 22:
+        return 0.0
+    c, o, h, l, hh, ll = s.c[i], s.o[i], s.h[i], s.l[i], s.hh20[i - 1], s.ll20[i - 1]
     if not _ok(c, o, h, l, hh, ll):
         return 0.0
     rng = max(h - l, 1e-9)
-    if l < ll and c > ll and (min(o, c) - l) / rng >= 0.45:
+    if (l < ll and c > ll and (min(o, c) - l) / rng >= 0.40) or (
+        s.l[i - 1] < s.ll20[i - 2] and c > ll and c > o and c > s.h[i - 1]
+    ):
         return 0.85
-    if h > hh and c < hh and (h - max(o, c)) / rng >= 0.45:
+    if (h > hh and c < hh and (h - max(o, c)) / rng >= 0.40) or (
+        s.h[i - 1] > s.hh20[i - 2] and c < hh and c < o and c < s.l[i - 1]
+    ):
         return -0.85
     return 0.0
 
 
 def ict_optimal_trade_entry(s):
-    """ICT Optimal Trade Entry (OTE 62% - 79% Retracement)."""
-    c, o, hh, ll, e21, e50 = s.c[s.i], s.o[s.i], s.hh20[s.i], s.ll20[s.i], s.ema21[s.i], s.ema50[s.i]
-    if not _ok(c, o, hh, ll, e21, e50):
+    """ICT Optimal Trade Entry (OTE 58% - 80% Retracement pada swing >= 1.5 ATR)."""
+    c, o, hh, ll, e21, e50, atr = s.c[s.i], s.o[s.i], s.hh20[s.i], s.ll20[s.i], s.ema21[s.i], s.ema50[s.i], s.atr14[s.i]
+    if not _ok(c, o, hh, ll, e21, e50, atr) or atr <= 0:
         return 0.0
     rng = hh - ll
-    if rng <= 0:
+    if rng < 1.5 * atr:
         return 0.0
     if e21 > e50 and c > o:
         depth = (hh - c) / rng
@@ -1304,13 +1338,13 @@ def ict_optimal_trade_entry(s):
 
 
 def momentum_candle_burst(s):
-    """Momentum Candle (Marubozu / Full-Body Range Expansion)."""
+    """Momentum Candle Expansion (Full-Body Range Expansion selaras EMA9)."""
     c, o, h, l, atr, e9 = s.c[s.i], s.o[s.i], s.h[s.i], s.l[s.i], s.atr14[s.i], s.ema9[s.i]
     if not _ok(c, o, h, l, atr, e9) or atr <= 0:
         return 0.0
     rng = h - l
     body = abs(c - o)
-    if rng > 1.5 * atr and body >= 0.75 * rng:
+    if rng > 1.35 * atr and body >= 0.68 * rng:
         if c > o and c > e9:
             return 0.85
         if c < o and c < e9:
@@ -1468,18 +1502,8 @@ def mc_fibo_retest(s):
     return 0.0
 
 
-def three_line_strike(s):
-    """Three Line Strike Price Action Reversal."""
-    if s.i < 4:
-        return 0.0
-    c0, o0 = s.c[s.i], s.o[s.i]
-    c1, o1 = s.c[s.i - 1], s.o[s.i - 1]
-    c2, o2 = s.c[s.i - 2], s.o[s.i - 2]
-    c3, o3 = s.c[s.i - 3], s.o[s.i - 3]
-    atr = s.atr14[s.i]
-    if not _ok(c0, o0, c1, o1, c2, o2, c3, o3, atr):
-        return 0.0
-    tol = max(0.0, 0.08 * atr)
+def _eval_three_line_strike(o3, c3, o2, c2, o1, c1, o0, c0, tol: float) -> float:
+    """Evaluasi pola Three Line Strike pada 4 bar OHLC berurutan."""
     if c3 < o3 and c2 < o2 and c1 < o1 and c1 < c2 < c3:
         if c0 > o0 and c0 > o3 and o0 <= c1 + tol:
             return 0.85
@@ -1489,18 +1513,62 @@ def three_line_strike(s):
     return 0.0
 
 
+def three_line_strike(s):
+    """Three Line Strike Price Action Reversal (M1 + konfirmasi M5 completed bars)."""
+    if s.i < 4:
+        return 0.0
+    atr = s.atr14[s.i]
+    if not _ok(s.c[s.i], s.o[s.i], atr):
+        return 0.0
+    tol = max(0.0, 0.08 * atr)
+    sc = _eval_three_line_strike(
+        s.o[s.i - 3], s.c[s.i - 3],
+        s.o[s.i - 2], s.c[s.i - 2],
+        s.o[s.i - 1], s.c[s.i - 1],
+        s.o[s.i], s.c[s.i],
+        tol,
+    )
+    if sc != 0.0:
+        return sc
+
+    # Evaluasi juga pada candle M5 tertutup terbaru (ambil ~30 bar M1 terakhir agar tetap cepat)
+    if s.i >= 24:
+        import numpy as np
+        lo_ix = max(0, s.i - 29)
+        ts_sub = s.ts[lo_ix:s.i + 1].astype(np.int64)
+        b5 = ts_sub // 300_000
+        cur_b = int(b5[-1])
+        cur_done = (((int(ts_sub[-1]) // 60_000) + 1) % 5) == 0
+        bars_5m = []
+        for k in np.unique(b5):
+            if int(k) == cur_b and not cur_done:
+                continue
+            ix = np.flatnonzero(b5 == k)
+            if ix.size >= 3:
+                bars_5m.append((float(s.o[lo_ix + ix[0]]), float(s.c[lo_ix + ix[-1]])))
+        if len(bars_5m) >= 4:
+            (o3, c3), (o2, c2), (o1, c1), (o0, c0) = bars_5m[-4:]
+            return _eval_three_line_strike(o3, c3, o2, c2, o1, c1, o0, c0, tol * 2.0)
+    return 0.0
+
+
 def pinbar_liquidity_reject(s):
-    """Pin Bar Rejection of Dynamic S/R (EMA21/50)."""
-    c, o, h, l, e21 = s.c[s.i], s.o[s.i], s.h[s.i], s.l[s.i], s.ema21[s.i]
-    if not _ok(c, o, h, l, e21):
+    """Pin Bar Liquidity Rejection pada EMA21 atau Swing High/Low (HH20/LL20)."""
+    i = s.i
+    if i < 22:
+        return 0.0
+    c, o, h, l, e21, ll, hh = s.c[i], s.o[i], s.h[i], s.l[i], s.ema21[i], s.ll20[i - 1], s.hh20[i - 1]
+    if not _ok(c, o, h, l, e21, ll, hh):
         return 0.0
     rng = max(h - l, 1e-9)
     body = abs(c - o)
-    if (min(o, c) - l) / rng >= 0.60 and body / rng <= 0.32:
-        if l < e21 and c >= e21 * 0.999:
+    lower_wick = min(o, c) - l
+    upper_wick = h - max(o, c)
+    if lower_wick / rng >= 0.55 and body / rng <= 0.35:
+        if (l <= e21 and c >= e21 * 0.999) or (l <= ll and c > ll):
             return 0.80
-    if (h - max(o, c)) / rng >= 0.60 and body / rng <= 0.32:
-        if h > e21 and c <= e21 * 1.001:
+    if upper_wick / rng >= 0.55 and body / rng <= 0.35:
+        if (h >= e21 and c <= e21 * 1.001) or (h >= hh and c < hh):
             return -0.80
     return 0.0
 
@@ -1512,51 +1580,63 @@ def london_ny_overlap(s):
         return 0.0
     hr = int((s.ts[s.i] // 3600000) % 24)
     if 12 <= hr <= 17:
-        if c > e9 > e21 and adx > 20 and c > o:
+        if c > e9 > e21 and adx > 18 and c > o:
             return 0.75
-        if c < e9 < e21 and adx > 20 and c < o:
+        if c < e9 < e21 and adx > 18 and c < o:
             return -0.75
     return 0.0
 
 
 def supply_demand_zone(s):
-    """Institutional Supply & Demand Imbalance Retest (scan 2..10 bar terakhir)."""
-    if s.i < 12:
+    """Institutional Supply & Demand Imbalance Retest (scan zona segar 2..30 bar terakhir)."""
+    if s.i < 32:
         return 0.0
     c, o, h, l, atr = s.c[s.i], s.o[s.i], s.h[s.i], s.l[s.i], s.atr14[s.i]
     if not _ok(c, o, h, l, atr) or atr <= 0:
         return 0.0
-    for k in range(s.i - 2, max(s.i - 10, 1), -1):
+    rng = max(h - l, 1e-12)
+    for k in range(s.i - 2, max(s.i - 30, 1), -1):
         base_h, base_l = s.h[k], s.l[k]
-        if (base_h - base_l) >= 0.9 * atr:
+        if (base_h - base_l) >= 1.0 * atr:
             continue
         impulse = s.c[k + 1] - s.o[k + 1]
         # Demand Zone: base sempit + rally impulsif + belum jebol ke bawah base_l
-        if impulse > 1.0 * atr:
+        if impulse > 0.95 * atr:
             invalid = (k + 2 <= s.i - 1) and (float(s.l[k + 2:s.i].min()) < base_l)
-            if not invalid and l <= base_h and c >= base_l and c > o:
+            if not invalid and l <= base_h and c >= base_l and (c > o or (c - l) / rng >= 0.60):
                 return 0.80
         # Supply Zone: base sempit + drop impulsif + belum jebol ke atas base_h
-        if -impulse > 1.0 * atr:
+        if -impulse > 0.95 * atr:
             invalid = (k + 2 <= s.i - 1) and (float(s.h[k + 2:s.i].max()) > base_h)
-            if not invalid and h >= base_l and c <= base_h and c < o:
+            if not invalid and h >= base_l and c <= base_h and (c < o or (h - c) / rng >= 0.60):
                 return -0.80
     return 0.0
 
 
 def volume_spread_analysis(s):
-    """Volume Spread Analysis (VSA): Wide spread + Volume Spike + Absorption Close."""
+    """Volume Spread Analysis (VSA): Wide Spread Momentum + Stopping Volume Climax."""
     i = s.i
-    c, o, h, l, atr, v, v_sma = s.c[i], s.o[i], s.h[i], s.l[i], s.atr14[i], s.v[i], s.vol_sma20[i]
+    c, o, h, l, atr, v, v_sma, e21 = (
+        s.c[i], s.o[i], s.h[i], s.l[i], s.atr14[i], s.v[i], s.vol_sma20[i], s.ema21[i]
+    )
     if not _ok(c, o, h, l, atr) or atr <= 0:
         return 0.0
     rng = h - l
-    vol_ok = True if (not _ok(v_sma) or v_sma <= 0) else (v > 1.15 * v_sma)
-    if rng > 1.5 * atr and vol_ok:
+    if rng <= 0:
+        return 0.0
+    has_vol = bool(_ok(v_sma) and v_sma > 0)
+    vol_ok = True if not has_vol else (v > 1.15 * v_sma)
+    if rng > 1.35 * atr and vol_ok:
         if (c - l) / rng >= 0.55 and c > o:
             return 0.80
         if (h - c) / rng >= 0.55 and c < o:
             return -0.80
+    # Stopping Volume Climax (volume spike tinggi + penolakan ekor kuat di sisi bawah/atas EMA21)
+    if has_vol and v > 1.45 * v_sma and _ok(e21):
+        if (c - l) / rng >= 0.62 and c <= e21:
+            return 0.78
+        if (h - c) / rng >= 0.62 and c >= e21:
+            return -0.78
     return 0.0
 
 

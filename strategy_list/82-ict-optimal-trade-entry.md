@@ -71,12 +71,12 @@ Berikut adalah implementasi kode aktual yang saat ini berjalan di produksi (`ser
 ```python
 # Sumber aktual dari server/strategies.py untuk 'ict_optimal_trade_entry':
 def ict_optimal_trade_entry(s):
-    """ICT Optimal Trade Entry (OTE 62% - 79% Retracement)."""
-    c, o, hh, ll, e21, e50 = s.c[s.i], s.o[s.i], s.hh20[s.i], s.ll20[s.i], s.ema21[s.i], s.ema50[s.i]
-    if not _ok(c, o, hh, ll, e21, e50):
+    """ICT Optimal Trade Entry (OTE 58% - 80% Retracement pada swing >= 1.5 ATR)."""
+    c, o, hh, ll, e21, e50, atr = s.c[s.i], s.o[s.i], s.hh20[s.i], s.ll20[s.i], s.ema21[s.i], s.ema50[s.i], s.atr14[s.i]
+    if not _ok(c, o, hh, ll, e21, e50, atr) or atr <= 0:
         return 0.0
     rng = hh - ll
-    if rng <= 0:
+    if rng < 1.5 * atr:
         return 0.0
     if e21 > e50 and c > o:
         depth = (hh - c) / rng

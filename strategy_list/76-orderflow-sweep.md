@@ -71,13 +71,21 @@ Berikut adalah implementasi kode aktual yang saat ini berjalan di produksi (`ser
 ```python
 # Sumber aktual dari server/strategies.py untuk 'orderflow_sweep':
 def orderflow_sweep(s):
-    """Support/Resistance Order Flow Imbalance."""
-    c, o, l, h, ll, hh, e9 = s.c[s.i], s.o[s.i], s.l[s.i], s.h[s.i], s.ll20[s.i - 1], s.hh20[s.i - 1], s.ema9[s.i]
+    """Order Flow Liquidity Sweep (1-2 bar sweep + reclaim + volume/wick absorption)."""
+    i = s.i
+    if i < 22:
+        return 0.0
+    c, o, l, h, ll, hh, e9 = s.c[i], s.o[i], s.l[i], s.h[i], s.ll20[i - 1], s.hh20[i - 1], s.ema9[i]
     if not _ok(c, o, l, h, ll, hh, e9):
         return 0.0
-    if l < ll and c > o and c > e9:
-        return 0.8
-    if h > hh and c < o and c < e9:
-        return -0.8
+    rng = max(h - l, 1e-12)
+    v, v_sma = s.v[i], s.vol_sma20[i]
+    vol_boost = True if (not _ok(v_sma) or v_sma <= 0) else (v >= 1.05 * v_sma)
+    swept_low = (l < ll) or (s.l[i - 1] < s.ll20[i - 2])
+    swept_high = (h > hh) or (s.h[i - 1] > s.hh20[i - 2])
+    if swept_low and c > ll and c > o and (c > e9 or vol_boost or (min(o, c) - l) / rng >= 0.35):
+        return 0.80
+    if swept_high and c < hh and c < o and (c < e9 or vol_boost or (h - max(o, c)) / rng >= 0.35):
+        return -0.80
     return 0.0
 ```

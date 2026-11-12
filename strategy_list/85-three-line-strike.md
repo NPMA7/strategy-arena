@@ -71,23 +71,52 @@ Berikut adalah implementasi kode aktual yang saat ini berjalan di produksi (`ser
 
 ```python
 # Sumber aktual dari server/strategies.py untuk 'three_line_strike':
-def three_line_strike(s):
-    """Three Line Strike Price Action Reversal."""
-    if s.i < 4:
-        return 0.0
-    c0, o0 = s.c[s.i], s.o[s.i]
-    c1, o1 = s.c[s.i - 1], s.o[s.i - 1]
-    c2, o2 = s.c[s.i - 2], s.o[s.i - 2]
-    c3, o3 = s.c[s.i - 3], s.o[s.i - 3]
-    atr = s.atr14[s.i]
-    if not _ok(c0, o0, c1, o1, c2, o2, c3, o3, atr):
-        return 0.0
-    tol = max(0.0, 0.08 * atr)
+def _eval_three_line_strike(o3, c3, o2, c2, o1, c1, o0, c0, tol: float) -> float:
+    """Evaluasi pola Three Line Strike pada 4 bar OHLC berurutan."""
     if c3 < o3 and c2 < o2 and c1 < o1 and c1 < c2 < c3:
         if c0 > o0 and c0 > o3 and o0 <= c1 + tol:
             return 0.85
     if c3 > o3 and c2 > o2 and c1 > o1 and c1 > c2 > c3:
         if c0 < o0 and c0 < o3 and o0 >= c1 - tol:
             return -0.85
+    return 0.0
+
+
+def three_line_strike(s):
+    """Three Line Strike Price Action Reversal (M1 + konfirmasi M5 completed bars)."""
+    if s.i < 4:
+        return 0.0
+    atr = s.atr14[s.i]
+    if not _ok(s.c[s.i], s.o[s.i], atr):
+        return 0.0
+    tol = max(0.0, 0.08 * atr)
+    sc = _eval_three_line_strike(
+        s.o[s.i - 3], s.c[s.i - 3],
+        s.o[s.i - 2], s.c[s.i - 2],
+        s.o[s.i - 1], s.c[s.i - 1],
+        s.o[s.i], s.c[s.i],
+        tol,
+    )
+    if sc != 0.0:
+        return sc
+
+    # Evaluasi juga pada candle M5 tertutup terbaru (ambil ~30 bar M1 terakhir agar tetap cepat)
+    if s.i >= 24:
+        import numpy as np
+        lo_ix = max(0, s.i - 29)
+        ts_sub = s.ts[lo_ix:s.i + 1].astype(np.int64)
+        b5 = ts_sub // 300_000
+        cur_b = int(b5[-1])
+        cur_done = (((int(ts_sub[-1]) // 60_000) + 1) % 5) == 0
+        bars_5m = []
+        for k in np.unique(b5):
+            if int(k) == cur_b and not cur_done:
+                continue
+            ix = np.flatnonzero(b5 == k)
+            if ix.size >= 3:
+                bars_5m.append((float(s.o[lo_ix + ix[0]]), float(s.c[lo_ix + ix[-1]])))
+        if len(bars_5m) >= 4:
+            (o3, c3), (o2, c2), (o1, c1), (o0, c0) = bars_5m[-4:]
+            return _eval_three_line_strike(o3, c3, o2, c2, o1, c1, o0, c0, tol * 2.0)
     return 0.0
 ```

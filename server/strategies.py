@@ -1319,11 +1319,12 @@ def momentum_candle_burst(s):
 
 
 def mc_fibo_retest(s):
-    """M15 Momentum Candle + M30/H1 alignment + Fibonacci [0.236..0.786] retest zones.
+    """M15 Momentum Candle + M30 confirmation + Fibonacci [0.236..0.786] retest zones.
 
     Strict specs:
     - Forex mode: XAUUSD only. Spot/Futures: all pairs.
-    - Completed M15/M30/H1 bars only (no mid-candle repainting).
+    - Completed M15 & M30 bars only (no mid-candle repainting; no H1 required).
+    - M30 confirms via trend alignment OR even a single long directional candle.
     - Asia (00-07 UTC) & New York (12-21 UTC) sessions only.
     - Anchors: wick/body extreme for 1.0 (SL) & 0.0, TP = -0.27.
     - Fires ONLY when price genuinely retests inside [0.236, 0.786] without invalidation.
@@ -1371,29 +1372,43 @@ def mc_fibo_retest(s):
 
     m15 = aggregate_closed(15)
     m30 = aggregate_closed(30)
-    h1 = aggregate_closed(60)
-    if len(m15) < 16 or len(m30) < 6 or len(h1) < 4:
+    if len(m15) < 16 or len(m30) < 1:
         return 0.0
 
-    def direction(bars):
-        closes = np.array([x[5] for x in bars], dtype=float)
-        fast = float(closes[-min(5, len(closes)):].mean())
-        slow = float(closes[-min(20, len(closes)):].mean())
-        if slow <= 0 or abs(fast - slow) / slow < 0.00008:
-            return 0
-        _, _, bo, bh, bl, bc = bars[-1]
-        body_ratio = abs(bc - bo) / max(bh - bl, 1e-12)
-        if body_ratio < 0.35:
-            return 0
-        if bc > bo and fast > slow:
-            return 1
-        if bc < bo and fast < slow:
-            return -1
-        return 0
+    def m30_confirms(target_dir: int, pre_aligned: bool) -> bool:
+        """Konfirmasi M30: 1 candle panjang searah ATAU trend SMA5/SMA20 + close searah."""
+        _, _, bo, bh, bl, bc = m30[-1]
+        m30_rng = bh - bl
+        if m30_rng <= 0:
+            return False
+        body = bc - bo
+        if (target_dir > 0 and body <= 0) or (target_dir < 0 and body >= 0):
+            return False
+        body_ratio = abs(body) / m30_rng
 
-    h1_dir, m30_dir = direction(h1), direction(m30)
-    if not h1_dir or h1_dir != m30_dir:
-        return 0.0
+        # 1. Single long directional M30 candle ("satu candle panjang saja")
+        prior_m30 = m30[-15:-1]
+        if not prior_m30:
+            if body_ratio >= 0.45:
+                return True
+        else:
+            avg_rng = float(np.mean([x[3] - x[4] for x in prior_m30]))
+            if body_ratio >= 0.45 and avg_rng > 0 and m30_rng >= 1.1 * avg_rng:
+                return True
+            if pre_aligned and body_ratio >= 0.35 and avg_rng > 0 and m30_rng >= 0.85 * avg_rng:
+                return True
+
+        # 2. M30 trend alignment fallback (SMA5 vs SMA20 + directional close)
+        if len(m30) >= 5 and body_ratio >= 0.35:
+            closes = np.array([x[5] for x in m30], dtype=float)
+            fast = float(closes[-min(5, len(closes)):].mean())
+            slow = float(closes[-min(20, len(closes)):].mean())
+            if slow > 0 and abs(fast - slow) / slow >= 0.00008:
+                if target_dir > 0 and fast > slow:
+                    return True
+                if target_dir < 0 and fast < slow:
+                    return True
+        return False
 
     px_now = float(c_a[-1])
     m1_m15_bucket = ts_a // (15 * 60_000)
@@ -1406,10 +1421,18 @@ def mc_fibo_retest(s):
         body = abs(c_mc - o_mc)
         if rng <= 0 or atr14 <= 0 or body / rng < 0.65 or rng < 1.5 * atr14:
             continue
-        if (h1_dir > 0 and c_mc <= o_mc) or (h1_dir < 0 and c_mc >= o_mc):
+
+        mc_dir = 1 if c_mc > o_mc else (-1 if c_mc < o_mc else 0)
+        if not mc_dir:
             continue
 
-        if h1_dir > 0:
+        _, _, o_prev, _, _, c_prev = m15[idx_mc - 1]
+        pre_aligned = (mc_dir > 0 and c_prev > o_prev) or (mc_dir < 0 and c_prev < o_prev)
+        if not m30_confirms(mc_dir, pre_aligned):
+            continue
+
+        sig_mag = 0.95 if pre_aligned else 0.9
+        if mc_dir > 0:
             origin = l_mc if l_mc < o_mc else o_mc
             terminal = h_mc if h_mc > c_mc else c_mc
             delta = abs(terminal - origin)
@@ -1424,7 +1447,7 @@ def mc_fibo_retest(s):
                     continue
             if fibo_786 <= px_now <= fibo_236 and px_now > origin:
                 s.custom_sl_tp = (origin, tp_neg_027)
-                return 0.9
+                return sig_mag
         else:
             origin = h_mc if h_mc > o_mc else o_mc
             terminal = l_mc if l_mc < c_mc else c_mc
@@ -1440,7 +1463,7 @@ def mc_fibo_retest(s):
                     continue
             if fibo_236 <= px_now <= fibo_786 and px_now < origin:
                 s.custom_sl_tp = (origin, tp_neg_027)
-                return -0.9
+                return -sig_mag
 
     return 0.0
 
